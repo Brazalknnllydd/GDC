@@ -27,6 +27,9 @@ export default function RootLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="admin" />
+      <Stack.Screen name="admin-products" />
+      <Stack.Screen name="admin-settings" />
     </Stack>
   );
 }
