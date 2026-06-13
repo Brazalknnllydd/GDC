@@ -1,14 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MoreVertical, Package, Pencil } from 'lucide-react-native';
+import { Pencil, Trash2 } from 'lucide-react-native';
 
-import { colors, fonts } from '../../constants/theme';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 import { SurfaceCard } from './surface-card';
 
 type ProductListItemProps = {
   category: string;
-  emoji: string;
   low?: boolean;
   name: string;
+  onDelete?: () => void;
+  onEdit?: () => void;
   price: string;
   sku: string;
   unitsText: string;
@@ -16,9 +17,10 @@ type ProductListItemProps = {
 
 export function ProductListItem({
   category,
-  emoji,
   low = false,
   name,
+  onDelete,
+  onEdit,
   price,
   sku,
   unitsText,
@@ -26,20 +28,17 @@ export function ProductListItem({
   return (
     <SurfaceCard style={styles.card}>
       <View style={styles.thumb}>
-        <Text style={styles.thumbEmoji}>{emoji}</Text>
-        {low && (
+        <Text style={styles.thumbGlyph}>PKG</Text>
+        {low ? (
           <View style={styles.lowBadge}>
             <Text style={styles.lowBadgeText}>LOW</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.body}>
         <View style={styles.topRow}>
           <Text style={styles.name}>{name}</Text>
-          <Pressable style={styles.moreButton}>
-            <MoreVertical color="#6A6F82" size={18} strokeWidth={2} />
-          </Pressable>
         </View>
 
         <Text style={styles.meta}>
@@ -49,10 +48,16 @@ export function ProductListItem({
 
         <View style={styles.bottomRow}>
           <Text style={styles.price}>{price}</Text>
-          <Pressable style={styles.editButton}>
-            <Pencil color={colors.secondary} size={16} strokeWidth={2.2} />
-            <Text style={styles.editText}>Edit</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            <Pressable onPress={onDelete} style={styles.deleteButton}>
+              <Trash2 color="#B3261E" size={16} strokeWidth={2.1} />
+              <Text style={styles.deleteText}>Delete</Text>
+            </Pressable>
+            <Pressable onPress={onEdit} style={styles.editButton}>
+              <Pencil color={colors.secondary} size={16} strokeWidth={2.2} />
+              <Text style={styles.editText}>Edit</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </SurfaceCard>
@@ -75,8 +80,11 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 112,
   },
-  thumbEmoji: {
-    fontSize: 54,
+  thumbGlyph: {
+    color: '#FFFFFF',
+    ...textRoles.value,
+    fontSize: 24,
+    letterSpacing: 2,
   },
   lowBadge: {
     backgroundColor: '#E3342F',
@@ -89,7 +97,7 @@ const styles = StyleSheet.create({
   },
   lowBadgeText: {
     color: '#FFFFFF',
-    fontFamily: fonts.bold,
+    ...textRoles.label,
     fontSize: 10,
   },
   body: {
@@ -104,32 +112,26 @@ const styles = StyleSheet.create({
   name: {
     color: '#1A1D26',
     flex: 1,
-    fontFamily: fonts.medium,
+    ...textRoles.value,
     fontSize: 20,
     marginRight: 8,
   },
-  moreButton: {
-    paddingTop: 2,
-  },
   meta: {
     color: '#3E4453',
-    fontFamily: fonts.regular,
-    fontSize: 12,
+    ...textRoles.label,
     marginTop: 6,
   },
   category: {
     color: colors.secondary,
-    fontFamily: fonts.medium,
+    ...textRoles.label,
   },
   units: {
     color: '#3E4453',
-    fontFamily: fonts.regular,
-    fontSize: 12,
+    ...textRoles.label,
     marginTop: 6,
   },
   unitsLow: {
     color: '#D11D1D',
-    fontFamily: fonts.medium,
   },
   bottomRow: {
     alignItems: 'center',
@@ -137,10 +139,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 12,
   },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   price: {
     color: colors.secondary,
-    fontFamily: fonts.bold,
+    ...textRoles.value,
     fontSize: 20,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    borderColor: '#E3B6B2',
+    borderRadius: 14,
+    borderWidth: 1.4,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 14,
+  },
+  deleteText: {
+    color: '#B3261E',
+    ...textRoles.label,
+    fontSize: textSizes.medium,
+    marginLeft: 8,
   },
   editButton: {
     alignItems: 'center',
@@ -154,8 +176,8 @@ const styles = StyleSheet.create({
   },
   editText: {
     color: colors.secondary,
-    fontFamily: fonts.medium,
-    fontSize: 16,
+    ...textRoles.label,
+    fontSize: textSizes.medium,
     marginLeft: 8,
   },
 });

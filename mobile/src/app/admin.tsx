@@ -1,9 +1,7 @@
 import { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   BarChart3,
-  Bell,
   FileText,
   LayoutDashboard,
   Package,
@@ -16,8 +14,11 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { colors, fonts } from '../constants/theme';
-import { AdminBottomNav } from '../components/ui/admin-bottom-nav';
+import { layout, radius, shadows, spacing } from '../constants/design-system';
+import { colors, textRoles, textSizes } from '../constants/theme';
+import { AdminMetricCard } from '../components/ui/admin-metric-card';
+import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
+import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { SectionHeading } from '../components/ui/section-heading';
 import { SurfaceCard } from '../components/ui/surface-card';
 
@@ -29,7 +30,7 @@ const summaryCards = [
 ];
 
 const actions = [
-  { label: 'New Sale', icon: ShoppingCart },
+  { label: 'New Sale', icon: ShoppingCart, route: '/admin-sales' as const },
   { label: 'Products', icon: Package, route: '/admin-products' as const },
   { label: 'Inventory', icon: Warehouse },
   { label: 'Reports', icon: BarChart3 },
@@ -55,7 +56,7 @@ const transactions = [
 const tabs = [
   { label: 'Dashboard', icon: LayoutDashboard, active: true, route: '/admin' as const },
   { label: 'Products', icon: Package, active: false, route: '/admin-products' as const },
-  { label: 'Sales', icon: ReceiptText, active: false },
+  { label: 'Sales', icon: ReceiptText, active: false, route: '/admin-sales' as const },
   { label: 'Reports', icon: BarChart3, active: false },
   { label: 'Settings', icon: Settings, active: false, route: '/admin-settings' as const },
 ];
@@ -73,240 +74,147 @@ export default function AdminScreen() {
   }, [params.name]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.page}>
-        <View style={styles.header}>
-          <View style={styles.headerIdentity}>
-            <Image
-              source={require('../../assets/images/logo.jpg')}
-              style={styles.avatar}
-              resizeMode="cover"
-            />
-            <Text style={styles.headerTitle}>Good Morning, {displayName}</Text>
-          </View>
-
-          <Pressable style={styles.bellButton}>
-            <Bell color="#383B4F" size={24} strokeWidth={1.9} />
-          </Pressable>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.summaryGrid}>
-            {summaryCards.map((card) => (
-              <SurfaceCard key={card.title} style={styles.metricCard}>
-                <Text style={styles.metricTitle}>{card.title}</Text>
-                <Text style={styles.metricValue}>{card.value}</Text>
-                <Text
-                  style={[
-                    styles.metricDetail,
-                    card.tone === 'up' ? styles.metricDetailUp : styles.metricDetailNeutral,
-                  ]}>
-                  {card.detail}
-                </Text>
-              </SurfaceCard>
-            ))}
-          </View>
-
-          <SectionHeading style={styles.sectionLabel}>QUICK ACTIONS</SectionHeading>
-          <View style={styles.actionsGrid}>
-            {actions.map((action) => {
-              const Icon = action.icon;
-
-              return (
-                <Pressable
-                  key={action.label}
-                  onPress={() => action.route && router.push(action.route)}
-                  style={styles.actionCard}>
-                  <Icon color={colors.secondary} size={31} strokeWidth={1.9} />
-                  <Text style={styles.actionLabel}>{action.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <SurfaceCard style={styles.revenueCard}>
-            <View style={styles.revenueHeader}>
-              <Text style={styles.revenueTitle}>Weekly Revenue</Text>
-              <View style={styles.periodPill}>
-                <Text style={styles.periodText}>LAST 7 DAYS</Text>
-              </View>
-            </View>
-
-            <View style={styles.chartArea}>
-              {revenueBars.map((bar) => (
-                <View key={bar.day} style={styles.chartColumn}>
-                  <View
-                    style={[
-                      styles.chartBar,
-                      {
-                        height: bar.height,
-                        backgroundColor: bar.active ? colors.secondary : '#ECECEF',
-                      },
-                    ]}
-                  />
-                  <Text style={styles.chartLabel}>{bar.day}</Text>
-                </View>
-              ))}
-            </View>
-          </SurfaceCard>
-
-          <View style={styles.transactionsHeader}>
-            <SectionHeading style={styles.sectionLabel}>RECENT TRANSACTIONS</SectionHeading>
-            <Pressable>
-              <Text style={styles.viewAllText}>View All</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.transactionsList}>
-            {transactions.map((transaction) => (
-              <SurfaceCard key={transaction.id} style={styles.transactionCard}>
-                <View style={styles.receiptBadge}>
-                  <FileText color={colors.secondary} size={25} strokeWidth={1.9} />
-                </View>
-
-                <View style={styles.transactionBody}>
-                  <View>
-                    <Text style={styles.transactionTitle}>Sale #{transaction.id}</Text>
-                    <Text style={styles.transactionMeta}>
-                      {transaction.method} | {transaction.time}
-                    </Text>
-                  </View>
-
-                  <View style={styles.transactionAmountWrap}>
-                    <Text style={styles.transactionAmount}>{transaction.amount}</Text>
-                    <View style={styles.statusPill}>
-                      <Text style={styles.statusText}>{transaction.status}</Text>
-                    </View>
-                  </View>
-                </View>
-              </SurfaceCard>
-            ))}
-          </View>
-        </ScrollView>
-
+    <AdminPageScreen
+      title="Dashboard"
+      introDescription={`Good morning, ${displayName}. Here's today's business snapshot.`}
+      bottomNavItems={tabs}
+      floatingContent={
         <Pressable style={styles.fab}>
           <Plus color="#FFFFFF" size={34} strokeWidth={2.2} />
         </Pressable>
+      }>
+      <AdminMetricGrid>
+        {summaryCards.map((card) => (
+          <AdminMetricCard
+            key={card.title}
+            detail={card.detail}
+            detailColor={card.tone === 'up' ? '#D40019' : '#454853'}
+            minHeight={146}
+            title={card.title}
+            titleColor="#303546"
+            titleLetterSpacing={2.4}
+            titleMarginBottom={18}
+            value={card.value}
+            valueColor="#111111"
+            valueFontSize={28}
+            valueLineHeight={33}
+            valueMarginBottom={10}
+          />
+        ))}
+      </AdminMetricGrid>
 
-        <AdminBottomNav items={tabs} />
+      <SectionHeading style={styles.sectionLabel}>QUICK ACTIONS</SectionHeading>
+      <View style={styles.actionsGrid}>
+        {actions.map((action) => {
+          const Icon = action.icon;
+
+          return (
+            <Pressable
+              key={action.label}
+              onPress={() => action.route && router.push(action.route)}
+              style={styles.actionCard}>
+              <Icon color={colors.secondary} size={31} strokeWidth={1.9} />
+              <Text style={styles.actionLabel}>{action.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
-    </SafeAreaView>
+
+      <SurfaceCard style={styles.revenueCard}>
+        <View style={styles.revenueHeader}>
+          <Text style={styles.revenueTitle}>Weekly Revenue</Text>
+          <View style={styles.periodPill}>
+            <Text style={styles.periodText}>LAST 7 DAYS</Text>
+          </View>
+        </View>
+
+        <View style={styles.chartArea}>
+          {revenueBars.map((bar) => (
+            <View key={bar.day} style={styles.chartColumn}>
+              <View
+                style={[
+                  styles.chartBar,
+                  {
+                    height: bar.height,
+                    backgroundColor: bar.active ? colors.secondary : '#ECECEF',
+                  },
+                ]}
+              />
+              <Text style={styles.chartLabel}>{bar.day}</Text>
+            </View>
+          ))}
+        </View>
+      </SurfaceCard>
+
+      <View style={styles.transactionsHeader}>
+        <SectionHeading style={styles.sectionLabel}>RECENT TRANSACTIONS</SectionHeading>
+        <Pressable>
+          <Text style={styles.viewAllText}>View All</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.transactionsList}>
+        {transactions.map((transaction) => (
+          <SurfaceCard key={transaction.id} style={styles.transactionCard}>
+            <View style={styles.receiptBadge}>
+              <FileText color={colors.secondary} size={25} strokeWidth={1.9} />
+            </View>
+
+            <View style={styles.transactionBody}>
+              <View>
+                <Text style={styles.transactionTitle}>Sale #{transaction.id}</Text>
+                <Text style={styles.transactionMeta}>
+                  {transaction.method} | {transaction.time}
+                </Text>
+              </View>
+
+              <View style={styles.transactionAmountWrap}>
+                <Text style={styles.transactionAmount}>{transaction.amount}</Text>
+                <View style={styles.statusPill}>
+                  <Text style={styles.statusText}>{transaction.status}</Text>
+                </View>
+              </View>
+            </View>
+          </SurfaceCard>
+        ))}
+      </View>
+    </AdminPageScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F7F7FA',
-  },
-  page: {
-    flex: 1,
-    backgroundColor: '#F7F7FA',
-  },
-  header: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#D7DAE3',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    paddingVertical: 14,
-  },
-  headerIdentity: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexShrink: 1,
-  },
-  avatar: {
-    borderRadius: 24,
-    height: 48,
-    marginRight: 12,
-    width: 48,
-  },
-  headerTitle: {
-    color: colors.secondary,
-    flexShrink: 1,
-    fontFamily: fonts.bold,
-    fontSize: 24,
-    lineHeight: 29,
-  },
-  bellButton: {
-    padding: 4,
-  },
-  scrollContent: {
-    paddingBottom: 120,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-  },
-  metricCard: {
-    minHeight: 146,
-    paddingHorizontal: 22,
-    paddingVertical: 22,
-    width: '47.5%',
-  },
-  metricTitle: {
-    color: '#303546',
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    letterSpacing: 2.4,
-    marginBottom: 18,
-  },
-  metricValue: {
-    color: '#111111',
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    lineHeight: 33,
-    marginBottom: 10,
-  },
-  metricDetail: {
-    fontSize: 13,
-  },
-  metricDetailUp: {
-    color: '#D40019',
-    fontFamily: fonts.bold,
-  },
-  metricDetailNeutral: {
-    color: '#454853',
-    fontFamily: fonts.regular,
-  },
   sectionLabel: {
-    marginBottom: 18,
-    marginTop: 34,
+    marginBottom: radius.xl,
+    marginTop: spacing.block,
   },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: layout.cardGap,
   },
   actionCard: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderColor: '#CED3E3',
-    borderRadius: 18,
+    borderRadius: radius.xl,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 114,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
     width: '30.8%',
   },
   actionLabel: {
     color: '#161A25',
-    fontFamily: fonts.medium,
-    fontSize: 16,
+    ...textRoles.label,
+    fontSize: textSizes.medium,
     marginTop: 16,
   },
   revenueCard: {
     borderRadius: 22,
-    marginTop: 34,
-    paddingBottom: 20,
-    paddingHorizontal: 18,
+    marginTop: spacing.block,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: radius.xl,
     paddingTop: 26,
   },
   revenueHeader: {
@@ -317,19 +225,18 @@ const styles = StyleSheet.create({
   },
   revenueTitle: {
     color: colors.secondary,
-    fontFamily: fonts.bold,
+    ...textRoles.value,
     fontSize: 21,
   },
   periodPill: {
     backgroundColor: '#F0F1F5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: 9,
   },
   periodText: {
     color: '#3F4454',
-    fontFamily: fonts.medium,
-    fontSize: 12,
+    ...textRoles.label,
   },
   chartArea: {
     alignItems: 'flex-end',
@@ -349,8 +256,7 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     color: '#303443',
-    fontFamily: fonts.medium,
-    fontSize: 12,
+    ...textRoles.label,
   },
   transactionsHeader: {
     alignItems: 'center',
@@ -359,9 +265,9 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     color: colors.secondary,
-    fontFamily: fonts.bold,
+    ...textRoles.label,
     fontSize: 15,
-    marginTop: 18,
+    marginTop: radius.xl,
   },
   transactionsList: {
     gap: 14,
@@ -369,7 +275,7 @@ const styles = StyleSheet.create({
   transactionCard: {
     alignItems: 'center',
     flexDirection: 'row',
-    paddingHorizontal: 18,
+    paddingHorizontal: radius.xl,
     paddingVertical: 20,
   },
   receiptBadge: {
@@ -389,13 +295,13 @@ const styles = StyleSheet.create({
   },
   transactionTitle: {
     color: '#151821',
-    fontFamily: fonts.bold,
+    ...textRoles.value,
     fontSize: 19,
     marginBottom: 4,
   },
   transactionMeta: {
     color: '#404552',
-    fontFamily: fonts.regular,
+    ...textRoles.label,
     fontSize: 14,
   },
   transactionAmountWrap: {
@@ -403,7 +309,7 @@ const styles = StyleSheet.create({
   },
   transactionAmount: {
     color: colors.secondary,
-    fontFamily: fonts.bold,
+    ...textRoles.value,
     fontSize: 20,
     marginBottom: 8,
   },
@@ -415,7 +321,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: '#117A38',
-    fontFamily: fonts.bold,
+    ...textRoles.label,
     fontSize: 11,
     letterSpacing: 1.2,
   },
@@ -428,10 +334,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
     right: 22,
-    shadowColor: '#0C2546',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
+    ...shadows.floating,
     width: 72,
   },
 });

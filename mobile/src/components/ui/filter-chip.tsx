@@ -1,15 +1,16 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, fonts } from '../../constants/theme';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 
 type FilterChipProps = {
   active?: boolean;
   label: string;
+  onPress?: () => void;
 };
 
-export function FilterChip({ active = false, label }: FilterChipProps) {
+export function FilterChip({ active = false, label, onPress }: FilterChipProps) {
   return (
-    <Pressable style={[styles.chip, active && styles.chipActive]}>
+    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -32,11 +33,10 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: '#2E3242',
-    fontFamily: fonts.medium,
-    fontSize: 16,
+    ...textRoles.label,
+    fontSize: textSizes.medium,
   },
   chipTextActive: {
     color: '#FFFFFF',
-    fontFamily: fonts.bold,
   },
 });

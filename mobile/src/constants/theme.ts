@@ -18,3 +18,30 @@ export const fonts = {
   semiBold: 'Poppins_600SemiBold',
   bold: 'Poppins_700Bold',
 };
+
+export const textSizes = {
+  small: 12,
+  medium: 16,
+  large: 22,
+};
+
+// Typography rule:
+// labels/meta use medium, body copy uses regular, and numeric/value content uses bold.
+export const textRoles = {
+  body: {
+    fontFamily: fonts.regular,
+    fontSize: textSizes.medium,
+  },
+  heading: {
+    fontFamily: fonts.bold,
+    fontSize: textSizes.large,
+  },
+  label: {
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+  },
+  value: {
+    fontFamily: fonts.bold,
+    fontSize: textSizes.medium,
+  },
+};

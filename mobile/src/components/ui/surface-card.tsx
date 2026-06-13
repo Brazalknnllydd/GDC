@@ -7,6 +7,8 @@ import {
 } from 'react-native';
 import type { ReactNode } from 'react';
 
+import { radius, shadows } from '../../constants/design-system';
+
 type SurfaceCardProps = ViewProps & {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -24,11 +26,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#CED3E3',
-    borderRadius: 18,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    shadowColor: '#121B3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    ...shadows.card,
   },
 });

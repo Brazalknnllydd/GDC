@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 
-import { fonts } from '../../constants/theme';
+import { textRoles, textSizes } from '../../constants/theme';
 
 type SectionHeadingProps = {
   children: string;
@@ -14,8 +14,8 @@ export function SectionHeading({ children, style }: SectionHeadingProps) {
 const styles = StyleSheet.create({
   heading: {
     color: '#2D3141',
-    fontFamily: fonts.medium,
-    fontSize: 14,
+    ...textRoles.label,
+    fontSize: textSizes.small + 2,
     letterSpacing: 3,
   },
 });

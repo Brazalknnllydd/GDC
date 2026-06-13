@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 import categoryRoutes from "./routes/category.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import productRoutes from "./routes/product.routes.js";
+import customerRoutes from "./routes/customer.routes.js";
+import saleRoutes from "./routes/sale.routes.js";
+import inventoryLogRoutes from "./routes/inventory-log.routes.js";
 
 dotenv.config();
 
@@ -13,6 +16,9 @@ app.use(cors());
 app.use(express.json());
 app.use("/categories", categoryRoutes);
 app.use("/products", productRoutes);
+app.use("/customers", customerRoutes);
+app.use("/sales", saleRoutes);
+app.use("/inventory-logs", inventoryLogRoutes);
 
 app.get("/", (_req, res) => {
   res.json({

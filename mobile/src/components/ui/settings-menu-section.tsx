@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ComponentType } from 'react';
 import { ChevronRight } from 'lucide-react-native';
 
-import { colors, fonts } from '../../constants/theme';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 import { SectionHeading } from './section-heading';
 import { SurfaceCard } from './surface-card';
 
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     color: '#1F2430',
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    ...textRoles.label,
+    fontSize: textSizes.small + 1,
   },
 });

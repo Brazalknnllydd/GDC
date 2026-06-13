@@ -12,19 +12,36 @@ export const createProduct = async (
       costPrice,
       price,
       stock,
+      weight,
       unit,
       categoryId,
     } = req.body;
 
+    const trimmedName = String(name ?? "").trim();
+    const trimmedBarcode = String(barcode ?? "").trim() || null;
+    const trimmedUnit = String(unit ?? "pcs").trim() || "pcs";
+    const parsedPrice = Number(price);
+    const parsedCostPrice = Number(costPrice);
+    const parsedStock = Number(stock);
+    const parsedCategoryId = Number(categoryId);
+    const parsedWeight = weight === null || weight === undefined || weight === "" ? null : Number(weight);
+
+    if (!trimmedName || Number.isNaN(parsedPrice) || Number.isNaN(parsedCostPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedCategoryId)) {
+      return res.status(400).json({
+        message: "Missing or invalid product fields",
+      });
+    }
+
     const product = await prisma.product.create({
       data: {
-        name,
-        barcode,
-        costPrice,
-        price,
-        stock,
-        unit,
-        categoryId,
+        name: trimmedName,
+        barcode: trimmedBarcode,
+        costPrice: parsedCostPrice,
+        price: parsedPrice,
+        stock: parsedStock,
+        unit: trimmedUnit,
+        categoryId: parsedCategoryId,
+        weight: parsedWeight,
       },
       include: {
         category: true,
@@ -34,6 +51,18 @@ export const createProduct = async (
     res.status(201).json(product);
   } catch (error) {
     console.error(error);
+
+    if ((error as { code?: string }).code === "P2002") {
+      return res.status(409).json({
+        message: "A product with that barcode already exists",
+      });
+    }
+
+    if ((error as { code?: string }).code === "P2003") {
+      return res.status(400).json({
+        message: "Selected category does not exist",
+      });
+    }
 
     res.status(500).json({
       message: "Failed to create product",
@@ -144,14 +173,108 @@ export const updateProduct = async (
   try {
     const id = Number(req.params.id);
 
+    if (!id) {
+      return res.status(400).json({
+        message: "Product id is required",
+      });
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (req.body.name !== undefined) {
+      const trimmedName = String(req.body.name).trim();
+      if (!trimmedName) {
+        return res.status(400).json({
+          message: "Product name is required",
+        });
+      }
+      data.name = trimmedName;
+    }
+
+    if (req.body.barcode !== undefined) {
+      data.barcode = String(req.body.barcode).trim() || null;
+    }
+
+    if (req.body.price !== undefined) {
+      const parsedPrice = Number(req.body.price);
+      if (Number.isNaN(parsedPrice)) {
+        return res.status(400).json({
+          message: "Price must be a valid number",
+        });
+      }
+      data.price = parsedPrice;
+    }
+
+    if (req.body.costPrice !== undefined) {
+      const parsedCostPrice = Number(req.body.costPrice);
+      if (Number.isNaN(parsedCostPrice)) {
+        return res.status(400).json({
+          message: "Cost price must be a valid number",
+        });
+      }
+      data.costPrice = parsedCostPrice;
+    }
+
+    if (req.body.stock !== undefined) {
+      const parsedStock = Number(req.body.stock);
+      if (Number.isNaN(parsedStock)) {
+        return res.status(400).json({
+          message: "Stock must be a valid number",
+        });
+      }
+      data.stock = parsedStock;
+    }
+
+    if (req.body.unit !== undefined) {
+      data.unit = String(req.body.unit).trim() || "pcs";
+    }
+
+    if (req.body.categoryId !== undefined) {
+      const parsedCategoryId = Number(req.body.categoryId);
+      if (Number.isNaN(parsedCategoryId)) {
+        return res.status(400).json({
+          message: "Category is required",
+        });
+      }
+      data.categoryId = parsedCategoryId;
+    }
+
+    if (req.body.weight !== undefined) {
+      data.weight =
+        req.body.weight === null || req.body.weight === ""
+          ? null
+          : Number(req.body.weight);
+    }
+
     const product = await prisma.product.update({
       where: { id },
-      data: req.body,
+      data,
+      include: {
+        category: true,
+      },
     });
 
     res.json(product);
   } catch (error) {
     console.error(error);
+
+    if ((error as { code?: string }).code === "P2025") {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    if ((error as { code?: string }).code === "P2002") {
+      return res.status(409).json({
+        message: "A product with that barcode already exists",
+      });
+    }
+
+    if ((error as { code?: string }).code === "P2003") {
+      return res.status(400).json({
+        message: "Selected category does not exist",
+      });
+    }
 
     res.status(500).json({
       message: "Failed to update product",
@@ -166,6 +289,12 @@ export const deleteProduct = async (
   try {
     const id = Number(req.params.id);
 
+    if (!id) {
+      return res.status(400).json({
+        message: "Product id is required",
+      });
+    }
+
     await prisma.product.delete({
       where: { id },
     });
@@ -175,6 +304,12 @@ export const deleteProduct = async (
     });
   } catch (error) {
     console.error(error);
+
+    if ((error as { code?: string }).code === "P2025") {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
 
     res.status(500).json({
       message: "Failed to delete product",

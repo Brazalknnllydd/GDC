@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
-import { fonts } from '../../constants/theme';
+import { textRoles, textSizes } from '../../constants/theme';
 
 type ProductFormInputProps = {
   label: string;
   placeholder: string;
   value: string;
+  errorMessage?: string;
   onChangeText?: (value: string) => void;
   keyboardType?: KeyboardTypeOptions;
   rightSlot?: ReactNode;
@@ -17,6 +18,7 @@ export function ProductFormInput({
   label,
   placeholder,
   value,
+  errorMessage,
   onChangeText,
   keyboardType,
   rightSlot,
@@ -25,7 +27,7 @@ export function ProductFormInput({
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputShell}>
+      <View style={[styles.inputShell, errorMessage ? styles.inputShellError : undefined]}>
         <TextInput
           editable={editable}
           keyboardType={keyboardType}
@@ -38,6 +40,7 @@ export function ProductFormInput({
         />
         {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
       </View>
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -48,8 +51,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#373C4A',
-    fontFamily: fonts.medium,
-    fontSize: 16,
+    ...textRoles.label,
+    fontSize: textSizes.medium,
     letterSpacing: 3,
     marginBottom: 14,
   },
@@ -65,10 +68,13 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 12,
   },
+  inputShellError: {
+    borderColor: '#C62828',
+  },
   input: {
     color: '#14171F',
     flex: 1,
-    fontFamily: fonts.regular,
+    ...textRoles.body,
     fontSize: 18,
     paddingVertical: 0,
   },
@@ -77,5 +83,11 @@ const styles = StyleSheet.create({
   },
   rightSlot: {
     marginLeft: 10,
+  },
+  errorText: {
+    color: '#C62828',
+    ...textRoles.label,
+    fontSize: 13,
+    marginTop: 10,
   },
 });

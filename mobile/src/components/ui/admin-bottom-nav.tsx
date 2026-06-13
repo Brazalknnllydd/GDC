@@ -2,7 +2,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { ComponentType } from 'react';
 
-import { colors, fonts } from '../../constants/theme';
+import { layout, spacing } from '../../constants/design-system';
+import { colors, textRoles } from '../../constants/theme';
 
 type IconProps = {
   color?: string;
@@ -14,7 +15,7 @@ type NavItem = {
   label: string;
   icon: ComponentType<IconProps>;
   active?: boolean;
-  route?: '/admin' | '/admin-products' | '/admin-settings';
+  route?: '/admin' | '/admin-products' | '/admin-sales' | '/admin-reports' | '/admin-settings';
 };
 
 type AdminBottomNavProps = {
@@ -57,8 +58,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingBottom: 12,
-    paddingTop: 10,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.sm + 2,
   },
   tabItem: {
     alignItems: 'center',
@@ -67,20 +68,18 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: '#404251',
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    marginTop: 6,
+    ...textRoles.label,
+    marginTop: spacing.sm - 2,
   },
   tabLabelActive: {
     color: colors.secondary,
-    fontFamily: fonts.bold,
   },
   activeTabLine: {
     backgroundColor: colors.secondary,
     borderRadius: 999,
     height: 3,
     position: 'absolute',
-    top: -10,
+    top: -layout.screenPaddingTop / 2 + 1,
     width: 62,
   },
 });
