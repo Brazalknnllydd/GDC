@@ -15,29 +15,44 @@ model Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  username  String   @unique
-  password  String
-  roleId    Int
-  role      Role     @relation(fields: [roleId], references: [id])
-  shifts    Shift[]
-  sales     Sale[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                      Int                     @id @default(autoincrement())
+  name                    String
+  username                String                  @unique
+  password                String
+  roleId                  Int
+  role                    Role                    @relation(fields: [roleId], references: [id])
+  shifts                  Shift[]
+  sales                   Sale[]
+  cashierCategoryAccesses CashierCategoryAccess[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 }
 
 model Category {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                      Int                     @id @default(autoincrement())
+  name                    String                  @unique
+  description             String?
+  products                Product[]
+  cashierCategoryAccesses CashierCategoryAccess[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model CashierCategoryAccess {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  categoryId Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, categoryId])
 }
 
 model Product {
   id            Int            @id @default(autoincrement())
   name          String
+  imageUrl      String?
   barcode       String?        @unique
   price         Decimal        @db.Decimal(10, 2)
   costPrice     Decimal        @db.Decimal(10, 2)
@@ -56,6 +71,8 @@ model Customer {
   id          Int      @id @default(autoincrement())
   name        String
   phoneNumber String?
+  address     String?
+  notes       String?
   sales       Sale[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

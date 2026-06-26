@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeClosed, LogIn, Lock, ShieldCheck, User } from 'lucide-react-native';
 
@@ -26,6 +27,7 @@ type AuthUser = {
 };
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -56,6 +58,24 @@ export default function LoginScreen() {
       setToken(response.data.token);
       setAuthenticatedUser(response.data.user);
       setPassword('');
+
+      if (response.data.user.role.toLowerCase() === 'admin') {
+        router.replace({
+          pathname: '/admin',
+          params: {
+            name: response.data.user.name,
+          },
+        });
+        return;
+      }
+
+      router.replace({
+        pathname: '/cashier',
+        params: {
+          name: response.data.user.name,
+          userId: String(response.data.user.id),
+        },
+      });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErrorMessage(error.response?.data?.message ?? 'Unable to sign in right now.');

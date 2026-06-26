@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import axios from 'axios';
 import { Platform } from 'react-native';
 
 const DEV_API_PORT = '5000';
@@ -46,3 +47,20 @@ function getDevHost() {
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL || `http://${getDevHost()}:${DEV_API_PORT}`;
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 5000,
+});
+
+export function resolveApiAssetUrl(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (/^(https?:\/\/|file:|content:|ph:|asset:|blob:|data:)/i.test(value)) {
+    return value;
+  }
+
+  return `${API_BASE_URL}${value.startsWith('/') ? value : `/${value}`}`;
+}
