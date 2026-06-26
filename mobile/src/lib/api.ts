@@ -52,3 +52,15 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 5000,
 });
+
+export function resolveApiAssetUrl(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (/^(https?:\/\/|file:|content:|ph:|asset:|blob:|data:)/i.test(value)) {
+    return value;
+  }
+
+  return `${API_BASE_URL}${value.startsWith('/') ? value : `/${value}`}`;
+}

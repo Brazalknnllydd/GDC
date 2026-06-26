@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Chip } from 'react-native-paper';
 
 import { colors, textRoles, textSizes } from '../../constants/theme';
 
@@ -10,9 +11,16 @@ type FilterChipProps = {
 
 export function FilterChip({ active = false, label, onPress }: FilterChipProps) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </Pressable>
+    <Chip
+      mode={active ? 'flat' : 'outlined'}
+      onPress={onPress}
+      selected={active}
+      showSelectedCheck={false}
+      showSelectedOverlay={false}
+      style={[styles.chip, active && styles.chipActive]}
+      textStyle={[styles.chipText, active && styles.chipTextActive]}>
+      {label}
+    </Chip>
   );
 }
 
@@ -22,7 +30,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#CFD5E3',
     borderRadius: 999,
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: 18,

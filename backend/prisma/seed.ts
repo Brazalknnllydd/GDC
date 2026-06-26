@@ -16,24 +16,66 @@ async function main() {
     create: { name: "Admin" },
   });
 
-  await prisma.role.upsert({
+  const cashierRole = await prisma.role.upsert({
     where: { name: "Cashier" },
     update: {},
     create: { name: "Cashier" },
   });
 
-  const hashedPassword = await bcrypt.hash("admin123", 10);
+  const [adminPassword, cashierPassword] = await Promise.all([
+    bcrypt.hash("admin123", 10),
+    bcrypt.hash("cashier123", 10),
+  ]);
 
   await prisma.user.upsert({
     where: { username: "admin" },
-    update: {},
+    update: {
+      name: "GDC Admin",
+      password: adminPassword,
+      roleId: adminRole.id,
+    },
     create: {
       name: "GDC Admin",
       username: "admin",
-      password: hashedPassword,
+      password: adminPassword,
       roleId: adminRole.id,
     },
   });
+
+  const cashierUser = await prisma.user.upsert({
+    where: { username: "cashier" },
+    update: {
+      name: "Juan Dela Cruz",
+      password: cashierPassword,
+      roleId: cashierRole.id,
+    },
+    create: {
+      name: "Juan Dela Cruz",
+      username: "cashier",
+      password: cashierPassword,
+      roleId: cashierRole.id,
+    },
+  });
+
+  const shiftStartedAt = new Date();
+  shiftStartedAt.setHours(8, 0, 0, 0);
+
+  const existingOpenShift = await prisma.shift.findFirst({
+    where: {
+      endedAt: null,
+      userId: cashierUser.id,
+    },
+  });
+
+  if (!existingOpenShift) {
+    await prisma.shift.create({
+      data: {
+        openingCash: 2000,
+        startedAt: shiftStartedAt,
+        userId: cashierUser.id,
+      },
+    });
+  }
 
   console.log("Seed completed.");
 }

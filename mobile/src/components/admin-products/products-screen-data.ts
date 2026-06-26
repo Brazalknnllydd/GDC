@@ -1,7 +1,7 @@
 import { BarChart3, LayoutDashboard, Package, ReceiptText, Settings } from 'lucide-react-native';
 
 export const baseOverviewCards = [
-  { title: 'TOTAL\nPRODUCTS', value: '0', detail: 'Live inventory count', accent: 'success' as const },
+  { title: 'TOTAL PRODUCTS', value: '0', detail: 'Live inventory count', accent: 'success' as const },
   { title: 'LOW STOCK', value: '0', detail: 'Requires Action', accent: 'danger' as const },
   { title: 'CATEGORIES', value: '0', detail: 'Active Sections', accent: 'default' as const },
   { title: 'INVENTORY VALUE', value: 'P0.00', detail: 'Market Valuation', accent: 'default' as const },
@@ -17,6 +17,7 @@ export const tabs = [
 
 export type Category = {
   id: number;
+  description: string | null;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -25,6 +26,7 @@ export type Category = {
 export type Product = {
   id: number;
   name: string;
+  imageUrl: string | null;
   barcode: string | null;
   price: number | string;
   costPrice: number | string;

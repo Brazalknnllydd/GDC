@@ -1,30 +1,25 @@
 import type { ComponentType, ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { layout } from '../../constants/design-system';
+import type { BottomNavItem } from '../../lib/app-routes';
 import { AdminBottomNav } from './admin-bottom-nav';
 import { AdminPageHeader } from './admin-page-header';
 import { AdminPageIntro } from './admin-page-intro';
-
-type IconProps = {
-  color?: string;
-  size?: number;
-  strokeWidth?: number;
-};
-
-type NavItem = {
-  label: string;
-  icon: ComponentType<IconProps>;
-  active?: boolean;
-  route?: '/admin' | '/admin-products' | '/admin-sales' | '/admin-reports' | '/admin-settings';
-};
 
 type AdminPageScreenProps = {
   title: string;
   introDescription: string;
   children: ReactNode;
-  bottomNavItems?: NavItem[];
+  bottomNavItems?: BottomNavItem[];
   introChildren?: ReactNode;
   floatingContent?: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
@@ -41,13 +36,20 @@ export function AdminPageScreen({
   contentContainerStyle,
   pageStyle,
 }: AdminPageScreenProps) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.page, pageStyle]}>
         <AdminPageHeader title={title} />
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isTablet ? styles.scrollContentTablet : undefined,
+            contentContainerStyle,
+          ]}
           showsVerticalScrollIndicator={false}>
           <AdminPageIntro description={introDescription}>{introChildren}</AdminPageIntro>
           {children}
@@ -73,5 +75,10 @@ const styles = StyleSheet.create({
     paddingBottom: layout.screenPaddingBottom,
     paddingHorizontal: layout.screenPaddingX,
     paddingTop: layout.screenPaddingTop,
+  },
+  scrollContentTablet: {
+    alignSelf: 'center',
+    maxWidth: 980,
+    width: '100%',
   },
 });

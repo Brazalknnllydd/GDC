@@ -16,5 +16,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: layout.cardGap,
+    justifyContent: 'space-between',
+    width: '100%',
   },
 });

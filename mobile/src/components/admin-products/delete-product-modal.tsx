@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { AlertTriangle, Trash2 } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, textRoles, textSizes } from '../../constants/theme';
+import { colors, textRoles } from '../../constants/theme';
 import { AdminModalShell } from '../ui/admin-modal-shell';
+import { AppButton } from '../ui/app-button';
+import { ModalActions } from '../ui/modal-actions';
 
 type DeleteProductModalProps = {
   isDeleting?: boolean;
@@ -31,17 +33,16 @@ export function DeleteProductModal({
         </View>
       }
       footer={
-        <View style={styles.footerActions}>
-          <Pressable onPress={onClose} style={[styles.actionButton, styles.cancelButton]}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
-          <Pressable onPress={onConfirm} style={[styles.actionButton, styles.deleteButton]}>
-            <Trash2 color="#FFFFFF" size={16} strokeWidth={2.1} />
-            <Text style={styles.deleteButtonText}>
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </Text>
-          </Pressable>
-        </View>
+        <ModalActions>
+          <AppButton label="Cancel" onPress={onClose} variant="secondary" />
+          <AppButton
+            icon={({ color, size }) => <Trash2 color={color} size={size} strokeWidth={2.1} />}
+            label="Delete"
+            loading={isDeleting}
+            onPress={onConfirm}
+            variant="danger"
+          />
+        </ModalActions>
       }>
       <View style={styles.body}>
         <Text style={styles.message}>
@@ -85,37 +86,5 @@ const styles = StyleSheet.create({
     ...textRoles.label,
     fontSize: 13,
     lineHeight: 20,
-  },
-  footerActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    minHeight: 54,
-  },
-  cancelButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#AEB5D0',
-    borderRadius: 2,
-    borderWidth: 1.5,
-  },
-  cancelButtonText: {
-    color: '#495098',
-    ...textRoles.label,
-    fontSize: textSizes.medium - 1,
-  },
-  deleteButton: {
-    backgroundColor: '#C62828',
-    borderRadius: 2,
-  },
-  deleteButtonText: {
-    color: '#FFFFFF',
-    ...textRoles.label,
-    fontSize: textSizes.medium - 1,
-    marginLeft: 8,
   },
 });

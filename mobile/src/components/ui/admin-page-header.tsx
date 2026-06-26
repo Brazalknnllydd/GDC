@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Bell } from 'lucide-react-native';
+import { Avatar, IconButton, Surface } from 'react-native-paper';
 
 import { layout, spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles } from '../../constants/theme';
@@ -16,12 +17,12 @@ export function AdminPageHeader({
   showNotificationDot = true,
 }: AdminPageHeaderProps) {
   return (
-    <View style={styles.header}>
+    <Surface elevation={1} style={styles.header}>
       <View style={styles.headerIdentity}>
-        <Image
+        <Avatar.Image
+          size={56}
           source={require('../../../assets/images/logo.jpg')}
           style={styles.avatar}
-          resizeMode="cover"
         />
         <View>
           <Text style={styles.headerTitle}>{title}</Text>
@@ -29,11 +30,14 @@ export function AdminPageHeader({
         </View>
       </View>
 
-      <Pressable style={styles.headerIconButton}>
-        <Bell color="#383B4F" size={23} strokeWidth={2.1} />
+      <IconButton
+        icon={() => <Bell color="#383B4F" size={23} strokeWidth={2.1} />}
+        onPress={() => {}}
+        size={22}
+        style={styles.headerIconButton}
+      />
         {showNotificationDot ? <View style={styles.notificationDot} /> : null}
-      </Pressable>
-    </View>
+    </Surface>
   );
 }
 
@@ -54,10 +58,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   avatar: {
-    borderRadius: 24,
-    height: 56,
     marginRight: spacing.md,
-    width: 56,
   },
   headerTitle: {
     color: colors.secondary,
@@ -72,7 +73,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   headerIconButton: {
-    padding: 2,
+    margin: 0,
     position: 'relative',
   },
   notificationDot: {

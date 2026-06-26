@@ -7,6 +7,9 @@ import {
   Poppins_700Bold,
 } from "@expo-google-fonts/poppins";
 import { ActivityIndicator, View } from "react-native";
+import { PaperProvider } from "react-native-paper";
+
+import { paperTheme } from "../constants/paper-theme";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -25,13 +28,16 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="admin" />
-      <Stack.Screen name="admin-products" />
-      <Stack.Screen name="admin-sales" />
-      <Stack.Screen name="admin-reports" />
-      <Stack.Screen name="admin-settings" />
-    </Stack>
+    <PaperProvider theme={paperTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="admin" />
+        <Stack.Screen name="admin-products" />
+        <Stack.Screen name="admin-sales" />
+        <Stack.Screen name="admin-reports" />
+        <Stack.Screen name="admin-settings" />
+        <Stack.Screen name="cashier" />
+      </Stack>
+    </PaperProvider>
   );
 }

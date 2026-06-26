@@ -69,7 +69,13 @@ export default function LoginScreen() {
         return;
       }
 
-      setErrorMessage('Cashier dashboard is not connected yet.');
+      router.replace({
+        pathname: '/cashier',
+        params: {
+          name: response.data.user.name,
+          userId: String(response.data.user.id),
+        },
+      });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErrorMessage(error.response?.data?.message ?? 'Unable to sign in right now.');

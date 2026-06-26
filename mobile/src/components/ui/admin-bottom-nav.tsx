@@ -1,53 +1,43 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { ComponentType } from 'react';
+import { Surface, TouchableRipple } from 'react-native-paper';
 
 import { layout, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
-
-type IconProps = {
-  color?: string;
-  size?: number;
-  strokeWidth?: number;
-};
-
-type NavItem = {
-  label: string;
-  icon: ComponentType<IconProps>;
-  active?: boolean;
-  route?: '/admin' | '/admin-products' | '/admin-sales' | '/admin-reports' | '/admin-settings';
-};
+import type { BottomNavItem } from '../../lib/app-routes';
 
 type AdminBottomNavProps = {
-  items: NavItem[];
+  items: BottomNavItem[];
 };
 
 export function AdminBottomNav({ items }: AdminBottomNavProps) {
   const router = useRouter();
 
   return (
-    <View style={styles.bottomNav}>
+    <Surface elevation={1} style={styles.bottomNav}>
       {items.map((item) => {
         const Icon = item.icon;
 
         return (
-          <Pressable
+          <TouchableRipple
             key={item.label}
             onPress={() => item.route && router.push(item.route)}
             style={styles.tabItem}>
-            <Icon
-              color={item.active ? colors.secondary : '#404251'}
-              size={24}
-              strokeWidth={item.active ? 2.3 : 1.9}
-            />
-            <Text style={[styles.tabLabel, item.active && styles.tabLabelActive]}>
-              {item.label}
-            </Text>
-            {item.active && <View style={styles.activeTabLine} />}
-          </Pressable>
+            <View style={styles.tabContent}>
+              <Icon
+                color={item.active ? colors.secondary : '#404251'}
+                size={24}
+                strokeWidth={item.active ? 2.3 : 1.9}
+              />
+              <Text style={[styles.tabLabel, item.active && styles.tabLabelActive]}>
+                {item.label}
+              </Text>
+              {item.active && <View style={styles.activeTabLine} />}
+            </View>
+          </TouchableRipple>
         );
       })}
-    </View>
+    </Surface>
   );
 }
 
@@ -57,19 +47,30 @@ const styles = StyleSheet.create({
     borderTopColor: '#D7DAE3',
     borderTopWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     paddingBottom: spacing.md,
     paddingTop: spacing.sm + 2,
   },
   tabItem: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  tabContent: {
     alignItems: 'center',
-    minWidth: 58,
+    justifyContent: 'center',
+    minHeight: 56,
+    paddingHorizontal: spacing.xs,
     position: 'relative',
   },
   tabLabel: {
+    textAlign: 'center',
     color: '#404251',
     ...textRoles.label,
-    marginTop: spacing.sm - 2,
+    fontSize: 13,
+    lineHeight: 16,
+    marginTop: spacing.xs + 1,
+    minHeight: 16,
   },
   tabLabelActive: {
     color: colors.secondary,

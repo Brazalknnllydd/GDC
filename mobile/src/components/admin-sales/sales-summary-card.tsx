@@ -17,7 +17,7 @@ export function SalesSummaryCard({
   return (
     <AdminMetricCard
       detail={detail}
-      minHeight={136}
+      minHeight={140}
       paddingHorizontal={16}
       paddingVertical={16}
       title={title}
@@ -30,7 +30,7 @@ export function SalesSummaryCard({
       valueFontSize={textSizes.large}
       valueLineHeight={24}
       valueMarginBottom={10}
-      width="48.2%"
+      width="48%"
     />
   );
 }

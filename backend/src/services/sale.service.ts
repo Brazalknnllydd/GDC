@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 
+const allowedPaymentMethods = new Set(["Cash", "GCash"]);
+
 export type SaleItemInput = {
   productId: number;
   quantity: number;
@@ -50,13 +52,27 @@ export async function createSaleWithInventoryUpdate({
   items,
 }: CreateSaleInput) {
   return prisma.$transaction(async (tx) => {
+    const normalizedPaymentMethod = paymentMethod.trim() || "Cash";
+
+    if (!allowedPaymentMethods.has(normalizedPaymentMethod)) {
+      throw new Error("Payment method must be Cash or GCash");
+    }
+
     const user = await tx.user.findUnique({
       where: { id: userId },
+      include: {
+        cashierCategoryAccesses: true,
+        role: true,
+      },
     });
 
     if (!user) {
       throw new Error("User not found");
     }
+
+    const restrictedCategoryIds = new Set(
+      user.cashierCategoryAccesses.map((entry) => entry.categoryId)
+    );
 
     if (typeof customerId === "number") {
       const customer = await tx.customer.findUnique({
@@ -102,6 +118,14 @@ export async function createSaleWithInventoryUpdate({
         throw new Error(`Product ${item.productId} not found`);
       }
 
+      if (
+        user.role.name === "Cashier" &&
+        restrictedCategoryIds.size > 0 &&
+        !restrictedCategoryIds.has(product.categoryId)
+      ) {
+        throw new Error(`Cashier cannot sell ${product.name} from this category`);
+      }
+
       if (product.stock < item.quantity) {
         throw new Error(`Insufficient stock for ${product.name}`);
       }
@@ -115,7 +139,7 @@ export async function createSaleWithInventoryUpdate({
         totalAmount,
         amountPaid,
         changeAmount,
-        paymentMethod: paymentMethod.trim() || "Cash",
+        paymentMethod: normalizedPaymentMethod,
         customerId: typeof customerId === "number" ? customerId : null,
         userId,
         shiftId: typeof shiftId === "number" ? shiftId : null,
@@ -160,7 +184,22 @@ export async function createSaleWithInventoryUpdate({
         customer: true,
         items: {
           include: {
-            product: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                barcode: true,
+                costPrice: true,
+                price: true,
+                categoryId: true,
+                createdAt: true,
+                updatedAt: true,
+                imageUrl: true,
+                stock: true,
+                unit: true,
+                weight: true,
+              },
+            },
           },
         },
         shift: true,

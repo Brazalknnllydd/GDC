@@ -1,13 +1,18 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, textRoles, textSizes } from '../../constants/theme';
+import { textRoles } from '../../constants/theme';
 import { AdminModalShell } from '../ui/admin-modal-shell';
+import { AppButton } from '../ui/app-button';
+import { ModalActions } from '../ui/modal-actions';
 import { ProductFormInput } from '../ui/product-form-input';
 
 type AddCategoryModalProps = {
+  categoryDescription: string;
   categoryError: string;
+  categoryName: string;
   isSavingCategory: boolean;
-  newCategoryName: string;
+  mode: 'create' | 'edit';
+  onChangeCategoryDescription: (value: string) => void;
   onChangeCategoryName: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -15,35 +20,50 @@ type AddCategoryModalProps = {
 };
 
 export function AddCategoryModal({
+  categoryDescription,
   categoryError,
+  categoryName,
   isSavingCategory,
-  newCategoryName,
+  mode,
+  onChangeCategoryDescription,
   onChangeCategoryName,
   onClose,
   onSave,
   visible,
 }: AddCategoryModalProps) {
+  const isEditing = mode === 'edit';
+
   return (
     <AdminModalShell
       onClose={onClose}
-      title="Add Category"
+      title={isEditing ? 'Edit Category' : 'Add Category'}
       visible={visible}
       footer={
-        <View style={styles.footerActions}>
-          <Pressable onPress={onClose} style={[styles.actionButton, styles.cancelButton]}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
-          <Pressable onPress={onSave} style={[styles.actionButton, styles.saveButton]}>
-            <Text style={styles.saveButtonText}>{isSavingCategory ? 'Saving...' : 'Save'}</Text>
-          </Pressable>
-        </View>
+        <ModalActions>
+          <AppButton label="Cancel" onPress={onClose} variant="secondary" />
+          <AppButton
+            label={isEditing ? 'Update' : 'Save'}
+            loading={isSavingCategory}
+            onPress={onSave}
+            variant="primary"
+          />
+        </ModalActions>
       }>
       <View style={styles.body}>
         <ProductFormInput
           label="CATEGORY NAME"
           onChangeText={onChangeCategoryName}
           placeholder="e.g. Frozen Meat"
-          value={newCategoryName}
+          value={categoryName}
+        />
+
+        <ProductFormInput
+          label="DESCRIPTION"
+          multiline
+          numberOfLines={4}
+          onChangeText={onChangeCategoryDescription}
+          placeholder="Short details about this category"
+          value={categoryDescription}
         />
 
         {categoryError ? <Text style={styles.errorText}>{categoryError}</Text> : null}
@@ -61,35 +81,5 @@ const styles = StyleSheet.create({
     ...textRoles.label,
     fontSize: 13,
     marginTop: 12,
-  },
-  footerActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  cancelButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#AEB5D0',
-    borderRadius: 2,
-    borderWidth: 1.5,
-  },
-  cancelButtonText: {
-    color: '#495098',
-    ...textRoles.label,
-    fontSize: textSizes.medium - 1,
-  },
-  saveButton: {
-    backgroundColor: colors.secondary,
-    borderRadius: 2,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    ...textRoles.label,
-    fontSize: textSizes.medium - 1,
   },
 });

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ChevronDown, ScanLine } from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Camera, ChevronDown, ImagePlus, ScanLine, Trash2 } from 'lucide-react-native';
+import { Image } from 'expo-image';
 
 import type { Category } from './products-screen-data';
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
+import { resolveApiAssetUrl } from '../../lib/api';
 import { AdminModalShell } from '../ui/admin-modal-shell';
+import { AppButton } from '../ui/app-button';
 import { ProductFormInput } from '../ui/product-form-input';
 
 type AddProductModalProps = {
@@ -13,7 +17,10 @@ type AddProductModalProps = {
   categoryValue: string;
   costPrice: string;
   errorMessage: string;
-  fieldErrors: Partial<Record<'name' | 'category' | 'costPrice' | 'sellingPrice' | 'stock' | 'weightVolume', string>>;
+  fieldErrors: Partial<
+    Record<'name' | 'category' | 'costPrice' | 'sellingPrice' | 'stock' | 'weightVolume', string>
+  >;
+  imagePreviewUri: string | null;
   initialStock: string;
   isSaving: boolean;
   onBarcodeChange: (value: string) => void;
@@ -21,6 +28,9 @@ type AddProductModalProps = {
   onClose: () => void;
   onCostPriceChange: (value: string) => void;
   onInitialStockChange: (value: string) => void;
+  onOpenCamera: () => void;
+  onPickImage: () => void;
+  onRemoveImage: () => void;
   onRequestCreateCategory: () => void;
   onProductNameChange: (value: string) => void;
   onSave: () => void;
@@ -42,6 +52,7 @@ export function AddProductModal({
   costPrice,
   errorMessage,
   fieldErrors,
+  imagePreviewUri,
   initialStock,
   isSaving,
   onBarcodeChange,
@@ -49,6 +60,9 @@ export function AddProductModal({
   onClose,
   onCostPriceChange,
   onInitialStockChange,
+  onOpenCamera,
+  onPickImage,
+  onRemoveImage,
   onRequestCreateCategory,
   onProductNameChange,
   onSave,
@@ -63,6 +77,10 @@ export function AddProductModal({
   weightVolume,
 }: AddProductModalProps) {
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const { height, width } = useWindowDimensions();
+  const isSingleColumn = width < 680;
+  const isPhone = width < 680;
+  const resolvedImagePreviewUri = resolveApiAssetUrl(imagePreviewUri);
 
   useEffect(() => {
     if (!visible) {
@@ -72,163 +90,218 @@ export function AddProductModal({
 
   return (
     <AdminModalShell
+      height={isPhone ? Math.min(height * 0.82, 720) : undefined}
       maxHeight="92%"
       onClose={onClose}
       title={productActionLabel}
       visible={visible}
       footer={
-        <Pressable onPress={onSave} style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>
-            {isSaving ? submittingLabel : productActionLabel}
-          </Text>
-        </Pressable>
+        <AppButton
+          label={isSaving ? submittingLabel : productActionLabel}
+          loading={isSaving}
+          onPress={onSave}
+          size="xl"
+          variant="primary"
+        />
       }>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <ProductFormInput
-              errorMessage={fieldErrors.name}
-              label="PRODUCT NAME"
-              onChangeText={onProductNameChange}
-              placeholder="e.g. Frozen Atlantic Salmon"
-              value={productName}
-            />
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CATEGORY</Text>
-              <Pressable
-                onPress={() => setCategoryDropdownOpen((current) => !current)}
-                style={[
-                  styles.dropdownTrigger,
-                  fieldErrors.category ? styles.dropdownTriggerError : undefined,
-                  categoryDropdownOpen && styles.dropdownTriggerOpen,
-                ]}>
-                <Text
-                  style={[
-                    styles.dropdownTriggerText,
-                    !categoryValue && styles.dropdownPlaceholderText,
-                  ]}>
-                  {categoryValue || 'Select a category'}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+        style={styles.formScroll}>
+        <View style={styles.imageSection}>
+          <Text style={styles.fieldLabel}>PRODUCT IMAGE</Text>
+          <Pressable onPress={onPickImage} style={styles.imagePicker}>
+            {resolvedImagePreviewUri ? (
+              <Image
+                contentFit="cover"
+                source={{ uri: resolvedImagePreviewUri }}
+                style={styles.imagePreview}
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <ImagePlus color={colors.secondary} size={28} strokeWidth={2} />
+                <Text style={styles.imagePlaceholderTitle}>Add product photo</Text>
+                <Text style={styles.imagePlaceholderText}>
+                  Tap here to pick from the gallery, or use the camera button below.
                 </Text>
-                <ChevronDown
-                  color="#4B5060"
-                  size={24}
-                  strokeWidth={2.2}
-                  style={categoryDropdownOpen ? styles.dropdownChevronOpen : undefined}
-                />
-              </Pressable>
+              </View>
+            )}
+          </Pressable>
 
-              {categoryDropdownOpen ? (
-                <View style={styles.dropdownMenu}>
-                  <ScrollView
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                    style={styles.dropdownScroll}>
-                    {categories.map((category, index) => (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => {
-                          onCategorySelect(category.name);
-                          setCategoryDropdownOpen(false);
-                        }}
-                        style={[
-                          styles.dropdownOption,
-                          selectedCategory === category.name && styles.dropdownOptionActive,
-                          index < categories.length - 1 && styles.dropdownOptionBorder,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.dropdownOptionText,
-                            selectedCategory === category.name &&
-                              styles.dropdownOptionTextActive,
-                          ]}>
-                          {category.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      onPress={() => {
-                        setCategoryDropdownOpen(false);
-                        onRequestCreateCategory();
-                      }}
-                      style={styles.createCategoryOption}>
-                      <Text style={styles.createCategoryText}>+ Add new category</Text>
-                    </Pressable>
-                  </ScrollView>
-                </View>
-              ) : null}
-              {fieldErrors.category ? (
-                <Text style={styles.fieldErrorText}>{fieldErrors.category}</Text>
-              ) : null}
-            </View>
-
-            <ProductFormInput
-              errorMessage={undefined}
-              keyboardType="numeric"
-              label="BARCODE / SKU"
-              onChangeText={onBarcodeChange}
-              placeholder="0000 0000 0000"
-              rightSlot={
-                <View style={styles.barcodeSlot}>
-                  <ScanLine color={colors.secondary} size={24} strokeWidth={2.1} />
-                </View>
-              }
-              value={barcode}
+          <View style={styles.imageActions}>
+            <AppButton
+              fullWidth={false}
+              icon={({ color, size }) => <Camera color={color} size={size} strokeWidth={2} />}
+              label="Open Camera"
+              onPress={onOpenCamera}
+              size="sm"
+              variant="primary"
             />
+            {resolvedImagePreviewUri ? (
+              <AppButton
+                fullWidth={false}
+                icon={({ color, size }) => <Trash2 color={color} size={size} strokeWidth={2} />}
+                label="Remove"
+                onPress={onRemoveImage}
+                size="sm"
+                variant="dangerOutline"
+              />
+            ) : null}
+          </View>
+        </View>
 
-            <View style={styles.twoColumnRow}>
-              <View style={styles.halfField}>
-                <ProductFormInput
-                  errorMessage={fieldErrors.costPrice}
-                  keyboardType="number-pad"
-                  label="COST PRICE (P)"
-                  onChangeText={onCostPriceChange}
-                  placeholder="0"
-                  value={costPrice}
-                />
-              </View>
-              <View style={styles.halfField}>
-                <ProductFormInput
-                  errorMessage={fieldErrors.sellingPrice}
-                  keyboardType="number-pad"
-                  label="SELLING PRICE (P)"
-                  onChangeText={onUnitPriceChange}
-                  placeholder="0"
-                  value={unitPrice}
-                />
-              </View>
+        <ProductFormInput
+          errorMessage={fieldErrors.name}
+          label="PRODUCT NAME"
+          onChangeText={onProductNameChange}
+          placeholder="e.g. Frozen Atlantic Salmon"
+          value={productName}
+        />
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>CATEGORY</Text>
+          <Pressable
+            onPress={() => setCategoryDropdownOpen((current) => !current)}
+            style={[
+              styles.dropdownTrigger,
+              fieldErrors.category ? styles.dropdownTriggerError : undefined,
+              categoryDropdownOpen && styles.dropdownTriggerOpen,
+            ]}>
+            <Text
+              style={[
+                styles.dropdownTriggerText,
+                !categoryValue && styles.dropdownPlaceholderText,
+              ]}>
+              {categoryValue || 'Select a category'}
+            </Text>
+            <ChevronDown
+              color="#4B5060"
+              size={24}
+              strokeWidth={2.2}
+              style={categoryDropdownOpen ? styles.dropdownChevronOpen : undefined}
+            />
+          </Pressable>
+
+          {categoryDropdownOpen ? (
+            <View style={styles.dropdownMenu}>
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                style={styles.dropdownScroll}>
+                {categories.map((category, index) => (
+                  <Pressable
+                    key={category.id}
+                    onPress={() => {
+                      onCategorySelect(category.name);
+                      setCategoryDropdownOpen(false);
+                    }}
+                    style={[
+                      styles.dropdownOption,
+                      selectedCategory === category.name && styles.dropdownOptionActive,
+                      index < categories.length - 1 && styles.dropdownOptionBorder,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        selectedCategory === category.name && styles.dropdownOptionTextActive,
+                      ]}>
+                      {category.name}
+                    </Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => {
+                    setCategoryDropdownOpen(false);
+                    onRequestCreateCategory();
+                  }}
+                  style={styles.createCategoryOption}>
+                  <Text style={styles.createCategoryText}>+ Add new category</Text>
+                </Pressable>
+              </ScrollView>
             </View>
+          ) : null}
+          {fieldErrors.category ? (
+            <Text style={styles.fieldErrorText}>{fieldErrors.category}</Text>
+          ) : null}
+        </View>
 
-            <View style={styles.twoColumnRow}>
-              <View style={styles.halfField}>
-                <ProductFormInput
-                  errorMessage={fieldErrors.stock}
-                  keyboardType="number-pad"
-                  label="INITIAL STOCK"
-                  onChangeText={onInitialStockChange}
-                  placeholder="0"
-                  value={initialStock}
-                />
-              </View>
-              <View style={styles.halfField}>
-                <ProductFormInput
-                  errorMessage={fieldErrors.weightVolume}
-                  label="WEIGHT / VOLUME"
-                  onChangeText={onWeightVolumeChange}
-                  placeholder="e.g. 500g"
-                  value={weightVolume}
-                />
-              </View>
+        <ProductFormInput
+          keyboardType="numeric"
+          label="BARCODE / SKU"
+          onChangeText={onBarcodeChange}
+          placeholder="0000 0000 0000"
+          rightSlot={
+            <View style={styles.barcodeSlot}>
+              <ScanLine color={colors.secondary} size={24} strokeWidth={2.1} />
             </View>
+          }
+          value={barcode}
+        />
 
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        <View style={[styles.twoColumnRow, isSingleColumn && styles.singleColumnRow]}>
+          <View style={styles.halfField}>
+            <ProductFormInput
+              errorMessage={fieldErrors.costPrice}
+              keyboardType="number-pad"
+              label="COST PRICE (P)"
+              onChangeText={onCostPriceChange}
+              placeholder="0"
+              value={costPrice}
+            />
+          </View>
+          <View style={[styles.halfField, isSingleColumn && styles.fullField]}>
+            <ProductFormInput
+              errorMessage={fieldErrors.sellingPrice}
+              keyboardType="number-pad"
+              label="SELLING PRICE (P)"
+              onChangeText={onUnitPriceChange}
+              placeholder="0"
+              value={unitPrice}
+            />
+          </View>
+        </View>
+
+        <View style={[styles.twoColumnRow, isSingleColumn && styles.singleColumnRow]}>
+          <View style={styles.halfField}>
+            <ProductFormInput
+              errorMessage={fieldErrors.stock}
+              keyboardType="number-pad"
+              label="INITIAL STOCK"
+              onChangeText={onInitialStockChange}
+              placeholder="0"
+              value={initialStock}
+            />
+          </View>
+          <View style={[styles.halfField, isSingleColumn && styles.fullField]}>
+            <ProductFormInput
+              errorMessage={fieldErrors.weightVolume}
+              label="WEIGHT / VOLUME"
+              onChangeText={onWeightVolumeChange}
+              placeholder="e.g. 500g"
+              value={weightVolume}
+            />
+          </View>
+        </View>
+
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </ScrollView>
     </AdminModalShell>
   );
 }
 
 const styles = StyleSheet.create({
+  formScroll: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 32,
     paddingTop: 8,
+  },
+  imageSection: {
+    marginBottom: spacing.section,
   },
   fieldGroup: {
     marginBottom: 26,
@@ -239,6 +312,45 @@ const styles = StyleSheet.create({
     fontSize: textSizes.medium,
     letterSpacing: 3,
     marginBottom: 14,
+  },
+  imagePicker: {
+    backgroundColor: '#F3F5FA',
+    borderColor: '#D4DAE7',
+    borderRadius: radius.xl,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    minHeight: 190,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    height: 220,
+    width: '100%',
+  },
+  imagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 190,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  imagePlaceholderTitle: {
+    color: '#172033',
+    ...textRoles.value,
+    fontSize: 18,
+    marginTop: 12,
+  },
+  imagePlaceholderText: {
+    color: '#6A7284',
+    ...textRoles.label,
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  imageActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
   },
   dropdownTrigger: {
     alignItems: 'center',
@@ -335,25 +447,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 14,
   },
+  singleColumnRow: {
+    flexDirection: 'column',
+    gap: 0,
+  },
   halfField: {
     flex: 1,
+  },
+  fullField: {
+    width: '100%',
   },
   errorText: {
     color: '#C62828',
     ...textRoles.label,
     fontSize: 13,
     marginTop: 8,
-  },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    borderRadius: 18,
-    justifyContent: 'center',
-    minHeight: 86,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    ...textRoles.label,
-    fontSize: textSizes.medium + 2,
   },
 });

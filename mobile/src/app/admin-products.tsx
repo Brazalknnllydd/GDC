@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,63 +9,44 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { Plus, Search } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { AddCategoryModal } from '../components/admin-products/add-category-modal';
+import { DeleteCategoryModal } from '../components/admin-products/delete-category-modal';
 import { DeleteProductModal } from '../components/admin-products/delete-product-modal';
 import { AddProductModal } from '../components/admin-products/add-product-modal';
+import { ManageCategoriesModal } from '../components/admin-products/manage-categories-modal';
 import {
   baseOverviewCards,
   tabs,
   type Category,
   type Product,
 } from '../components/admin-products/products-screen-data';
-import { layout, radius, shadows, spacing } from '../constants/design-system';
+import { radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
+import { usePagination } from '../hooks/use-pagination';
+import {
+  digitsOnly,
+  formatCompactPeso,
+  formatPeso,
+  inferUnit,
+  normalizeNumber,
+  parseWeight,
+} from '../lib/product-utils';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { FilterChip } from '../components/ui/filter-chip';
 import { InventoryStatCard } from '../components/ui/inventory-stat-card';
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { ProductListItem } from '../components/ui/product-list-item';
 import { SectionHeading } from '../components/ui/section-heading';
+import { AppButton } from '../components/ui/app-button';
+import { AppFab } from '../components/ui/app-fab';
 import { apiClient } from '../lib/api';
 
-function digitsOnly(value: string) {
-  return value.replace(/\D/g, '');
-}
-
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function normalizeNumber(value: number | string) {
-  return typeof value === 'number' ? value : Number(value) || 0;
-}
-
-function parseWeight(value: string) {
-  const parsed = Number.parseFloat(value);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function inferUnit(value: string) {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized) {
-    return 'pcs';
-  }
-
-  if (normalized.includes('kg')) return 'kg';
-  if (normalized.includes('g')) return 'g';
-  if (normalized.includes('ml')) return 'ml';
-  if (normalized.includes('l')) return 'L';
-
-  return 'pcs';
-}
-
 const lowStockThreshold = 10;
+const productsPerPage = 10;
 type FeedbackState = {
   tone: 'success' | 'error';
   message: string;
@@ -72,11 +54,19 @@ type FeedbackState = {
 type ProductFieldErrors = Partial<
   Record<'name' | 'category' | 'costPrice' | 'sellingPrice' | 'stock' | 'weightVolume', string>
 >;
+type SelectedProductImage = {
+  file?: File;
+  fileName?: string | null;
+  mimeType?: string | null;
+  uri: string;
+};
 
 export default function AdminProductsScreen() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showManageCategories, setShowManageCategories] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
 
   const [productName, setProductName] = useState('');
   const [categoryValue, setCategoryValue] = useState('');
@@ -85,6 +75,8 @@ export default function AdminProductsScreen() {
   const [unitPrice, setUnitPrice] = useState('');
   const [initialStock, setInitialStock] = useState('');
   const [weightVolume, setWeightVolume] = useState('');
+  const [productImageUri, setProductImageUri] = useState<string | null>(null);
+  const [productImageAsset, setProductImageAsset] = useState<SelectedProductImage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -101,8 +93,11 @@ export default function AdminProductsScreen() {
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState('');
+  const [categoryPendingDelete, setCategoryPendingDelete] = useState<Category | null>(null);
 
   async function loadCategories() {
     const response = await apiClient.get<Category[]>('/categories');
@@ -161,6 +156,8 @@ export default function AdminProductsScreen() {
     setUnitPrice('');
     setInitialStock('');
     setWeightVolume('');
+    setProductImageUri(null);
+    setProductImageAsset(null);
     setProductError('');
     setProductFieldErrors({});
   }
@@ -183,6 +180,8 @@ export default function AdminProductsScreen() {
     setCostPrice(String(normalizeNumber(product.costPrice)));
     setUnitPrice(String(normalizeNumber(product.price)));
     setInitialStock(String(product.stock));
+    setProductImageUri(product.imageUrl || null);
+    setProductImageAsset(null);
     setWeightVolume(
       product.weight !== null && product.weight !== undefined
         ? `${product.weight}${product.unit !== 'pcs' ? product.unit : ''}`
@@ -214,6 +213,29 @@ export default function AdminProductsScreen() {
     });
   }, [products, searchQuery, selectedCategory]);
 
+  const categoriesWithCounts = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        productCount: products.filter((product) => product.categoryId === category.id).length,
+      })),
+    [categories, products]
+  );
+
+  const {
+    endItem: productPageEnd,
+    page: productPage,
+    paginatedItems: paginatedProducts,
+    setPage: setProductPage,
+    startItem: productPageStart,
+    totalPages: totalProductPages,
+    visiblePageNumbers,
+  } = usePagination({
+    items: filteredProducts,
+    itemsPerPage: productsPerPage,
+    resetDependencies: [searchQuery, selectedCategory],
+  });
+
   const overviewCards = useMemo(() => {
     const inventoryValue = products.reduce(
       (sum, product) => sum + normalizeNumber(product.price) * product.stock,
@@ -235,7 +257,11 @@ export default function AdminProductsScreen() {
       }
 
       if (card.title === 'INVENTORY VALUE') {
-        return { ...card, value: formatPeso(inventoryValue) };
+        return {
+          ...card,
+          fullValue: formatPeso(inventoryValue),
+          value: formatCompactPeso(inventoryValue),
+        };
       }
 
       return card;
@@ -244,6 +270,7 @@ export default function AdminProductsScreen() {
 
   async function handleSaveCategory() {
     const trimmedName = newCategoryName.trim();
+    const trimmedDescription = categoryDescription.trim();
 
     if (!trimmedName) {
       setCategoryError('Category name is required.');
@@ -253,22 +280,46 @@ export default function AdminProductsScreen() {
     try {
       setIsSavingCategory(true);
       setCategoryError('');
-
-      const response = await apiClient.post<Category>('/categories', {
+      const payload = {
+        description: trimmedDescription || null,
         name: trimmedName,
-      });
+      };
 
-      setCategories((currentCategories) =>
-        [...currentCategories, response.data].sort((a, b) => a.name.localeCompare(b.name))
-      );
-      setCategoryValue(response.data.name);
-      setSelectedCategory(response.data.name);
-      setNewCategoryName('');
-      setShowAddCategory(false);
-      setFeedback({
-        tone: 'success',
-        message: `Category "${response.data.name}" added successfully.`,
-      });
+      if (editingCategoryId) {
+        const response = await apiClient.put<Category>(`/categories/${editingCategoryId}`, payload);
+        setCategories((currentCategories) =>
+          currentCategories
+            .map((category) => (category.id === editingCategoryId ? response.data : category))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
+        setCategoryValue((currentValue) =>
+          currentValue === categories.find((category) => category.id === editingCategoryId)?.name
+            ? response.data.name
+            : currentValue
+        );
+        setSelectedCategory((currentValue) =>
+          currentValue === categories.find((category) => category.id === editingCategoryId)?.name
+            ? response.data.name
+            : currentValue
+        );
+        setFeedback({
+          tone: 'success',
+          message: `Category "${response.data.name}" updated successfully.`,
+        });
+      } else {
+        const response = await apiClient.post<Category>('/categories', payload);
+        setCategories((currentCategories) =>
+          [...currentCategories, response.data].sort((a, b) => a.name.localeCompare(b.name))
+        );
+        setCategoryValue(response.data.name);
+        setSelectedCategory(response.data.name);
+        setFeedback({
+          tone: 'success',
+          message: `Category "${response.data.name}" added successfully.`,
+        });
+      }
+
+      closeCategoryModal();
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         setCategoryError(error.response?.data?.message ?? 'Could not save category right now.');
@@ -283,14 +334,186 @@ export default function AdminProductsScreen() {
 
   function closeCategoryModal() {
     setShowAddCategory(false);
+    setEditingCategoryId(null);
     setNewCategoryName('');
+    setCategoryDescription('');
     setCategoryError('');
   }
 
-  function openCategoryModalFromProduct() {
+  function openCreateCategoryModal() {
+    setEditingCategoryId(null);
     setNewCategoryName('');
+    setCategoryDescription('');
     setCategoryError('');
     setShowAddCategory(true);
+  }
+
+  function openEditCategoryModal(category: Category) {
+    setEditingCategoryId(category.id);
+    setNewCategoryName(category.name);
+    setCategoryDescription(category.description || '');
+    setCategoryError('');
+    setShowAddCategory(true);
+  }
+
+  function openCategoryModalFromProduct() {
+    openCreateCategoryModal();
+  }
+
+  function requestDeleteCategory(category: Category) {
+    setCategoryPendingDelete(category);
+  }
+
+  function closeDeleteCategoryModal() {
+    if (isDeletingCategory) {
+      return;
+    }
+
+    setCategoryPendingDelete(null);
+  }
+
+  async function handleConfirmDeleteCategory() {
+    if (!categoryPendingDelete) {
+      return;
+    }
+
+    try {
+      setIsDeletingCategory(true);
+      await apiClient.delete(`/categories/${categoryPendingDelete.id}`);
+      setCategories((currentCategories) =>
+        currentCategories.filter((category) => category.id !== categoryPendingDelete.id)
+      );
+      setFeedback({
+        tone: 'success',
+        message: `Category "${categoryPendingDelete.name}" deleted successfully.`,
+      });
+      setCategoryPendingDelete(null);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        setScreenError(error.response?.data?.message ?? 'Could not delete category right now.');
+      } else {
+        setScreenError('Could not delete category right now.');
+      }
+    } finally {
+      setIsDeletingCategory(false);
+    }
+  }
+
+  async function handlePickProductImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setProductError('Media library access is needed to choose a product image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const selectedAsset = result.assets[0];
+      if (!selectedAsset?.uri) {
+        setProductError('Could not use the selected image.');
+        return;
+      }
+
+      setProductImageUri(selectedAsset.uri);
+      setProductImageAsset({
+        file: (selectedAsset as ImagePicker.ImagePickerAsset & { file?: File }).file,
+        fileName: selectedAsset.fileName,
+        mimeType: selectedAsset.mimeType,
+        uri: selectedAsset.uri,
+      });
+      setProductError('');
+    }
+  }
+
+  async function handleOpenProductCamera() {
+    if (Platform.OS === 'web') {
+      setProductError('Camera capture is available on the mobile app. Tap the photo area to pick an image on web.');
+      return;
+    }
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      setProductError('Camera access is needed to take a product image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      cameraType: ImagePicker.CameraType.back,
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const selectedAsset = result.assets[0];
+      if (!selectedAsset?.uri) {
+        setProductError('Could not use the captured image.');
+        return;
+      }
+
+      setProductImageUri(selectedAsset.uri);
+      setProductImageAsset({
+        file: (selectedAsset as ImagePicker.ImagePickerAsset & { file?: File }).file,
+        fileName: selectedAsset.fileName,
+        mimeType: selectedAsset.mimeType,
+        uri: selectedAsset.uri,
+      });
+      setProductError('');
+    }
+  }
+
+  function buildProductFormData(categoryId: number) {
+    const formData = new FormData();
+
+    formData.append('name', productName.trim());
+    formData.append('barcode', barcode.trim());
+    formData.append('costPrice', costPrice);
+    formData.append('price', unitPrice);
+    formData.append('stock', initialStock);
+    formData.append('weight', String(parseWeight(weightVolume) ?? ''));
+    formData.append('unit', inferUnit(weightVolume));
+    formData.append('categoryId', String(categoryId));
+
+    if (!productImageUri) {
+      if (editingProductId) {
+        formData.append('removeImage', 'true');
+      }
+
+      return formData;
+    }
+
+    if (!productImageAsset) {
+      return formData;
+    }
+
+    if (productImageAsset.file) {
+      formData.append('image', productImageAsset.file);
+      return formData;
+    }
+
+    const extensionMatch =
+      productImageAsset.fileName?.match(/\.(\w+)$/) ??
+      productImageAsset.uri.match(/\.(\w+)(?:\?.*)?$/);
+    const extension = extensionMatch?.[1]?.toLowerCase() || 'jpg';
+    const mimeType = productImageAsset.mimeType || (extension === 'png' ? 'image/png' : 'image/jpeg');
+    const fileName = productImageAsset.fileName || `product-image.${extension}`;
+
+    formData.append('image', {
+      uri: productImageAsset.uri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    return formData;
   }
 
   async function handleSaveProduct() {
@@ -340,24 +563,18 @@ export default function AdminProductsScreen() {
       return;
     }
 
-    const payload = {
-      name: trimmedName,
-      barcode: barcode.trim() || null,
-      costPrice: Number(costPrice),
-      price: Number(unitPrice),
-      stock: Number(initialStock),
-      weight: parseWeight(weightVolume),
-      unit: inferUnit(weightVolume),
-      categoryId: matchedCategory.id,
-    };
-
     try {
       setIsSavingProduct(true);
       setProductError('');
       setProductFieldErrors({});
+      const payload = buildProductFormData(matchedCategory.id);
 
       if (editingProductId) {
-        const response = await apiClient.put<Product>(`/products/${editingProductId}`, payload);
+        const response = await apiClient.put<Product>(`/products/${editingProductId}`, payload, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
         setProducts((currentProducts) =>
           currentProducts.map((product) =>
             product.id === editingProductId ? response.data : product
@@ -368,7 +585,11 @@ export default function AdminProductsScreen() {
           message: `Product "${response.data.name}" updated successfully.`,
         });
       } else {
-        const response = await apiClient.post<Product>('/products', payload);
+        const response = await apiClient.post<Product>('/products', payload, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
         setProducts((currentProducts) => [response.data, ...currentProducts]);
         setFeedback({
           tone: 'success',
@@ -434,13 +655,28 @@ export default function AdminProductsScreen() {
       introDescription="Manage inventory and pricing across all stores."
       bottomNavItems={tabs}
       floatingContent={
-        <Pressable onPress={openCreateProductModal} style={styles.fab}>
-          <Text style={styles.fabPlus}>+</Text>
-        </Pressable>
+        <AppFab
+          icon={<Plus color="#FFFFFF" size={34} strokeWidth={2.2} />}
+          onPress={openCreateProductModal}
+          style={styles.fab}
+        />
       }>
-      <Pressable onPress={() => setShowAddCategory(true)} style={styles.addCategoryButton}>
-        <Text style={styles.addCategoryButtonText}>Add Category</Text>
-      </Pressable>
+      <View style={styles.categoryActionsRow}>
+        <AppButton
+          fullWidth={false}
+          label="Add Category"
+          onPress={openCreateCategoryModal}
+          size="sm"
+          variant="primary"
+        />
+        <AppButton
+          fullWidth={false}
+          label="Manage Categories"
+          onPress={() => setShowManageCategories(true)}
+          size="sm"
+          variant="secondary"
+        />
+      </View>
 
       <AdminMetricGrid>
         {overviewCards.map((card) => (
@@ -448,6 +684,8 @@ export default function AdminProductsScreen() {
             key={card.title}
             accent={card.accent}
             detail={card.detail}
+            infoDialogTitle={card.title.replace('\n', ' ')}
+            infoDialogValue={'fullValue' in card ? card.fullValue : undefined}
             title={card.title}
             value={card.value}
           />
@@ -507,10 +745,11 @@ export default function AdminProductsScreen() {
         {isLoadingProducts ? (
           <Text style={styles.emptyStateText}>Loading inventory...</Text>
         ) : filteredProducts.length > 0 ? (
-          filteredProducts.map((product) => (
+          paginatedProducts.map((product) => (
             <ProductListItem
               key={product.id}
               category={product.category.name}
+              imageUrl={product.imageUrl}
               low={product.stock <= lowStockThreshold}
               name={product.name}
               onDelete={() => requestDeleteProduct(product)}
@@ -524,11 +763,30 @@ export default function AdminProductsScreen() {
           <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
         )}
       </View>
+      {!isLoadingProducts && filteredProducts.length > 0 ? (
+        <PaginationControls
+          currentPage={productPage}
+          endItem={productPageEnd}
+          onPageChange={setProductPage}
+          startItem={productPageStart}
+          totalItems={filteredProducts.length}
+          totalPages={totalProductPages}
+          visiblePageNumbers={visiblePageNumbers}
+        />
+      ) : null}
 
       <AddCategoryModal
+        categoryDescription={categoryDescription}
         categoryError={categoryError}
+        categoryName={newCategoryName}
         isSavingCategory={isSavingCategory}
-        newCategoryName={newCategoryName}
+        mode={editingCategoryId ? 'edit' : 'create'}
+        onChangeCategoryDescription={(value) => {
+          setCategoryDescription(value);
+          if (categoryError) {
+            setCategoryError('');
+          }
+        }}
         onChangeCategoryName={(value) => {
           setNewCategoryName(value);
           if (categoryError) {
@@ -540,6 +798,21 @@ export default function AdminProductsScreen() {
         visible={showAddCategory}
       />
 
+      <ManageCategoriesModal
+        categories={categoriesWithCounts}
+        onClose={() => setShowManageCategories(false)}
+        onCreate={() => {
+          setShowManageCategories(false);
+          openCreateCategoryModal();
+        }}
+        onDelete={(category) => requestDeleteCategory(category)}
+        onEdit={(category) => {
+          setShowManageCategories(false);
+          openEditCategoryModal(category);
+        }}
+        visible={showManageCategories}
+      />
+
       <AddProductModal
         barcode={barcode}
         categories={categories}
@@ -547,6 +820,7 @@ export default function AdminProductsScreen() {
         costPrice={costPrice}
         errorMessage={productError}
         fieldErrors={productFieldErrors}
+        imagePreviewUri={productImageUri}
         initialStock={initialStock}
         isSaving={isSavingProduct}
         onBarcodeChange={setBarcode}
@@ -554,6 +828,12 @@ export default function AdminProductsScreen() {
         onClose={closeProductModal}
         onCostPriceChange={(value) => setCostPrice(digitsOnly(value))}
         onInitialStockChange={(value) => setInitialStock(digitsOnly(value))}
+        onOpenCamera={handleOpenProductCamera}
+        onPickImage={handlePickProductImage}
+        onRemoveImage={() => {
+          setProductImageUri(null);
+          setProductImageAsset(null);
+        }}
         onRequestCreateCategory={openCategoryModalFromProduct}
         onProductNameChange={setProductName}
         onSave={handleSaveProduct}
@@ -575,25 +855,24 @@ export default function AdminProductsScreen() {
         productName={productPendingDelete?.name || ''}
         visible={!!productPendingDelete}
       />
+
+      <DeleteCategoryModal
+        categoryName={categoryPendingDelete?.name || ''}
+        isDeleting={isDeletingCategory}
+        onClose={closeDeleteCategoryModal}
+        onConfirm={handleConfirmDeleteCategory}
+        visible={!!categoryPendingDelete}
+      />
     </AdminPageScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  addCategoryButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.secondary,
-    borderRadius: radius.lg,
-    justifyContent: 'center',
+  categoryActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
     marginBottom: spacing.xl + 4,
-    minHeight: 56,
-    paddingHorizontal: spacing.xl,
-  },
-  addCategoryButtonText: {
-    color: '#FFFFFF',
-    ...textRoles.label,
-    fontSize: textSizes.medium,
   },
   searchRow: {
     alignItems: 'center',
@@ -673,22 +952,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   fab: {
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    borderRadius: 36,
     bottom: 104,
-    height: 72,
-    justifyContent: 'center',
     position: 'absolute',
     right: 22,
-    ...shadows.floating,
-    width: 72,
-  },
-  fabPlus: {
-    color: '#FFFFFF',
-    fontFamily: fonts.regular,
-    fontSize: 44,
-    lineHeight: 46,
-    marginTop: -2,
   },
 });

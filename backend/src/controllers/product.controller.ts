@@ -1,5 +1,36 @@
 import type { Request, Response } from "express";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { prisma } from "../lib/prisma.js";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const uploadsRootDir = path.resolve(currentDir, "../../uploads");
+
+function getImageUrlFromFile(file?: Express.Multer.File) {
+  if (!file) {
+    return undefined;
+  }
+
+  return `/uploads/products/${file.filename}`;
+}
+
+async function removeStoredImage(imageUrl?: string | null) {
+  if (!imageUrl || !imageUrl.startsWith("/uploads/")) {
+    return;
+  }
+
+  const relativePath = imageUrl.replace(/^\/uploads[\\/]/, "");
+  const absolutePath = path.resolve(uploadsRootDir, relativePath);
+
+  try {
+    await fs.unlink(absolutePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error(error);
+    }
+  }
+}
 
 export const createProduct = async (
   req: Request,
@@ -25,8 +56,10 @@ export const createProduct = async (
     const parsedStock = Number(stock);
     const parsedCategoryId = Number(categoryId);
     const parsedWeight = weight === null || weight === undefined || weight === "" ? null : Number(weight);
+    const imageUrl = getImageUrlFromFile(req.file);
 
     if (!trimmedName || Number.isNaN(parsedPrice) || Number.isNaN(parsedCostPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedCategoryId)) {
+      await removeStoredImage(imageUrl);
       return res.status(400).json({
         message: "Missing or invalid product fields",
       });
@@ -42,6 +75,7 @@ export const createProduct = async (
         unit: trimmedUnit,
         categoryId: parsedCategoryId,
         weight: parsedWeight,
+        imageUrl: imageUrl ?? null,
       },
       include: {
         category: true,
@@ -51,6 +85,7 @@ export const createProduct = async (
     res.status(201).json(product);
   } catch (error) {
     console.error(error);
+    await removeStoredImage(getImageUrlFromFile(req.file));
 
     if ((error as { code?: string }).code === "P2002") {
       return res.status(409).json({
@@ -100,6 +135,12 @@ export const getProductById = async (
 ) => {
   try {
     const id = Number(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        message: "Product id is required",
+      });
+    }
 
     const product = await prisma.product.findUnique({
       where: { id },
@@ -174,8 +215,21 @@ export const updateProduct = async (
     const id = Number(req.params.id);
 
     if (!id) {
+      await removeStoredImage(getImageUrlFromFile(req.file));
       return res.status(400).json({
         message: "Product id is required",
+      });
+    }
+
+    const existingProduct = await prisma.product.findUnique({
+      where: { id },
+      select: { imageUrl: true },
+    });
+
+    if (!existingProduct) {
+      await removeStoredImage(getImageUrlFromFile(req.file));
+      return res.status(404).json({
+        message: "Product not found",
       });
     }
 
@@ -184,6 +238,7 @@ export const updateProduct = async (
     if (req.body.name !== undefined) {
       const trimmedName = String(req.body.name).trim();
       if (!trimmedName) {
+        await removeStoredImage(getImageUrlFromFile(req.file));
         return res.status(400).json({
           message: "Product name is required",
         });
@@ -198,6 +253,7 @@ export const updateProduct = async (
     if (req.body.price !== undefined) {
       const parsedPrice = Number(req.body.price);
       if (Number.isNaN(parsedPrice)) {
+        await removeStoredImage(getImageUrlFromFile(req.file));
         return res.status(400).json({
           message: "Price must be a valid number",
         });
@@ -208,6 +264,7 @@ export const updateProduct = async (
     if (req.body.costPrice !== undefined) {
       const parsedCostPrice = Number(req.body.costPrice);
       if (Number.isNaN(parsedCostPrice)) {
+        await removeStoredImage(getImageUrlFromFile(req.file));
         return res.status(400).json({
           message: "Cost price must be a valid number",
         });
@@ -218,6 +275,7 @@ export const updateProduct = async (
     if (req.body.stock !== undefined) {
       const parsedStock = Number(req.body.stock);
       if (Number.isNaN(parsedStock)) {
+        await removeStoredImage(getImageUrlFromFile(req.file));
         return res.status(400).json({
           message: "Stock must be a valid number",
         });
@@ -232,6 +290,7 @@ export const updateProduct = async (
     if (req.body.categoryId !== undefined) {
       const parsedCategoryId = Number(req.body.categoryId);
       if (Number.isNaN(parsedCategoryId)) {
+        await removeStoredImage(getImageUrlFromFile(req.file));
         return res.status(400).json({
           message: "Category is required",
         });
@@ -246,6 +305,14 @@ export const updateProduct = async (
           : Number(req.body.weight);
     }
 
+    if (req.file) {
+      data.imageUrl = getImageUrlFromFile(req.file);
+    }
+
+    if (String(req.body.removeImage).toLowerCase() === "true") {
+      data.imageUrl = null;
+    }
+
     const product = await prisma.product.update({
       where: { id },
       data,
@@ -254,9 +321,21 @@ export const updateProduct = async (
       },
     });
 
+    if (req.file && existingProduct.imageUrl && existingProduct.imageUrl !== product.imageUrl) {
+      await removeStoredImage(existingProduct.imageUrl);
+    }
+
+    if (
+      String(req.body.removeImage).toLowerCase() === "true" &&
+      existingProduct.imageUrl
+    ) {
+      await removeStoredImage(existingProduct.imageUrl);
+    }
+
     res.json(product);
   } catch (error) {
     console.error(error);
+    await removeStoredImage(getImageUrlFromFile(req.file));
 
     if ((error as { code?: string }).code === "P2025") {
       return res.status(404).json({
@@ -295,9 +374,11 @@ export const deleteProduct = async (
       });
     }
 
-    await prisma.product.delete({
+    const deletedProduct = await prisma.product.delete({
       where: { id },
     });
+
+    await removeStoredImage(deletedProduct.imageUrl);
 
     res.json({
       message: "Product deleted successfully",

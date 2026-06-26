@@ -28,6 +28,7 @@ export const createCategory = async (
 ) => {
   try {
     const name = String(req.body?.name ?? "").trim();
+    const description = String(req.body?.description ?? "").trim() || null;
 
     if (!name) {
       return res.status(400).json({
@@ -38,6 +39,7 @@ export const createCategory = async (
     const category = await prisma.category.create({
       data: {
         name,
+        description,
       },
     });
 
@@ -64,6 +66,7 @@ export const updateCategory = async (
   try {
     const id = Number(req.params.id);
     const name = String(req.body?.name ?? "").trim();
+    const description = String(req.body?.description ?? "").trim() || null;
 
     if (!id) {
       return res.status(400).json({
@@ -79,7 +82,7 @@ export const updateCategory = async (
 
     const category = await prisma.category.update({
       where: { id },
-      data: { name },
+      data: { description, name },
     });
 
     res.json(category);

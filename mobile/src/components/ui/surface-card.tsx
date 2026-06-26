@@ -1,24 +1,20 @@
-import {
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewProps,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
+import { Card } from 'react-native-paper';
 
 import { radius, shadows } from '../../constants/design-system';
 
-type SurfaceCardProps = ViewProps & {
+type SurfaceCardProps = {
   children: ReactNode;
+  onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
-export function SurfaceCard({ children, style, ...rest }: SurfaceCardProps) {
+export function SurfaceCard({ children, onPress, style }: SurfaceCardProps) {
   return (
-    <View {...rest} style={[styles.card, style]}>
+    <Card mode="contained" onPress={onPress} style={[styles.card, style]}>
       {children}
-    </View>
+    </Card>
   );
 }
 

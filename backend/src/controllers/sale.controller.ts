@@ -5,6 +5,8 @@ import {
   isValidSaleItem,
 } from "../services/sale.service.js";
 
+const allowedPaymentMethods = new Set(["Cash", "GCash"]);
+
 export const getSales = async (
   _req: Request,
   res: Response
@@ -17,6 +19,7 @@ export const getSales = async (
           include: {
             product: {
               select: {
+                costPrice: true,
                 id: true,
                 name: true,
                 barcode: true,
@@ -61,7 +64,22 @@ export const getSaleById = async (
         customer: true,
         items: {
           include: {
-            product: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                barcode: true,
+                costPrice: true,
+                price: true,
+                categoryId: true,
+                createdAt: true,
+                updatedAt: true,
+                imageUrl: true,
+                stock: true,
+                unit: true,
+                weight: true,
+              },
+            },
           },
         },
         shift: true,
@@ -142,6 +160,15 @@ export const createSale = async (
     ) {
       return res.status(400).json({
         message: "Sale amounts are required",
+      });
+    }
+
+    if (
+      typeof paymentMethod !== "string" ||
+      !allowedPaymentMethods.has(paymentMethod.trim())
+    ) {
+      return res.status(400).json({
+        message: "Payment method must be Cash or GCash",
       });
     }
 

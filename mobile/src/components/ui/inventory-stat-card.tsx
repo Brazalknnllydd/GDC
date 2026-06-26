@@ -7,6 +7,8 @@ type InventoryStatCardProps = {
   value: string;
   detail: string;
   accent?: 'default' | 'danger' | 'success';
+  infoDialogTitle?: string;
+  infoDialogValue?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -15,11 +17,15 @@ export function InventoryStatCard({
   value,
   detail,
   accent = 'default',
+  infoDialogTitle,
+  infoDialogValue,
   style,
 }: InventoryStatCardProps) {
   return (
     <AdminMetricCard
       detail={detail}
+      infoDialogTitle={infoDialogTitle}
+      infoDialogValue={infoDialogValue}
       style={style}
       title={title}
       tone={accent}

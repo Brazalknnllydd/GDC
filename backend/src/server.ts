@@ -1,24 +1,33 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import categoryRoutes from "./routes/category.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import cashierRoutes from "./routes/cashier.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
 import saleRoutes from "./routes/sale.routes.js";
 import inventoryLogRoutes from "./routes/inventory-log.routes.js";
+import staffRoutes from "./routes/staff.routes.js";
 
 dotenv.config();
 
 const app = express();
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(currentDir, "../uploads");
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(uploadsDir));
 app.use("/categories", categoryRoutes);
 app.use("/products", productRoutes);
 app.use("/customers", customerRoutes);
+app.use("/cashier", cashierRoutes);
 app.use("/sales", saleRoutes);
 app.use("/inventory-logs", inventoryLogRoutes);
+app.use("/staff", staffRoutes);
 
 app.get("/", (_req, res) => {
   res.json({

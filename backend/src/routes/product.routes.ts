@@ -8,6 +8,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "../controllers/product.controller.js";
+import { productImageUpload } from "../middleware/product-image-upload.js";
 
 const router = Router();
 
@@ -15,9 +16,9 @@ router.get("/", getProducts);
 router.get("/barcode/:barcode", getProductByBarcode);
 router.get("/:id", getProductById);
 
-router.post("/", createProduct);
+router.post("/", productImageUpload.single("image"), createProduct);
 
-router.put("/:id", updateProduct);
+router.put("/:id", productImageUpload.single("image"), updateProduct);
 
 router.delete("/:id", deleteProduct);
 

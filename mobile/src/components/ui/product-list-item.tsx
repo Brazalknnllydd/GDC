@@ -1,11 +1,15 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Pencil, Trash2 } from 'lucide-react-native';
+import { Image } from 'expo-image';
 
-import { colors, textRoles, textSizes } from '../../constants/theme';
+import { colors, textRoles } from '../../constants/theme';
+import { resolveApiAssetUrl } from '../../lib/api';
+import { AppButton } from './app-button';
 import { SurfaceCard } from './surface-card';
 
 type ProductListItemProps = {
   category: string;
+  imageUrl?: string | null;
   low?: boolean;
   name: string;
   onDelete?: () => void;
@@ -17,6 +21,7 @@ type ProductListItemProps = {
 
 export function ProductListItem({
   category,
+  imageUrl,
   low = false,
   name,
   onDelete,
@@ -25,10 +30,18 @@ export function ProductListItem({
   sku,
   unitsText,
 }: ProductListItemProps) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 430;
+  const resolvedImageUrl = resolveApiAssetUrl(imageUrl);
+
   return (
-    <SurfaceCard style={styles.card}>
+    <SurfaceCard style={[styles.card, isCompact && styles.cardCompact]}>
       <View style={styles.thumb}>
-        <Text style={styles.thumbGlyph}>PKG</Text>
+        {resolvedImageUrl ? (
+          <Image contentFit="cover" source={{ uri: resolvedImageUrl }} style={styles.thumbImage} />
+        ) : (
+          <Text style={styles.thumbGlyph}>PKG</Text>
+        )}
         {low ? (
           <View style={styles.lowBadge}>
             <Text style={styles.lowBadgeText}>LOW</Text>
@@ -46,17 +59,25 @@ export function ProductListItem({
         </Text>
         <Text style={[styles.units, low && styles.unitsLow]}>{unitsText}</Text>
 
-        <View style={styles.bottomRow}>
+        <View style={[styles.bottomRow, isCompact && styles.bottomRowCompact]}>
           <Text style={styles.price}>{price}</Text>
-          <View style={styles.actions}>
-            <Pressable onPress={onDelete} style={styles.deleteButton}>
-              <Trash2 color="#B3261E" size={16} strokeWidth={2.1} />
-              <Text style={styles.deleteText}>Delete</Text>
-            </Pressable>
-            <Pressable onPress={onEdit} style={styles.editButton}>
-              <Pencil color={colors.secondary} size={16} strokeWidth={2.2} />
-              <Text style={styles.editText}>Edit</Text>
-            </Pressable>
+          <View style={[styles.actions, isCompact && styles.actionsCompact]}>
+            <AppButton
+              fullWidth={false}
+              icon={({ color, size }) => <Trash2 color={color} size={size} strokeWidth={2.1} />}
+              label="Delete"
+              onPress={onDelete}
+              size="sm"
+              variant="dangerOutline"
+            />
+            <AppButton
+              fullWidth={false}
+              icon={({ color, size }) => <Pencil color={color} size={size} strokeWidth={2.2} />}
+              label="Edit"
+              onPress={onEdit}
+              size="sm"
+              variant="secondary"
+            />
           </View>
         </View>
       </View>
@@ -69,6 +90,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 14,
   },
+  cardCompact: {
+    alignItems: 'flex-start',
+  },
   thumb: {
     alignItems: 'center',
     backgroundColor: '#132A3E',
@@ -79,6 +103,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     width: 112,
+  },
+  thumbImage: {
+    height: '100%',
+    width: '100%',
   },
   thumbGlyph: {
     color: '#FFFFFF',
@@ -139,45 +167,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 12,
   },
+  bottomRowCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: 12,
+  },
   actions: {
     flexDirection: 'row',
     gap: 10,
+  },
+  actionsCompact: {
+    width: '100%',
   },
   price: {
     color: colors.secondary,
     ...textRoles.value,
     fontSize: 20,
-  },
-  deleteButton: {
-    alignItems: 'center',
-    borderColor: '#E3B6B2',
-    borderRadius: 14,
-    borderWidth: 1.4,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 14,
-  },
-  deleteText: {
-    color: '#B3261E',
-    ...textRoles.label,
-    fontSize: textSizes.medium,
-    marginLeft: 8,
-  },
-  editButton: {
-    alignItems: 'center',
-    borderColor: colors.secondary,
-    borderRadius: 14,
-    borderWidth: 1.4,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 18,
-  },
-  editText: {
-    color: colors.secondary,
-    ...textRoles.label,
-    fontSize: textSizes.medium,
-    marginLeft: 8,
   },
 });

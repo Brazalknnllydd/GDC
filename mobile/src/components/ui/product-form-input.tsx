@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  type KeyboardTypeOptions,
+} from 'react-native';
+import { HelperText, TextInput } from 'react-native-paper';
 
 import { textRoles, textSizes } from '../../constants/theme';
 
@@ -12,6 +18,9 @@ type ProductFormInputProps = {
   keyboardType?: KeyboardTypeOptions;
   rightSlot?: ReactNode;
   editable?: boolean;
+  multiline?: boolean;
+  numberOfLines?: number;
+  secureTextEntry?: boolean;
 };
 
 export function ProductFormInput({
@@ -23,24 +32,37 @@ export function ProductFormInput({
   keyboardType,
   rightSlot,
   editable = true,
+  multiline = false,
+  numberOfLines,
+  secureTextEntry = false,
 }: ProductFormInputProps) {
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputShell, errorMessage ? styles.inputShellError : undefined]}>
+      <View style={styles.inputWrap}>
         <TextInput
+          contentStyle={[styles.input, multiline ? styles.inputMultiline : undefined]}
           editable={editable}
+          error={!!errorMessage}
           keyboardType={keyboardType}
+          mode="outlined"
+          multiline={multiline}
+          numberOfLines={numberOfLines}
           onChangeText={onChangeText}
+          outlineColor="#C8CDDD"
           placeholder={placeholder}
-          placeholderTextColor="#737A8D"
+          right={rightSlot ? <TextInput.Affix text="" /> : undefined}
+          secureTextEntry={secureTextEntry}
           selectionColor="#1A237E"
-          style={[styles.input, rightSlot ? styles.inputWithSlot : undefined]}
+          style={[styles.inputShell, multiline ? styles.inputShellMultiline : undefined]}
+          textAlignVertical={multiline ? 'top' : undefined}
           value={value}
         />
         {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
       </View>
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      <HelperText style={styles.errorText} type="error" visible={!!errorMessage}>
+        {errorMessage || ' '}
+      </HelperText>
     </View>
   );
 }
@@ -57,37 +79,34 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   inputShell: {
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#C8CDDD',
     borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: 'row',
     minHeight: 86,
-    overflow: 'hidden',
-    paddingLeft: 20,
-    paddingRight: 12,
   },
-  inputShellError: {
-    borderColor: '#C62828',
+  inputWrap: {
+    justifyContent: 'center',
+  },
+  inputShellMultiline: {
+    minHeight: 132,
   },
   input: {
     color: '#14171F',
-    flex: 1,
     ...textRoles.body,
     fontSize: 18,
-    paddingVertical: 0,
   },
-  inputWithSlot: {
-    paddingRight: 14,
+  inputMultiline: {
+    minHeight: 96,
   },
   rightSlot: {
-    marginLeft: 10,
+    position: 'absolute',
+    right: 16,
   },
   errorText: {
     color: '#C62828',
     ...textRoles.label,
     fontSize: 13,
-    marginTop: 10,
+    marginTop: 6,
+    minHeight: 22,
+    paddingHorizontal: 0,
   },
 });
