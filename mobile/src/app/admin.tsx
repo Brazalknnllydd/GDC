@@ -20,6 +20,7 @@ import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { apiClient } from '../lib/api';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 
 type Product = {
   id: number;
@@ -47,8 +48,6 @@ const tabs = [
   { label: 'Settings', icon: Settings, active: false, route: '/admin-settings' as const },
 ];
 
-
-
 function startOfDay(date: Date) {
   const next = new Date(date);
   next.setHours(0, 0, 0, 0);
@@ -60,6 +59,7 @@ function isToday(value: string) {
 }
 
 export default function AdminScreen() {
+  const { compactPhone } = useResponsiveLayout();
   const params = useLocalSearchParams<{ name?: string }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -127,25 +127,25 @@ export default function AdminScreen() {
     () => [
       {
         detail: `${todaySales.length} transactions today`,
-        detailColor: '#454853',
+        detailColor: colors.textHeading,
         title: "TODAY'S SALES",
         value: formatPeso(todaySalesTotal),
       },
       {
         detail: `${sales.length} total transactions`,
-        detailColor: '#454853',
+        detailColor: colors.textHeading,
         title: 'TRANSACTIONS',
         value: String(sales.length),
       },
       {
         detail: `${categories.length} active categories`,
-        detailColor: '#454853',
+        detailColor: colors.textHeading,
         title: 'CATEGORIES',
         value: String(categories.length),
       },
       {
         detail: `${lowStockCount} low in stock`,
-        detailColor: lowStockCount > 0 ? '#D40019' : '#454853',
+        detailColor: lowStockCount > 0 ? colors.danger : colors.textHeading,
         title: 'PRODUCTS',
         value: String(products.length),
       },
@@ -164,25 +164,25 @@ export default function AdminScreen() {
             key={card.title}
             detail={card.detail}
             detailColor={card.detailColor}
-            minHeight={146}
+            minHeight={compactPhone ? 138 : 146}
             title={card.title}
-            titleColor="#303546"
-            titleLetterSpacing={2.4}
-            titleMarginBottom={18}
+            titleColor={colors.textHeading}
+            titleLetterSpacing={compactPhone ? 1 : 1.8}
+            titleMarginBottom={compactPhone ? 12 : 16}
             value={card.value}
-            valueColor="#111111"
-            valueFontSize={28}
-            valueLineHeight={33}
-            valueMarginBottom={10}
+            valueColor={colors.neutral}
+            valueFontSize={compactPhone ? 24 : 28}
+            valueLineHeight={compactPhone ? 28 : 33}
+            valueMarginBottom={compactPhone ? 8 : 10}
           />
         ))}
       </AdminMetricGrid>
 
-      <SurfaceCard style={styles.revenueCard}>
-        <View style={styles.revenueHeader}>
+      <SurfaceCard style={[styles.revenueCard, compactPhone && styles.revenueCardCompact]}>
+        <View style={[styles.revenueHeader, compactPhone && styles.revenueHeaderCompact]}>
           <Text style={styles.revenueTitle}>Weekly Revenue</Text>
-          <View style={styles.periodPill}>
-            <CalendarDays color="#3F4454" size={14} strokeWidth={1.9} />
+          <View style={[styles.periodPill, compactPhone && styles.periodPillCompact]}>
+            <CalendarDays color={colors.textHeading} size={14} strokeWidth={1.9} />
             <Text style={styles.periodText}>LIVE DATA</Text>
           </View>
         </View>
@@ -205,12 +205,14 @@ export default function AdminScreen() {
       <View style={styles.transactionsList}>
         {sales.length > 0 ? (
           sales.slice(0, 5).map((transaction) => (
-            <SurfaceCard key={transaction.id} style={styles.transactionCard}>
-              <View style={styles.receiptBadge}>
+            <SurfaceCard
+              key={transaction.id}
+              style={[styles.transactionCard, compactPhone && styles.transactionCardCompact]}>
+              <View style={[styles.receiptBadge, compactPhone && styles.receiptBadgeCompact]}>
                 <FileText color={colors.secondary} size={25} strokeWidth={1.9} />
               </View>
 
-              <View style={styles.transactionBody}>
+              <View style={[styles.transactionBody, compactPhone && styles.transactionBodyCompact]}>
                 <View>
                   <Text style={styles.transactionTitle}>{transaction.receiptNumber}</Text>
                   <Text style={styles.transactionMeta}>
@@ -252,11 +254,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: radius.xl,
     paddingTop: 26,
   },
+  revenueCardCompact: {
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+  },
   revenueHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 26,
+  },
+  revenueHeaderCompact: {
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   revenueTitle: {
     color: colors.secondary,
@@ -265,15 +277,20 @@ const styles = StyleSheet.create({
   },
   periodPill: {
     alignItems: 'center',
-    backgroundColor: '#F0F1F5',
+    backgroundColor: colors.surfaceNeutral,
     borderRadius: radius.sm,
     flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 9,
   },
+  periodPillCompact: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 7,
+  },
   periodText: {
-    color: '#3F4454',
+    color: colors.textHeading,
     ...textRoles.label,
   },
   transactionsHeader: {
@@ -284,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.block,
   },
   transactionsHeading: {
-    color: '#171C28',
+    color: colors.textStrong,
     ...textRoles.label,
     fontSize: textSizes.medium,
     letterSpacing: 2.2,
@@ -298,14 +315,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: radius.xl,
     paddingVertical: 20,
   },
+  transactionCardCompact: {
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
   receiptBadge: {
     alignItems: 'center',
-    backgroundColor: '#F3F4F7',
+    backgroundColor: colors.surfaceNeutral,
     borderRadius: 12,
     height: 60,
     justifyContent: 'center',
     marginRight: 16,
     width: 60,
+  },
+  receiptBadgeCompact: {
+    height: 48,
+    marginRight: 12,
+    width: 48,
   },
   transactionBody: {
     alignItems: 'center',
@@ -313,14 +340,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  transactionBodyCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
   transactionTitle: {
-    color: '#151821',
+    color: colors.textStrong,
     ...textRoles.value,
     fontSize: 19,
     marginBottom: 4,
   },
   transactionMeta: {
-    color: '#404552',
+    color: colors.textHeading,
     ...textRoles.label,
     fontSize: 14,
   },
@@ -337,12 +369,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   emptyCardText: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 22,
   },
   errorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: spacing.lg,

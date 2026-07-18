@@ -4,15 +4,25 @@ import {
   createSaleWithInventoryUpdate,
   isValidSaleItem,
 } from "../services/sale.service.js";
+import type { AuthenticatedRequest } from "../types/express.js";
 
 const allowedPaymentMethods = new Set(["Cash", "GCash"]);
 
 export const getSales = async (
-  _req: Request,
+  req: Request,
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
     const sales = await prisma.sale.findMany({
+      ...(isAdmin
+        ? {}
+        : {
+            where: {
+              userId: authReq.authUser.id,
+            },
+          }),
       include: {
         customer: true,
         items: {
@@ -56,6 +66,7 @@ export const getSaleById = async (
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const id = Number(req.params.id);
 
     const sale = await prisma.sale.findUnique({
@@ -99,6 +110,14 @@ export const getSaleById = async (
       });
     }
 
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
+
+    if (!isAdmin && sale.user.id !== authReq.authUser.id) {
+      return res.status(403).json({
+        message: "Cashiers can only access their own sales",
+      });
+    }
+
     res.json(sale);
   } catch (error) {
     console.error(error);
@@ -114,6 +133,8 @@ export const createSale = async (
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
     const {
       receiptNumber,
       subtotal,
@@ -123,7 +144,7 @@ export const createSale = async (
       changeAmount,
       paymentMethod = "Cash",
       customerId,
-      userId,
+      userId: requestedUserId,
       shiftId,
       items,
     } = req.body as {
@@ -146,7 +167,11 @@ export const createSale = async (
       });
     }
 
-    if (typeof userId !== "number") {
+    const saleUserId = isAdmin
+      ? requestedUserId ?? authReq.authUser.id
+      : authReq.authUser.id;
+
+    if (typeof saleUserId !== "number") {
       return res.status(400).json({
         message: "User ID is required",
       });
@@ -186,7 +211,7 @@ export const createSale = async (
       amountPaid,
       changeAmount,
       paymentMethod,
-      userId,
+      userId: saleUserId,
       items,
       ...(customerId !== undefined ? { customerId } : {}),
       ...(shiftId !== undefined ? { shiftId } : {}),

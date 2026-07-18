@@ -177,7 +177,7 @@ export function AddProductModal({
               {categoryValue || 'Select a category'}
             </Text>
             <ChevronDown
-              color="#4B5060"
+              color={colors.textSoft}
               size={24}
               strokeWidth={2.2}
               style={categoryDropdownOpen ? styles.dropdownChevronOpen : undefined}
@@ -307,15 +307,15 @@ const styles = StyleSheet.create({
     marginBottom: 26,
   },
   fieldLabel: {
-    color: '#373C4A',
+    color: colors.textHeading,
     ...textRoles.label,
     fontSize: textSizes.medium,
     letterSpacing: 3,
     marginBottom: 14,
   },
   imagePicker: {
-    backgroundColor: '#F3F5FA',
-    borderColor: '#D4DAE7',
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderMuted,
     borderRadius: radius.xl,
     borderStyle: 'dashed',
     borderWidth: 1.5,
@@ -334,13 +334,13 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   imagePlaceholderTitle: {
-    color: '#172033',
+    color: colors.textDark,
     ...textRoles.value,
     fontSize: 18,
     marginTop: 12,
   },
   imagePlaceholderText: {
-    color: '#6A7284',
+    color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 8,
@@ -354,8 +354,8 @@ const styles = StyleSheet.create({
   },
   dropdownTrigger: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C8CDDD',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
@@ -368,24 +368,24 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 0,
   },
   dropdownTriggerError: {
-    borderColor: '#C62828',
+    borderColor: colors.dangerStrong,
   },
   dropdownTriggerText: {
-    color: '#14171F',
+    color: colors.textStrong,
     ...textRoles.body,
     flex: 1,
     fontSize: 18,
     marginRight: 10,
   },
   dropdownPlaceholderText: {
-    color: '#737A8D',
+    color: colors.textSubtle,
   },
   dropdownChevronOpen: {
     transform: [{ rotate: '180deg' }],
   },
   dropdownMenu: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C8CDDD',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderTopWidth: 0,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
@@ -402,14 +402,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   dropdownOptionActive: {
-    backgroundColor: '#EEF1FF',
+    backgroundColor: colors.surfaceInfoMuted,
   },
   dropdownOptionBorder: {
-    borderBottomColor: '#E5E8F0',
+    borderBottomColor: colors.divider,
     borderBottomWidth: 1,
   },
   dropdownOptionText: {
-    color: '#1F2533',
+    color: colors.textStrong,
     ...textRoles.body,
     fontSize: 17,
   },
@@ -418,13 +418,13 @@ const styles = StyleSheet.create({
     ...textRoles.value,
   },
   fieldErrorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 10,
   },
   createCategoryOption: {
-    borderTopColor: '#E5E8F0',
+    borderTopColor: colors.divider,
     borderTopWidth: 1,
     justifyContent: 'center',
     minHeight: 58,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   },
   barcodeSlot: {
     alignItems: 'center',
-    backgroundColor: '#F2F3F7',
+    backgroundColor: colors.surfaceNeutral,
     borderRadius: 14,
     height: 64,
     justifyContent: 'center',
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   errorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 8,

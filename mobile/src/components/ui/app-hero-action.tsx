@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { TouchableRipple } from 'react-native-paper';
 
 import { radius, shadows, spacing } from '../../constants/design-system';
-import { fonts } from '../../constants/theme';
+import { colors, fonts, textSizes } from '../../constants/theme';
 
 type AppHeroActionProps = {
   icon: ReactNode;
@@ -36,7 +36,7 @@ export function AppHeroAction({
 const styles = StyleSheet.create({
   button: {
     alignSelf: 'stretch',
-    backgroundColor: '#133CBE',
+    backgroundColor: colors.hero,
     borderRadius: radius.lg,
     minHeight: 62,
     minWidth: 194,
@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   label: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontFamily: fonts.semiBold,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
   },
   subtitle: {
-    color: '#D8E4FF',
+    color: colors.textOnSecondaryMuted,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     marginTop: 2,
   },
   textWrap: {

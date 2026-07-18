@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import axios from 'axios';
 import { Platform } from 'react-native';
+import { getAuthToken } from './auth-session';
 
 const DEV_API_PORT = '5001';
 
@@ -51,6 +52,18 @@ export const API_BASE_URL =
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 5000,
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = getAuthToken();
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else if (config.headers?.Authorization) {
+    delete config.headers.Authorization;
+  }
+
+  return config;
 });
 
 export function resolveApiAssetUrl(value?: string | null) {

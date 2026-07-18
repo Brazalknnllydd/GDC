@@ -1,9 +1,16 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 import { resolveApiAssetUrl } from '../../lib/api';
 import { AppButton } from '../ui/app-button';
 
@@ -24,11 +31,12 @@ export function CashierProductCard({
   stock,
   style,
 }: CashierProductCardProps) {
+  const { compactPhone } = useResponsiveLayout();
   const resolvedImage = resolveApiAssetUrl(imageUrl);
 
   return (
-    <View style={[styles.card, style]}>
-      <View style={styles.imageWrap}>
+    <View style={[styles.card, compactPhone && styles.cardCompact, style]}>
+      <View style={[styles.imageWrap, compactPhone && styles.imageWrapCompact]}>
         {resolvedImage ? (
           <Image contentFit="cover" source={{ uri: resolvedImage }} style={styles.image} />
         ) : (
@@ -43,10 +51,10 @@ export function CashierProductCard({
         ) : null}
       </View>
 
-      <Text numberOfLines={2} style={styles.name}>
+      <Text numberOfLines={2} style={[styles.name, compactPhone && styles.nameCompact]}>
         {name}
       </Text>
-      <Text style={styles.price}>{price}</Text>
+      <Text style={[styles.price, compactPhone && styles.priceCompact]}>{price}</Text>
 
       <AppButton
         fullWidth
@@ -62,12 +70,15 @@ export function CashierProductCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.md,
     width: '48%',
+  },
+  cardCompact: {
+    padding: spacing.sm + 2,
   },
   imageWrap: {
     borderRadius: radius.md,
@@ -76,23 +87,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  imageWrapCompact: {
+    height: 110,
+    marginBottom: spacing.sm,
+  },
   image: {
     height: '100%',
     width: '100%',
   },
   fallbackImage: {
     alignItems: 'center',
-    backgroundColor: '#D8DEE9',
+    backgroundColor: colors.fallbackImage,
     flex: 1,
     justifyContent: 'center',
   },
   fallbackText: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 20,
+    fontSize: textSizes.titleLarge,
   },
   lowBadge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.surfaceDanger,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -101,22 +116,31 @@ const styles = StyleSheet.create({
     top: spacing.sm,
   },
   lowBadgeText: {
-    color: '#B91C1C',
+    color: colors.dangerStrong,
     ...textRoles.label,
-    fontSize: 10,
+    fontSize: textSizes.xsmall,
   },
   name: {
-    color: '#131927',
+    color: colors.textStrong,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: textSizes.body,
     lineHeight: 19,
     marginBottom: spacing.xs,
     minHeight: 38,
   },
+  nameCompact: {
+    fontSize: textSizes.small + 1,
+    lineHeight: 18,
+    minHeight: 36,
+  },
   price: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 16,
+    fontSize: textSizes.medium,
     marginBottom: spacing.md,
+  },
+  priceCompact: {
+    fontSize: textSizes.bodyLarge,
+    marginBottom: spacing.sm,
   },
 });

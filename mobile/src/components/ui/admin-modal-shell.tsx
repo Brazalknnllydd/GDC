@@ -75,7 +75,7 @@ export function AdminModalShell({
               <Text style={styles.title}>{title}</Text>
             </View>
             <IconButton
-              icon={() => <X color="#666C7A" size={25} strokeWidth={2.1} />}
+              icon={() => <X color={colors.textTertiary} size={25} strokeWidth={2.1} />}
               onPress={onClose}
               size={22}
               style={styles.closeButton}
@@ -93,7 +93,7 @@ export function AdminModalShell({
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: 'rgba(29, 31, 42, 0.34)',
+    backgroundColor: colors.overlayScrim,
     justifyContent: 'center',
     marginHorizontal: 12,
     paddingHorizontal: 12,
@@ -101,8 +101,8 @@ const styles = StyleSheet.create({
   },
   card: {
     alignSelf: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
+    backgroundColor: colors.card,
+    borderRadius: radius.xxl,
     display: 'flex',
     elevation: 3,
     flexShrink: 1,
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    borderBottomColor: '#E8EAF1',
+    borderBottomColor: colors.dividerStrong,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   title: {
-    color: '#292E3D',
+    color: colors.textHeading,
     ...textRoles.value,
     fontSize: 18,
   },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   footer: {
-    borderTopColor: '#E8EAF1',
+    borderTopColor: colors.dividerStrong,
     borderTopWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 16,

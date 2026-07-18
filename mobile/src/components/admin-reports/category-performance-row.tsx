@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { radius } from '../../constants/design-system';
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
 
 type CategoryPerformanceRowProps = {
@@ -28,24 +28,24 @@ export function CategoryPerformanceRow({
 
 const styles = StyleSheet.create({
   row: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   label: {
-    color: '#1F2330',
+    color: colors.textStrong,
     ...textRoles.body,
   },
   value: {
-    color: '#3E4455',
+    color: colors.textSoft,
     ...textRoles.label,
   },
   track: {
-    backgroundColor: '#E6E8EF',
+    backgroundColor: colors.dividerStrong,
     borderRadius: radius.round,
     height: 7,
     overflow: 'hidden',

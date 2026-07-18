@@ -1,6 +1,6 @@
-import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, type StyleProp, type TextStyle } from 'react-native';
 
-import { textRoles, textSizes } from '../../constants/theme';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 
 type SectionHeadingProps = {
   children: string;
@@ -8,14 +8,25 @@ type SectionHeadingProps = {
 };
 
 export function SectionHeading({ children, style }: SectionHeadingProps) {
-  return <Text style={[styles.heading, style]}>{children}</Text>;
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
+
+  return (
+    <Text style={[styles.heading, isCompactPhone ? styles.headingCompact : undefined, style]}>
+      {children}
+    </Text>
+  );
 }
 
 const styles = StyleSheet.create({
   heading: {
-    color: '#2D3141',
+    color: colors.textHeading,
     ...textRoles.label,
     fontSize: textSizes.small + 2,
-    letterSpacing: 3,
+    letterSpacing: 2.4,
+  },
+  headingCompact: {
+    fontSize: 13,
+    letterSpacing: 2.1,
   },
 });

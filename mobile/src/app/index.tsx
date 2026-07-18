@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -16,8 +16,15 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeClosed, LogIn, Lock, ShieldCheck, User } from 'lucide-react-native';
 
-import { colors, fonts } from '../constants/theme';
+import { controlHeights, radius, shadows, spacing } from '../constants/design-system';
+import { colors, fonts, textSizes } from '../constants/theme';
 import { API_BASE_URL } from '../lib/api';
+import {
+  clearAuthSession,
+  getAuthUser,
+  restoreAuthSession,
+  saveAuthSession,
+} from '../lib/auth-session';
 
 type AuthUser = {
   id: number;
@@ -32,9 +39,54 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function resumeSession() {
+      try {
+        await restoreAuthSession();
+        const sessionUser = getAuthUser();
+
+        if (!mounted || !sessionUser) {
+          return;
+        }
+
+        setAuthenticatedUser(sessionUser);
+
+        if (sessionUser.role.toLowerCase() === 'admin') {
+          router.replace({
+            pathname: '/admin',
+            params: {
+              name: sessionUser.name,
+            },
+          });
+          return;
+        }
+
+        router.replace({
+          pathname: '/cashier',
+          params: {
+            name: sessionUser.name,
+          },
+        });
+      } finally {
+        if (mounted) {
+          setIsRestoringSession(false);
+        }
+      }
+    }
+
+    resumeSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
@@ -49,12 +101,14 @@ export default function LoginScreen() {
       setErrorMessage('');
       setAuthenticatedUser(null);
       setToken('');
+      await clearAuthSession();
 
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         username: trimmedUsername,
         password,
       });
 
+      await saveAuthSession(response.data.token, response.data.user);
       setToken(response.data.token);
       setAuthenticatedUser(response.data.user);
       setPassword('');
@@ -73,10 +127,10 @@ export default function LoginScreen() {
         pathname: '/cashier',
         params: {
           name: response.data.user.name,
-          userId: String(response.data.user.id),
         },
       });
     } catch (error) {
+      await clearAuthSession();
       if (axios.isAxiosError(error)) {
         setErrorMessage(error.response?.data?.message ?? 'Unable to sign in right now.');
       } else {
@@ -127,7 +181,7 @@ export default function LoginScreen() {
                   editable={!isSubmitting}
                   onChangeText={setUsername}
                   placeholder="Enter username"
-                  placeholderTextColor="#A0A7B4"
+                  placeholderTextColor={colors.textSubtle}
                   returnKeyType="next"
                   style={styles.input}
                   value={username}
@@ -148,7 +202,7 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   onSubmitEditing={handleLogin}
                   placeholder="Password"
-                  placeholderTextColor="#A0A7B4"
+                  placeholderTextColor={colors.textSubtle}
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
                   style={styles.input}
@@ -179,19 +233,19 @@ export default function LoginScreen() {
               )}
 
               <Pressable
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRestoringSession}
                 onPress={handleLogin}
                 style={({ pressed }) => [
                   styles.authorizeButton,
-                  isSubmitting && styles.authorizeButtonDisabled,
-                  pressed && !isSubmitting && styles.authorizeButtonPressed,
+                  (isSubmitting || isRestoringSession) && styles.authorizeButtonDisabled,
+                  pressed && !isSubmitting && !isRestoringSession && styles.authorizeButtonPressed,
                 ]}>
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                {isSubmitting || isRestoringSession ? (
+                  <ActivityIndicator color={colors.textInverse} />
                 ) : (
                   <>
                     <Text style={styles.authorizeText}>AUTHORIZE</Text>
-                    <LogIn size={22} color="#FFFFFF" />
+                    <LogIn size={22} color={colors.textInverse} />
                   </>
                 )}
               </Pressable>
@@ -207,7 +261,7 @@ export default function LoginScreen() {
 
             <View style={styles.statusRow}>
               <View style={styles.statusItem}>
-                <ShieldCheck size={15} color="#3C87F7" />
+                <ShieldCheck size={15} color={colors.info} />
                 <Text style={styles.statusLabel}>SECURE</Text>
               </View>
 
@@ -227,42 +281,36 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FBF8F2',
+    backgroundColor: colors.background,
   },
   background: {
     flex: 1,
-    backgroundColor: '#FBF8F2',
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 28,
-    paddingTop: 16,
-    paddingBottom: 28,
+    paddingHorizontal: spacing.section,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.section,
     alignItems: 'center',
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: spacing.section - 2,
   },
   logoTile: {
     width: 150,
     height: 150,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.xxl + 2,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 22,
+    marginBottom: spacing.xxl,
     overflow: 'hidden',
-    shadowColor: '#0C2546',
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    ...shadows.floating,
     elevation: 8,
   },
   logoImage: {
@@ -270,29 +318,29 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   brandTitle: {
-    color: '#0C2546',
+    color: colors.textDark,
     fontFamily: fonts.bold,
     fontSize: 34,
     lineHeight: 38,
-    marginBottom: 10,
+    marginBottom: spacing.sm + 2,
   },
   brandSubtitle: {
-    color: '#3F4652',
+    color: colors.textSoft,
     fontFamily: fonts.semiBold,
-    fontSize: 12,
+    fontSize: textSizes.small,
     letterSpacing: 4,
     textAlign: 'center',
   },
   card: {
     width: '100%',
     maxWidth: 640,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 28,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
+    paddingHorizontal: spacing.xl + 4,
+    paddingVertical: spacing.section,
     borderWidth: 1,
-    borderColor: '#E6EAF1',
-    shadowColor: '#0C2546',
+    borderColor: colors.borderSoft,
+    shadowColor: colors.textDark,
     shadowOpacity: 0.1,
     shadowRadius: 24,
     shadowOffset: {
@@ -304,32 +352,32 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm + 2,
   },
   cardAccent: {
     width: 8,
     height: 44,
-    borderRadius: 999,
-    backgroundColor: '#EF4444',
-    marginRight: 14,
+    borderRadius: radius.round,
+    backgroundColor: colors.danger,
+    marginRight: spacing.md + 2,
   },
   cardTitle: {
-    color: '#171C24',
+    color: colors.textStrong,
     fontFamily: fonts.bold,
-    fontSize: 22,
+    fontSize: textSizes.large,
   },
   cardDescription: {
-    color: '#4B5563',
+    color: colors.textSoft,
     fontFamily: fonts.regular,
-    fontSize: 14,
-    marginBottom: 28,
+    fontSize: textSizes.body,
+    marginBottom: spacing.section,
   },
   fieldLabel: {
-    color: '#353C47',
+    color: colors.textHeading,
     fontFamily: fonts.bold,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.4,
-    marginBottom: 10,
+    marginBottom: spacing.sm + 2,
   },
   passwordHeader: {
     flexDirection: 'row',
@@ -338,69 +386,69 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   helpText: {
-    color: '#1459B8',
+    color: colors.info,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   inputContainer: {
-    minHeight: 60,
-    borderRadius: 16,
+    minHeight: controlHeights.md + 8,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
-    borderColor: '#C9D2DE',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: spacing.xxl,
   },
   input: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
     color: colors.text,
     fontFamily: fonts.regular,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
     paddingVertical: Platform.select({ web: 14, default: 10 }),
   },
   eyeButton: {
-    paddingLeft: 12,
+    paddingLeft: spacing.md,
   },
   errorText: {
-    color: '#B42318',
+    color: colors.dangerStrong,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     marginTop: -6,
-    marginBottom: 14,
+    marginBottom: spacing.md + 2,
   },
   successBanner: {
-    backgroundColor: '#ECFDF3',
-    borderColor: '#ABEFC6',
+    backgroundColor: colors.surfaceSuccessSoft,
+    borderColor: colors.borderSuccess,
     borderRadius: 14,
     borderWidth: 1,
     marginTop: -6,
-    marginBottom: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginBottom: spacing.md + 2,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
   },
   successTitle: {
-    color: '#067647',
+    color: colors.successStrong,
     fontFamily: fonts.bold,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
   },
   successMeta: {
-    color: '#067647',
+    color: colors.successStrong,
     fontFamily: fonts.regular,
-    fontSize: 12,
+    fontSize: textSizes.small,
     marginTop: 2,
   },
   authorizeButton: {
-    minHeight: 62,
-    borderRadius: 16,
-    backgroundColor: '#0C2546',
-    marginTop: 8,
+    minHeight: controlHeights.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.textDark,
+    marginTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0C2546',
+    shadowColor: colors.textDark,
     shadowOpacity: 0.18,
     shadowRadius: 14,
     shadowOffset: {
@@ -416,60 +464,60 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   authorizeText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontFamily: fonts.bold,
-    fontSize: 18,
+    fontSize: textSizes.title,
     letterSpacing: 2.2,
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   divider: {
     height: 1,
-    backgroundColor: '#E7EBF0',
-    marginVertical: 28,
+    backgroundColor: colors.dividerStrong,
+    marginVertical: spacing.section,
   },
   supportSection: {
     alignItems: 'center',
     gap: 4,
   },
   supportText: {
-    color: '#414A57',
+    color: colors.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
     textAlign: 'center',
   },
   supportLink: {
-    color: '#DC2626',
+    color: colors.danger,
     fontFamily: fonts.bold,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
     marginTop: 4,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 28,
-    marginBottom: 24,
+    marginTop: spacing.section,
+    marginBottom: spacing.xl + 4,
   },
   statusItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusLabel: {
-    color: '#363D47',
+    color: colors.textHeading,
     fontFamily: fonts.bold,
-    fontSize: 12,
-    marginLeft: 8,
+    fontSize: textSizes.small,
+    marginLeft: spacing.sm,
   },
   statusToken: {
-    color: '#067647',
+    color: colors.successStrong,
     fontFamily: fonts.medium,
-    fontSize: 12,
-    marginLeft: 14,
+    fontSize: textSizes.small,
+    marginLeft: spacing.md + 2,
   },
   footerText: {
-    color: '#3F4652',
+    color: colors.textSoft,
     fontFamily: fonts.regular,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     textAlign: 'center',
     maxWidth: 420,
   },

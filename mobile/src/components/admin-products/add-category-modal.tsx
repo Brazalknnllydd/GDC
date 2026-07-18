@@ -1,40 +1,58 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-import { textRoles } from '../../constants/theme';
+import { spacing } from '../../constants/design-system';
+import { colors, textRoles } from '../../constants/theme';
+import { categoryFormSchema, type CategoryFormValues } from '../../lib/form-schemas';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
 import { ModalActions } from '../ui/modal-actions';
 import { ProductFormInput } from '../ui/product-form-input';
 
 type AddCategoryModalProps = {
-  categoryDescription: string;
-  categoryError: string;
-  categoryName: string;
   isSavingCategory: boolean;
+  initialValues: {
+    categoryDescription: string;
+    categoryName: string;
+  };
   mode: 'create' | 'edit';
-  onChangeCategoryDescription: (value: string) => void;
-  onChangeCategoryName: (value: string) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: CategoryFormValues) => void;
+  serverError: string;
   visible: boolean;
 };
 
 export function AddCategoryModal({
-  categoryDescription,
-  categoryError,
-  categoryName,
   isSavingCategory,
+  initialValues,
   mode,
-  onChangeCategoryDescription,
-  onChangeCategoryName,
   onClose,
   onSave,
+  serverError,
   visible,
 }: AddCategoryModalProps) {
   const isEditing = mode === 'edit';
+  const {
+    control,
+    formState: { errors },
+    handleSubmit,
+    reset,
+  } = useForm<CategoryFormValues>({
+    defaultValues: initialValues,
+    resolver: zodResolver(categoryFormSchema),
+  });
+
+  useEffect(() => {
+    if (visible) {
+      reset(initialValues);
+    }
+  }, [initialValues, reset, visible]);
 
   return (
     <AdminModalShell
+      maxHeight="72%"
       onClose={onClose}
       title={isEditing ? 'Edit Category' : 'Add Category'}
       visible={visible}
@@ -44,40 +62,58 @@ export function AddCategoryModal({
           <AppButton
             label={isEditing ? 'Update' : 'Save'}
             loading={isSavingCategory}
-            onPress={onSave}
+            onPress={handleSubmit(onSave)}
             variant="primary"
           />
         </ModalActions>
       }>
-      <View style={styles.body}>
-        <ProductFormInput
-          label="CATEGORY NAME"
-          onChangeText={onChangeCategoryName}
-          placeholder="e.g. Frozen Meat"
-          value={categoryName}
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}>
+        <Controller
+          control={control}
+          name="categoryName"
+          render={({ field: { onChange, value } }) => (
+            <ProductFormInput
+              compact
+              errorMessage={errors.categoryName?.message}
+              label="CATEGORY NAME"
+              onChangeText={onChange}
+              placeholder="e.g. Frozen Meat"
+              value={value}
+            />
+          )}
         />
 
-        <ProductFormInput
-          label="DESCRIPTION"
-          multiline
-          numberOfLines={4}
-          onChangeText={onChangeCategoryDescription}
-          placeholder="Short details about this category"
-          value={categoryDescription}
+        <Controller
+          control={control}
+          name="categoryDescription"
+          render={({ field: { onChange, value } }) => (
+            <ProductFormInput
+              compact
+              errorMessage={errors.categoryDescription?.message}
+              label="DESCRIPTION"
+              multiline
+              numberOfLines={4}
+              onChangeText={onChange}
+              placeholder="Short details about this category"
+              value={value}
+            />
+          )}
         />
 
-        {categoryError ? <Text style={styles.errorText}>{categoryError}</Text> : null}
-      </View>
+        {serverError ? <Text style={styles.errorText}>{serverError}</Text> : null}
+      </ScrollView>
     </AdminModalShell>
   );
 }
 
 const styles = StyleSheet.create({
   body: {
-    paddingBottom: 20,
+    paddingBottom: spacing.md,
   },
   errorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 12,

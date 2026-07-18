@@ -1,20 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
-import { formatCashierTime, formatShiftDuration } from '../../lib/cashier-formatters';
-import { formatPeso } from '../../lib/product-utils';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
+import { formatCashierTime } from '../../lib/cashier-formatters';
 
 type CashierShiftCardProps = {
-  durationMinutes: number;
-  openingCash: number;
   startedAt: string;
   status: string;
 };
 
 export function CashierShiftCard({
-  durationMinutes,
-  openingCash,
   startedAt,
   status,
 }: CashierShiftCardProps) {
@@ -27,10 +22,6 @@ export function CashierShiftCard({
           <View style={styles.statusDot} />
           <Text style={styles.statusText}>{status.toUpperCase()}</Text>
         </View>
-        <View style={styles.durationWrap}>
-          <Text style={styles.metaLabel}>DURATION</Text>
-          <Text style={styles.durationValue}>{formatShiftDuration(durationMinutes)}</Text>
-        </View>
       </View>
 
       <Text style={styles.title}>Current Shift</Text>
@@ -41,10 +32,6 @@ export function CashierShiftCard({
         <View>
           <Text style={styles.metaLabel}>STARTED AT</Text>
           <Text style={styles.metaValue}>{formatCashierTime(startedAtDate)}</Text>
-        </View>
-        <View>
-          <Text style={styles.metaLabel}>OPENING CASH</Text>
-          <Text style={styles.metaValue}>{formatPeso(openingCash)}</Text>
         </View>
       </View>
     </View>
@@ -66,60 +53,50 @@ const styles = StyleSheet.create({
   },
   statusPill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.overlayInverse12,
     borderRadius: radius.round,
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   statusDot: {
-    backgroundColor: '#5BF08C',
+    backgroundColor: colors.accentDot,
     borderRadius: radius.round,
     height: 8,
     marginRight: spacing.sm,
     width: 8,
   },
   statusText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     letterSpacing: 1,
   },
-  durationWrap: {
-    alignItems: 'flex-end',
-  },
   metaLabel: {
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.overlayInverse72,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.3,
   },
-  durationValue: {
-    color: '#FFFFFF',
-    fontFamily: fonts.bold,
-    fontSize: 18,
-    marginTop: 4,
-  },
   title: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontFamily: fonts.regular,
-    fontSize: 31,
+    fontSize: textSizes.hero + 1,
     lineHeight: 36,
     marginTop: spacing.lg,
   },
   divider: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.overlayInverse12,
     height: 1,
     marginVertical: spacing.xl,
   },
   bottomRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   metaValue: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     ...textRoles.value,
-    fontSize: 16,
+    fontSize: textSizes.medium,
     marginTop: 6,
   },
 });

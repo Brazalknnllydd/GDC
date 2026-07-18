@@ -2,7 +2,8 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Pencil, Trash2 } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
-import { colors, textRoles } from '../../constants/theme';
+import { radius, spacing } from '../../constants/design-system';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 import { resolveApiAssetUrl } from '../../lib/api';
 import { AppButton } from './app-button';
 import { SurfaceCard } from './surface-card';
@@ -88,18 +89,18 @@ export function ProductListItem({
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    padding: 14,
+    padding: spacing.md + 2,
   },
   cardCompact: {
     alignItems: 'flex-start',
   },
   thumb: {
     alignItems: 'center',
-    backgroundColor: '#132A3E',
-    borderRadius: 12,
+    backgroundColor: colors.textDark,
+    borderRadius: radius.md,
     height: 112,
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: spacing.lg,
     overflow: 'hidden',
     position: 'relative',
     width: 112,
@@ -109,24 +110,24 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   thumbGlyph: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     ...textRoles.value,
-    fontSize: 24,
+    fontSize: textSizes.xlarge,
     letterSpacing: 2,
   },
   lowBadge: {
-    backgroundColor: '#E3342F',
-    borderRadius: 6,
+    backgroundColor: colors.dangerAccent,
+    borderRadius: radius.sm - 4,
     bottom: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     position: 'absolute',
     right: 8,
   },
   lowBadgeText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     ...textRoles.label,
-    fontSize: 10,
+    fontSize: textSizes.xsmall,
   },
   body: {
     flex: 1,
@@ -138,43 +139,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   name: {
-    color: '#1A1D26',
+    color: colors.textStrong,
     flex: 1,
     ...textRoles.value,
-    fontSize: 20,
-    marginRight: 8,
+    fontSize: textSizes.titleLarge,
+    marginRight: spacing.sm,
   },
   meta: {
-    color: '#3E4453',
+    color: colors.textSoft,
     ...textRoles.label,
-    marginTop: 6,
+    marginTop: spacing.sm - 2,
   },
   category: {
     color: colors.secondary,
     ...textRoles.label,
   },
   units: {
-    color: '#3E4453',
+    color: colors.textSoft,
     ...textRoles.label,
-    marginTop: 6,
+    marginTop: spacing.sm - 2,
   },
   unitsLow: {
-    color: '#D11D1D',
+    color: colors.danger,
   },
   bottomRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   bottomRowCompact: {
     alignItems: 'flex-start',
     flexDirection: 'column',
-    gap: 12,
+    gap: spacing.md,
   },
   actions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.sm + 2,
   },
   actionsCompact: {
     width: '100%',
@@ -182,6 +183,6 @@ const styles = StyleSheet.create({
   price: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 20,
+    fontSize: textSizes.titleLarge,
   },
 });

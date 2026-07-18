@@ -7,12 +7,14 @@ import {
 } from 'react-native';
 import { HelperText, TextInput } from 'react-native-paper';
 
-import { textRoles, textSizes } from '../../constants/theme';
+import { controlHeights, radius, spacing } from '../../constants/design-system';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 
 type ProductFormInputProps = {
   label: string;
   placeholder: string;
   value: string;
+  compact?: boolean;
   errorMessage?: string;
   onChangeText?: (value: string) => void;
   keyboardType?: KeyboardTypeOptions;
@@ -27,6 +29,7 @@ export function ProductFormInput({
   label,
   placeholder,
   value,
+  compact = false,
   errorMessage,
   onChangeText,
   keyboardType,
@@ -41,7 +44,12 @@ export function ProductFormInput({
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputWrap}>
         <TextInput
-          contentStyle={[styles.input, multiline ? styles.inputMultiline : undefined]}
+          contentStyle={[
+            styles.input,
+            compact ? styles.inputCompact : undefined,
+            multiline ? styles.inputMultiline : undefined,
+            multiline && compact ? styles.inputMultilineCompact : undefined,
+          ]}
           editable={editable}
           error={!!errorMessage}
           keyboardType={keyboardType}
@@ -49,12 +57,17 @@ export function ProductFormInput({
           multiline={multiline}
           numberOfLines={numberOfLines}
           onChangeText={onChangeText}
-          outlineColor="#C8CDDD"
+          outlineColor={colors.borderStrong}
           placeholder={placeholder}
           right={rightSlot ? <TextInput.Affix text="" /> : undefined}
           secureTextEntry={secureTextEntry}
-          selectionColor="#1A237E"
-          style={[styles.inputShell, multiline ? styles.inputShellMultiline : undefined]}
+          selectionColor={colors.secondary}
+          style={[
+            styles.inputShell,
+            compact ? styles.inputShellCompact : undefined,
+            multiline ? styles.inputShellMultiline : undefined,
+            multiline && compact ? styles.inputShellMultilineCompact : undefined,
+          ]}
           textAlignVertical={multiline ? 'top' : undefined}
           value={value}
         />
@@ -69,43 +82,55 @@ export function ProductFormInput({
 
 const styles = StyleSheet.create({
   fieldGroup: {
-    marginBottom: 26,
+    marginBottom: spacing.section - 2,
   },
   label: {
-    color: '#373C4A',
+    color: colors.textHeading,
     ...textRoles.label,
     fontSize: textSizes.medium,
     letterSpacing: 3,
-    marginBottom: 14,
+    marginBottom: spacing.lg - 2,
   },
   inputShell: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    minHeight: 86,
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    minHeight: controlHeights.input,
+  },
+  inputShellCompact: {
+    minHeight: controlHeights.inputCompact,
   },
   inputWrap: {
     justifyContent: 'center',
   },
   inputShellMultiline: {
-    minHeight: 132,
+    minHeight: controlHeights.inputMultiline,
+  },
+  inputShellMultilineCompact: {
+    minHeight: controlHeights.inputMultilineCompact,
   },
   input: {
-    color: '#14171F',
+    color: colors.textStrong,
     ...textRoles.body,
     fontSize: 18,
+  },
+  inputCompact: {
+    fontSize: 16,
   },
   inputMultiline: {
     minHeight: 96,
   },
+  inputMultilineCompact: {
+    minHeight: 84,
+  },
   rightSlot: {
     position: 'absolute',
-    right: 16,
+    right: spacing.lg,
   },
   errorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
-    marginTop: 6,
+    marginTop: spacing.sm - 2,
     minHeight: 22,
     paddingHorizontal: 0,
   },

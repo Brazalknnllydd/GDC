@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { layout } from '../../constants/design-system';
 
@@ -8,7 +8,10 @@ type AdminMetricGridProps = {
 };
 
 export function AdminMetricGrid({ children }: AdminMetricGridProps) {
-  return <View style={styles.grid}>{children}</View>;
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
+
+  return <View style={[styles.grid, isCompactPhone ? styles.gridCompact : undefined]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -18,5 +21,8 @@ const styles = StyleSheet.create({
     gap: layout.cardGap,
     justifyContent: 'space-between',
     width: '100%',
+  },
+  gridCompact: {
+    gap: 10,
   },
 });

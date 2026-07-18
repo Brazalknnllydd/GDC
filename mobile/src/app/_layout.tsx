@@ -8,8 +8,10 @@ import {
 } from "@expo-google-fonts/poppins";
 import { ActivityIndicator, View } from "react-native";
 import { PaperProvider } from "react-native-paper";
+import { useEffect, useState } from "react";
 
 import { paperTheme } from "../constants/paper-theme";
+import { restoreAuthSession } from "../lib/auth-session";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -18,8 +20,25 @@ export default function RootLayout() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+  const [sessionReady, setSessionReady] = useState(false);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    let mounted = true;
+
+    restoreAuthSession()
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) {
+          setSessionReady(true);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!fontsLoaded || !sessionReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator />

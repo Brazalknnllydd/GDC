@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import { FlashList } from '@shopify/flash-list';
 import {
   Platform,
   Pressable,
@@ -7,9 +8,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Plus, Search } from 'lucide-react-native';
+import { PackagePlus, Search, Shapes, Tags } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { AddCategoryModal } from '../components/admin-products/add-category-modal';
@@ -42,8 +44,8 @@ import { PaginationControls } from '../components/ui/pagination-controls';
 import { ProductListItem } from '../components/ui/product-list-item';
 import { SectionHeading } from '../components/ui/section-heading';
 import { AppButton } from '../components/ui/app-button';
-import { AppFab } from '../components/ui/app-fab';
 import { apiClient } from '../lib/api';
+import type { CategoryFormValues } from '../lib/form-schemas';
 
 const lowStockThreshold = 10;
 const productsPerPage = 10;
@@ -62,6 +64,8 @@ type SelectedProductImage = {
 };
 
 export default function AdminProductsScreen() {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
@@ -92,8 +96,6 @@ export default function AdminProductsScreen() {
   const [productFieldErrors, setProductFieldErrors] = useState<ProductFieldErrors>({});
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [categoryDescription, setCategoryDescription] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState('');
@@ -268,14 +270,14 @@ export default function AdminProductsScreen() {
     });
   }, [categories.length, products]);
 
-  async function handleSaveCategory() {
-    const trimmedName = newCategoryName.trim();
-    const trimmedDescription = categoryDescription.trim();
+  const editingCategory = useMemo(
+    () => categories.find((category) => category.id === editingCategoryId) ?? null,
+    [categories, editingCategoryId]
+  );
 
-    if (!trimmedName) {
-      setCategoryError('Category name is required.');
-      return;
-    }
+  async function handleSaveCategory(values: CategoryFormValues) {
+    const trimmedName = values.categoryName.trim();
+    const trimmedDescription = values.categoryDescription.trim();
 
     try {
       setIsSavingCategory(true);
@@ -335,23 +337,17 @@ export default function AdminProductsScreen() {
   function closeCategoryModal() {
     setShowAddCategory(false);
     setEditingCategoryId(null);
-    setNewCategoryName('');
-    setCategoryDescription('');
     setCategoryError('');
   }
 
   function openCreateCategoryModal() {
     setEditingCategoryId(null);
-    setNewCategoryName('');
-    setCategoryDescription('');
     setCategoryError('');
     setShowAddCategory(true);
   }
 
   function openEditCategoryModal(category: Category) {
     setEditingCategoryId(category.id);
-    setNewCategoryName(category.name);
-    setCategoryDescription(category.description || '');
     setCategoryError('');
     setShowAddCategory(true);
   }
@@ -653,27 +649,33 @@ export default function AdminProductsScreen() {
     <AdminPageScreen
       title="Products"
       introDescription="Manage inventory and pricing across all stores."
-      bottomNavItems={tabs}
-      floatingContent={
-        <AppFab
-          icon={<Plus color="#FFFFFF" size={34} strokeWidth={2.2} />}
-          onPress={openCreateProductModal}
-          style={styles.fab}
-        />
-      }>
-      <View style={styles.categoryActionsRow}>
+      bottomNavItems={tabs}>
+      <View style={[styles.categoryActionsRow, isCompactPhone && styles.categoryActionsColumn]}>
         <AppButton
-          fullWidth={false}
-          label="Add Category"
-          onPress={openCreateCategoryModal}
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <PackagePlus color={color} size={size} strokeWidth={2.1} />}
+          label="Add Product"
+          onPress={openCreateProductModal}
           size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
           variant="primary"
         />
         <AppButton
-          fullWidth={false}
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <Tags color={color} size={size} strokeWidth={2.1} />}
+          label="Add Category"
+          onPress={openCreateCategoryModal}
+          size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
+          variant="primary"
+        />
+        <AppButton
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <Shapes color={color} size={size} strokeWidth={2.1} />}
           label="Manage Categories"
           onPress={() => setShowManageCategories(true)}
           size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
           variant="secondary"
         />
       </View>
@@ -694,11 +696,11 @@ export default function AdminProductsScreen() {
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Search color="#6F7487" size={22} strokeWidth={2} />
+          <Search color={colors.textTertiary} size={22} strokeWidth={2} />
           <TextInput
             onChangeText={setSearchQuery}
             placeholder="Search products..."
-            placeholderTextColor="#747B8D"
+            placeholderTextColor={colors.textSubtle}
             style={styles.searchInput}
             value={searchQuery}
           />
@@ -745,20 +747,25 @@ export default function AdminProductsScreen() {
         {isLoadingProducts ? (
           <Text style={styles.emptyStateText}>Loading inventory...</Text>
         ) : filteredProducts.length > 0 ? (
-          paginatedProducts.map((product) => (
-            <ProductListItem
-              key={product.id}
-              category={product.category.name}
-              imageUrl={product.imageUrl}
-              low={product.stock <= lowStockThreshold}
-              name={product.name}
-              onDelete={() => requestDeleteProduct(product)}
-              onEdit={() => openEditProductModal(product)}
-              price={formatPeso(normalizeNumber(product.price))}
-              sku={product.barcode || `ID-${product.id}`}
-              unitsText={`${product.stock} ${product.unit} in stock`}
-            />
-          ))
+          <FlashList
+            data={paginatedProducts}
+            ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
+            keyExtractor={(product) => String(product.id)}
+            renderItem={({ item: product }) => (
+              <ProductListItem
+                category={product.category.name}
+                imageUrl={product.imageUrl}
+                low={product.stock <= lowStockThreshold}
+                name={product.name}
+                onDelete={() => requestDeleteProduct(product)}
+                onEdit={() => openEditProductModal(product)}
+                price={formatPeso(normalizeNumber(product.price))}
+                sku={product.barcode || `ID-${product.id}`}
+                unitsText={`${product.stock} ${product.unit} in stock`}
+              />
+            )}
+            scrollEnabled={false}
+          />
         ) : (
           <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
         )}
@@ -776,25 +783,15 @@ export default function AdminProductsScreen() {
       ) : null}
 
       <AddCategoryModal
-        categoryDescription={categoryDescription}
-        categoryError={categoryError}
-        categoryName={newCategoryName}
         isSavingCategory={isSavingCategory}
+        initialValues={{
+          categoryDescription: editingCategory?.description || '',
+          categoryName: editingCategory?.name || '',
+        }}
         mode={editingCategoryId ? 'edit' : 'create'}
-        onChangeCategoryDescription={(value) => {
-          setCategoryDescription(value);
-          if (categoryError) {
-            setCategoryError('');
-          }
-        }}
-        onChangeCategoryName={(value) => {
-          setNewCategoryName(value);
-          if (categoryError) {
-            setCategoryError('');
-          }
-        }}
         onClose={closeCategoryModal}
         onSave={handleSaveCategory}
+        serverError={categoryError}
         visible={showAddCategory}
       />
 
@@ -874,6 +871,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl + 4,
   },
+  categoryActionsColumn: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  mobileActionButton: {
+    width: '100%',
+  },
+  desktopActionButton: {
+    minWidth: 184,
+  },
   searchRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -882,31 +889,31 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.xl,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    minHeight: 76,
-    paddingHorizontal: spacing.xl,
+    minHeight: 60,
+    paddingHorizontal: spacing.lg,
   },
   searchInput: {
-    color: '#2E3341',
+    color: colors.textHeading,
     flex: 1,
     fontFamily: fonts.regular,
-    fontSize: 20,
-    marginLeft: 10,
+    fontSize: 17,
+    marginLeft: spacing.sm + 2,
   },
   chipsRow: {
     gap: spacing.md,
     paddingVertical: spacing.xl + 4,
   },
   filterSummaryText: {
-    color: '#687082',
+    color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   sectionHeading: {
     marginBottom: 18,
@@ -918,13 +925,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   feedbackSuccess: {
-    backgroundColor: '#E9F8EF',
-    borderColor: '#A6D9B6',
+    backgroundColor: colors.surfaceSuccessMuted,
+    borderColor: colors.borderSuccess,
     borderWidth: 1,
   },
   feedbackError: {
-    backgroundColor: '#FDECEC',
-    borderColor: '#E7B5B5',
+    backgroundColor: colors.surfaceDangerMuted,
+    borderColor: colors.borderDangerSoft,
     borderWidth: 1,
   },
   feedbackText: {
@@ -932,28 +939,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   feedbackTextSuccess: {
-    color: '#0D7A33',
+    color: colors.successBright,
   },
   feedbackTextError: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
   },
   screenErrorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginBottom: 12,
   },
   productsList: {
-    gap: 14,
+    minHeight: 60,
+  },
+  listSpacer: {
+    height: 14,
   },
   emptyStateText: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
-    fontSize: 17,
-  },
-  fab: {
-    bottom: 104,
-    position: 'absolute',
-    right: 22,
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

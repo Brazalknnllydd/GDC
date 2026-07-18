@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ComponentType } from 'react';
 import { ChevronRight } from 'lucide-react-native';
 
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
 import { SectionHeading } from './section-heading';
 import { SurfaceCard } from './surface-card';
@@ -43,7 +44,7 @@ export function SettingsMenuSection({ title, items }: SettingsMenuSectionProps) 
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </View>
 
-              <ChevronRight color="#666E84" size={18} strokeWidth={2} />
+              <ChevronRight color={colors.textTertiary} size={18} strokeWidth={2} />
             </Pressable>
           );
         })}
@@ -54,16 +55,16 @@ export function SettingsMenuSection({ title, items }: SettingsMenuSectionProps) 
 
 const styles = StyleSheet.create({
   sectionLabel: {
-    color: '#7A8092',
-    fontSize: 10,
+    color: colors.textSubtle,
+    fontSize: textSizes.xsmall,
     letterSpacing: 1.4,
-    marginBottom: 8,
-    marginLeft: 10,
-    marginTop: 18,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.sm + 2,
+    marginTop: spacing.lg + 2,
   },
   sectionCard: {
-    borderColor: '#D8DDE8',
-    borderRadius: 10,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.sm,
     overflow: 'hidden',
   },
   menuRow: {
@@ -71,10 +72,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     minHeight: 58,
-    paddingHorizontal: 14,
+    paddingHorizontal: spacing.md + 2,
   },
   menuRowBorder: {
-    borderBottomColor: '#E6EAF2',
+    borderBottomColor: colors.borderSoft,
     borderBottomWidth: 1,
   },
   menuRowLeft: {
@@ -84,14 +85,14 @@ const styles = StyleSheet.create({
   },
   iconChip: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: spacing.sm,
     height: 26,
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
     width: 26,
   },
   menuLabel: {
-    color: '#1F2430',
+    color: colors.textStrong,
     ...textRoles.label,
     fontSize: textSizes.small + 1,
   },

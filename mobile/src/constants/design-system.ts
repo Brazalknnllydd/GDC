@@ -1,3 +1,5 @@
+import { colors } from './theme';
+
 // Design system rules:
 // 1. Use spacing tokens instead of raw padding/margin values whenever possible.
 // 2. Use radius tokens for cards, pills, and inputs instead of ad hoc borderRadius values.
@@ -35,23 +37,38 @@ export const iconSizes = {
   xl: 31,
 };
 
+export const controlHeights = {
+  sm: 42,
+  md: 52,
+  lg: 62,
+  xl: 86,
+  inputCompact: 62,
+  input: 86,
+  inputMultilineCompact: 118,
+  inputMultiline: 132,
+  iconButton: 44,
+  fab: 72,
+};
+
 export const layout = {
   headerPaddingX: spacing.xxl,
   screenPaddingX: spacing.xxl,
   screenPaddingTop: spacing.xxl,
   screenPaddingBottom: 120,
   cardGap: spacing.md + 2,
+  floatingContentPadding: 178,
+  floatingContentPaddingCompact: 164,
 };
 
 export const shadows = {
   card: {
-    shadowColor: '#121B3E',
+    shadowColor: colors.textStrong,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
     shadowRadius: 10,
   },
   floating: {
-    shadowColor: '#0C2546',
+    shadowColor: colors.textDark,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.24,
     shadowRadius: 18,

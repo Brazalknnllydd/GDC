@@ -1,9 +1,15 @@
 import { Router } from "express";
 
-import { getCashierDashboardSummary } from "../controllers/cashier.controller.js";
+import { getAuthenticatedCashierDashboardSummary } from "../controllers/cashier.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/dashboard/:userId", getCashierDashboardSummary);
+router.get(
+  "/dashboard/me",
+  requireAuth,
+  requireRole(["Admin", "Cashier"]),
+  getAuthenticatedCashierDashboardSummary
+);
 
 export default router;

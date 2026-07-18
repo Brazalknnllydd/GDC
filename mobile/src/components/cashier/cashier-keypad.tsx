@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Delete } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts } from '../../constants/theme';
+import { colors, fonts, textSizes } from '../../constants/theme';
 
 type CashierKeypadProps = {
   onBackspace: () => void;
@@ -28,7 +28,7 @@ export function CashierKeypad({ onBackspace, onKeyPress }: CashierKeypadProps) {
             pressed && (keyValue === 'backspace' ? styles.keyBackspacePressed : styles.keyPressed),
           ]}>
           {keyValue === 'backspace' ? (
-            <Delete color="#D22D2D" size={18} strokeWidth={2.1} />
+            <Delete color={colors.dangerAccent} size={18} strokeWidth={2.1} />
           ) : (
             <Text style={styles.keyText}>{keyValue}</Text>
           )}
@@ -46,8 +46,8 @@ const styles = StyleSheet.create({
   },
   key: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DDEB',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.md,
     borderWidth: 1.1,
     height: 42,
@@ -56,18 +56,18 @@ const styles = StyleSheet.create({
     width: '31.3%',
   },
   keyPressed: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#B9C4F4',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfoStrong,
     transform: [{ scale: 0.97 }],
   },
   keyBackspacePressed: {
-    backgroundColor: '#FDEEEE',
-    borderColor: '#F2B8B5',
+    backgroundColor: colors.surfaceDangerMuted,
+    borderColor: colors.borderDangerSoft,
     transform: [{ scale: 0.97 }],
   },
   keyText: {
-    color: '#202636',
+    color: colors.textDark,
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: textSizes.medium,
   },
 });

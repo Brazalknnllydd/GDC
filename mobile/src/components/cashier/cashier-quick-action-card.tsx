@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts } from '../../constants/theme';
+import { colors, fonts, textSizes } from '../../constants/theme';
 
 type CashierQuickActionCardProps = {
   active?: boolean;
@@ -21,7 +21,7 @@ export function CashierQuickActionCard({
     <View style={styles.itemWrap}>
       <Pressable onPress={onPress} style={[styles.card, active && styles.cardActive]}>
         <Icon
-          color={active ? '#FFFFFF' : colors.secondary}
+          color={active ? colors.textInverse : colors.secondary}
           size={25}
           strokeWidth={active ? 2.2 : 1.9}
         />
@@ -38,8 +38,8 @@ const styles = StyleSheet.create({
   },
   card: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.lg,
     borderWidth: 1,
     height: 84,
@@ -52,9 +52,9 @@ const styles = StyleSheet.create({
     borderColor: colors.secondary,
   },
   label: {
-    color: '#141A25',
+    color: colors.textStrong,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     textAlign: 'center',
   },
 });

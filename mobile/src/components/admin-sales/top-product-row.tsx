@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
 
 type TopProductRowProps = {
@@ -32,33 +33,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm + 2,
   },
   leftColumn: {
     alignItems: 'center',
     flexDirection: 'row',
     flex: 1,
-    marginRight: 14,
+    marginRight: spacing.md + 2,
   },
   thumb: {
     alignItems: 'center',
-    backgroundColor: '#EAF0FF',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceBrandMuted,
+    borderRadius: radius.md,
     height: 42,
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
     width: 42,
   },
   thumbEmoji: {
     fontSize: 20,
   },
   name: {
-    color: '#181D2A',
+    color: colors.textStrong,
     ...textRoles.value,
     marginBottom: 2,
   },
   soldText: {
-    color: '#757B8B',
+    color: colors.textSubtle,
     ...textRoles.label,
   },
   total: {

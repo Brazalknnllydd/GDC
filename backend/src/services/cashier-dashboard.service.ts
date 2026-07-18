@@ -6,6 +6,16 @@ function getStartOfToday() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+function getStartOfTomorrow() {
+  const startOfToday = getStartOfToday();
+
+  return new Date(
+    startOfToday.getFullYear(),
+    startOfToday.getMonth(),
+    startOfToday.getDate() + 1
+  );
+}
+
 function toNumber(value: unknown) {
   if (typeof value === "number") {
     return value;
@@ -41,12 +51,14 @@ export async function getCashierDashboard(userId: number) {
   });
 
   const startOfToday = getStartOfToday();
+  const startOfTomorrow = getStartOfTomorrow();
 
   const todaySales = await prisma.sale.findMany({
     where: {
       userId,
       createdAt: {
         gte: startOfToday,
+        lt: startOfTomorrow,
       },
     },
     include: {
@@ -61,7 +73,7 @@ export async function getCashierDashboard(userId: number) {
     },
   });
 
-  const recentSales = todaySales.slice(0, 3).map((sale) => ({
+  const recentSales = todaySales.slice(0, 8).map((sale) => ({
     id: sale.id,
     paymentMethod: sale.paymentMethod,
     receiptNumber: sale.receiptNumber,
