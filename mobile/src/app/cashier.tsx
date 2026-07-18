@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import axios from 'axios';
 import {
   ArrowRight,
@@ -40,10 +40,11 @@ import { CashierRecentSaleItem } from '../components/cashier/cashier-recent-sale
 import { CashierShiftCard } from '../components/cashier/cashier-shift-card';
 import { type Category, type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
-import { AppHeroAction } from '../components/ui/app-hero-action';
 import { AppTextAction } from '../components/ui/app-text-action';
 import { FilterChip } from '../components/ui/filter-chip';
 import { AdminModalShell } from '../components/ui/admin-modal-shell';
+import { CashierCartSummary } from '../components/cashier/cashier-cart-summary';
+import { CashierKeypadInput } from '../components/cashier/cashier-keypad-input';
 import { ModalActions } from '../components/ui/modal-actions';
 import { SectionHeading } from '../components/ui/section-heading';
 import { SurfaceCard } from '../components/ui/surface-card';
@@ -228,6 +229,10 @@ export default function CashierScreen() {
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scannerFeedback, setScannerFeedback] = useState('');
+  const [scannerEnabled, setScannerEnabled] = useState(true);
   const [activeCheckoutInput, setActiveCheckoutInput] = useState<ActiveCheckoutInput>({
     type: 'amount',
   });
@@ -405,6 +410,49 @@ export default function CashierScreen() {
     });
   }
 
+  async function openProductScanner() {
+    setScannerFeedback('');
+
+    if (!cameraPermission?.granted) {
+      const nextPermission = await requestCameraPermission();
+
+      if (!nextPermission.granted) {
+        setScannerFeedback('Camera permission is required to scan product barcodes.');
+        setShowScannerModal(true);
+        return;
+      }
+    }
+
+    setScannerEnabled(true);
+    setShowScannerModal(true);
+  }
+
+  function handleBarcodeScanned(result: BarcodeScanningResult) {
+    if (!scannerEnabled) {
+      return;
+    }
+
+    const scannedBarcode = result.data.trim();
+    const matchedProduct = products.find(
+      (product) => product.barcode?.trim() === scannedBarcode
+    );
+
+    setScannerEnabled(false);
+
+    if (!matchedProduct) {
+      setScannerFeedback(`No product found for barcode ${scannedBarcode}.`);
+      setSearchQuery(scannedBarcode);
+      setTimeout(() => setScannerEnabled(true), 1400);
+      return;
+    }
+
+    addToCart(matchedProduct);
+    setSelectedCategory('All');
+    setSearchQuery('');
+    setScannerFeedback(`${matchedProduct.name} added to cart.`);
+    setShowScannerModal(false);
+  }
+
   function updateCartQuantity(productId: number, nextQuantity: number) {
     setCart((currentCart) =>
       currentCart
@@ -567,11 +615,16 @@ export default function CashierScreen() {
               </View>
             </View>
 
-            <AppHeroAction
-              icon={<ScanLine color="#FFFFFF" size={18} strokeWidth={2.2} />}
-              label="Scan Product"
-              subtitle="Fast barcode lookup"
+            <AppButton
+              fullWidth={false}
+              icon={({ color, size }) => (
+                <ScanLine color={color} size={size} strokeWidth={2.2} />
+              )}
+              label="Scan Barcode"
+              onPress={openProductScanner}
+              size="md"
               style={styles.scanProductButton}
+              variant="primary"
             />
           </View>
 
@@ -653,25 +706,12 @@ export default function CashierScreen() {
               )}
             </ScrollView>
 
-            <View style={styles.cartSummary}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>{formatPeso(cartGrossSubtotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Discount</Text>
-                <Text style={styles.summaryDiscountValue}>- {formatPeso(cartDiscountTotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Items</Text>
-                <Text style={styles.summaryValue}>{cartItemCount}</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryRow}>
-                <Text style={styles.totalLabel}>Total Amount</Text>
-                <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
-              </View>
-            </View>
+            <CashierCartSummary
+              grossSubtotal={cartGrossSubtotal}
+              discountTotal={cartDiscountTotal}
+              itemCount={cartItemCount}
+              netSubtotal={cartSubtotal}
+            />
 
             <AppButton
               disabled={cart.length === 0}
@@ -846,6 +886,51 @@ export default function CashierScreen() {
       <AdminModalShell
         footer={
           <AppButton
+            label="Close Scanner"
+            onPress={() => setShowScannerModal(false)}
+            variant="secondary"
+          />
+        }
+        height={Math.min(height * 0.74, 620)}
+        onClose={() => setShowScannerModal(false)}
+        title="Scan Product"
+        visible={showScannerModal}>
+        <View style={styles.scannerContent}>
+          {cameraPermission?.granted ? (
+            <View style={styles.cameraFrame}>
+              <CameraView
+                active={showScannerModal}
+                facing="back"
+                onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
+                style={styles.cameraPreview}
+              />
+              <View style={styles.scanGuide} />
+            </View>
+          ) : (
+            <SurfaceCard style={styles.scannerPermissionCard}>
+              <Text style={styles.scannerTitle}>Camera access needed</Text>
+              <Text style={styles.scannerCopy}>
+                Enable camera permission to scan product barcodes.
+              </Text>
+              <AppButton
+                label="Allow Camera"
+                onPress={openProductScanner}
+                style={styles.scannerPermissionButton}
+                variant="primary"
+              />
+            </SurfaceCard>
+          )}
+
+          <Text style={styles.scannerHint}>
+            Point the camera at a product barcode to add it to the cart.
+          </Text>
+          {scannerFeedback ? <Text style={styles.scannerFeedback}>{scannerFeedback}</Text> : null}
+        </View>
+      </AdminModalShell>
+
+      <AdminModalShell
+        footer={
+          <AppButton
             disabled={cart.length === 0}
             label="Proceed to Checkout"
             onPress={() => {
@@ -860,15 +945,6 @@ export default function CashierScreen() {
         title="Cart Details"
         visible={!showInlineCart && showCartModal}>
         <ScrollView contentContainerStyle={styles.cartModalContent}>
-          <View style={styles.checkoutInputIndicator}>
-            <Text style={styles.checkoutInputIndicatorLabel}>NOW EDITING</Text>
-            <Text style={styles.checkoutInputIndicatorValue}>
-              {activeCheckoutInput.type === 'amount'
-                ? 'Amount Received'
-                : `Discount - ${activeDiscountItem?.name ?? 'Selected Item'}`}
-            </Text>
-          </View>
-
           {cart.length > 0 ? (
             cart.map((item) => (
               <CashierCartItemRow
@@ -888,25 +964,13 @@ export default function CashierScreen() {
           )}
         </ScrollView>
 
-        <View style={styles.cartSummary}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>{formatPeso(cartGrossSubtotal)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Discount</Text>
-            <Text style={styles.summaryDiscountValue}>- {formatPeso(cartDiscountTotal)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Items</Text>
-            <Text style={styles.summaryValue}>{cartItemCount}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
-          </View>
-        </View>
+        <CashierCartSummary
+          discountTotal={cartDiscountTotal}
+          grossSubtotal={cartGrossSubtotal}
+          itemCount={cartItemCount}
+          netSubtotal={cartSubtotal}
+          style={{ paddingHorizontal: 18, marginBottom: 12 }}
+        />
       </AdminModalShell>
 
       <AdminModalShell
@@ -961,36 +1025,20 @@ export default function CashierScreen() {
                       </View>
 
                       <View style={styles.discountInputRow}>
-                        <Pressable
+                        <CashierKeypadInput
+                          isActive={
+                            activeCheckoutInput.type === 'discount' &&
+                            activeCheckoutInput.productId === item.id
+                          }
                           onPress={() =>
                             setActiveCheckoutInput({
                               productId: item.id,
                               type: 'discount',
                             })
                           }
-                          style={[
-                            styles.moneyField,
-                            styles.discountMoneyField,
-                            activeCheckoutInput.type === 'discount' &&
-                            activeCheckoutInput.productId === item.id
-                              ? styles.moneyFieldActive
-                              : undefined,
-                          ]}>
-                          <Text style={styles.discountInputPrefix}>P</Text>
-                          <Text
-                            style={[
-                              styles.moneyValue,
-                              !item.discountInput && styles.discountPlaceholderText,
-                            ]}>
-                            {item.discountInput || '0'}
-                          </Text>
-                          {activeCheckoutInput.type === 'discount' &&
-                          activeCheckoutInput.productId === item.id ? (
-                            <View style={styles.activeInputBadge}>
-                              <Text style={styles.activeInputBadgeText}>ACTIVE</Text>
-                            </View>
-                          ) : null}
-                        </Pressable>
+                          style={styles.discountMoneyField}
+                          value={item.discountInput}
+                        />
                         <Text style={styles.discountAppliedText}>
                           Discount: {formatPeso(discountAmount)}
                         </Text>
@@ -1016,20 +1064,11 @@ export default function CashierScreen() {
           </View>
 
           <Text style={styles.checkoutFieldLabel}>AMOUNT RECEIVED</Text>
-          <Pressable
+          <CashierKeypadInput
+            isActive={activeCheckoutInput.type === 'amount'}
             onPress={() => setActiveCheckoutInput({ type: 'amount' })}
-            style={[
-              styles.moneyField,
-              activeCheckoutInput.type === 'amount' ? styles.moneyFieldActive : undefined,
-            ]}>
-            <Text style={styles.moneyPrefix}>P</Text>
-            <Text style={styles.moneyValue}>{amountReceivedInput || '0'}</Text>
-            {activeCheckoutInput.type === 'amount' ? (
-              <View style={styles.activeInputBadge}>
-                <Text style={styles.activeInputBadgeText}>ACTIVE</Text>
-              </View>
-            ) : null}
-          </Pressable>
+            value={amountReceivedInput}
+          />
 
           <View style={styles.amountIndicatorRow}>
             <View style={styles.amountIndicatorCard}>
@@ -1075,6 +1114,14 @@ export default function CashierScreen() {
             </Text>
           </View>
 
+          <View style={styles.checkoutInputIndicator}>
+            <Text style={styles.checkoutInputIndicatorLabel}>NOW EDITING</Text>
+            <Text style={styles.checkoutInputIndicatorValue}>
+              {activeCheckoutInput.type === 'amount'
+                ? 'Amount Received'
+                : `Discount - ${activeDiscountItem?.name ?? 'Selected Item'}`}
+            </Text>
+          </View>
           <CashierKeypad onBackspace={handleKeypadBackspace} onKeyPress={handleKeypadPress} />
           {saleError ? <Text style={styles.saleErrorText}>{saleError}</Text> : null}
         </ScrollView>
@@ -1119,22 +1166,26 @@ export default function CashierScreen() {
               <Text style={styles.successTotalLabel}>TOTAL PAID</Text>
               <Text style={styles.successTotalValue}>{formatPeso(completedSale.totalAmount)}</Text>
 
-              <View style={styles.successMiniRow}>
-                <View style={styles.successMiniCard}>
-                  <Text style={styles.successMiniLabel}>CHANGE</Text>
-                  <Text style={styles.successMiniValue}>
-                    {formatPeso(completedSale.changeAmount)}
-                  </Text>
+              <View style={styles.receiptHeaderSection}>
+                <View style={styles.successMetaRow}>
+                  <Text style={styles.successMetaLabel}>Receipt No</Text>
+                  <Text style={styles.successMetaValue}>{completedSale.receiptNumber}</Text>
                 </View>
-                <View style={styles.successMiniCard}>
-                  <Text style={styles.successMiniLabel}>RECEIVED</Text>
-                  <Text style={styles.successMiniValue}>
-                    {formatPeso(completedSale.amountPaid)}
+                <View style={styles.successMetaRow}>
+                  <Text style={styles.successMetaLabel}>Cashier</Text>
+                  <Text style={styles.successMetaValue}>{completedSale.cashierName}</Text>
+                </View>
+                <View style={styles.successMetaRow}>
+                  <Text style={styles.successMetaLabel}>Date & Time</Text>
+                  <Text style={styles.successMetaValue}>
+                    {formatReceiptDateTime(completedSale.createdAt)}
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.successBreakdownCard}>
+              <View style={styles.receiptDashedLine} />
+
+              <View style={styles.receiptMainSection}>
                 <View style={styles.successMetaRow}>
                   <Text style={styles.successMetaLabel}>Original Price</Text>
                   <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
@@ -1146,11 +1197,16 @@ export default function CashierScreen() {
                   </Text>
                 </View>
                 <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Discounted Price</Text>
-                  <Text style={styles.successMetaValue}>
+                  <Text style={styles.successMetaLabelBold}>Total Amount</Text>
+                  <Text style={styles.successMetaValueBold}>
                     {formatPeso(completedSale.totalAmount)}
                   </Text>
                 </View>
+              </View>
+
+              <View style={styles.receiptDashedLine} />
+
+              <View style={styles.receiptPaymentSection}>
                 <View style={styles.successMetaRow}>
                   <Text style={styles.successMetaLabel}>Payment Method</Text>
                   <Text style={styles.successMetaValue}>
@@ -1164,30 +1220,11 @@ export default function CashierScreen() {
                   </Text>
                 </View>
                 <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Change</Text>
-                  <Text style={styles.successMetaValue}>
+                  <Text style={styles.successMetaLabelBold}>Change</Text>
+                  <Text style={styles.successMetaValueBold}>
                     {formatPeso(completedSale.changeAmount)}
                   </Text>
                 </View>
-              </View>
-
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Receipt No</Text>
-                <Text style={styles.successMetaValue}>{completedSale.receiptNumber}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Cashier</Text>
-                <Text style={styles.successMetaValue}>{completedSale.cashierName}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Amount Paid</Text>
-                <Text style={styles.successMetaValue}>{formatPeso(completedSale.amountPaid)}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Date & Time</Text>
-                <Text style={styles.successMetaValue}>
-                  {formatReceiptDateTime(completedSale.createdAt)}
-                </Text>
               </View>
             </SurfaceCard>
           ) : null}
@@ -1313,6 +1350,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  scannerContent: {
+    flex: 1,
+  },
+  cameraFrame: {
+    backgroundColor: '#111827',
+    borderRadius: radius.lg,
+    flex: 1,
+    minHeight: 320,
+    overflow: 'hidden',
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  scanGuide: {
+    borderColor: '#FFFFFF',
+    borderRadius: radius.md,
+    borderWidth: 2,
+    height: 120,
+    left: '12%',
+    opacity: 0.88,
+    position: 'absolute',
+    right: '12%',
+    top: '36%',
+  },
+  scannerPermissionCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 320,
+    padding: spacing.xl,
+  },
+  scannerTitle: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    marginBottom: spacing.sm,
+  },
+  scannerCopy: {
+    color: '#697285',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  scannerPermissionButton: {
+    marginTop: spacing.lg,
+  },
+  scannerHint: {
+    color: '#5D6476',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  scannerFeedback: {
+    color: colors.tertiary,
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
   inlineCartCard: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
@@ -1346,44 +1442,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: spacing.xl,
     textAlign: 'center',
-  },
-  cartSummary: {
-    marginTop: spacing.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  summaryLabel: {
-    color: '#5D6476',
-    fontFamily: fonts.regular,
-    fontSize: 13,
-  },
-  summaryValue: {
-    color: '#2D3342',
-    fontFamily: fonts.medium,
-    fontSize: 13,
-  },
-  summaryDiscountValue: {
-    color: successColorDark,
-    fontFamily: fonts.semiBold,
-    fontSize: 13,
-  },
-  summaryDivider: {
-    backgroundColor: '#E6EAF4',
-    height: 1,
-    marginVertical: spacing.md,
-  },
-  totalLabel: {
-    color: colors.secondary,
-    fontFamily: fonts.semiBold,
-    fontSize: 14,
-  },
-  totalValue: {
-    color: colors.secondary,
-    fontFamily: fonts.bold,
-    fontSize: 18,
   },
   checkoutBarWrap: {
     bottom: 84,
@@ -1511,14 +1569,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     justifyContent: 'space-between',
   },
-  discountInputPrefix: {
-    color: successColorDark,
-    fontFamily: fonts.bold,
-    fontSize: 16,
-    marginRight: spacing.sm,
-  },
   discountAppliedText: {
-    color: successColorDark,
+    color: '#047857',
     fontFamily: fonts.medium,
     fontSize: 12,
   },
@@ -1536,51 +1588,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  moneyField: {
-    alignItems: 'center',
-    borderColor: colors.secondary,
-    borderRadius: radius.md,
-    borderWidth: 1.3,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 50,
-    paddingHorizontal: spacing.md,
-  },
-  moneyFieldActive: {
-    backgroundColor: '#F3F6FF',
-    borderColor: '#2A3CC7',
-    borderWidth: 1.5,
-  },
-  moneyPrefix: {
-    color: colors.secondary,
-    fontFamily: fonts.bold,
-    fontSize: 20,
-    marginRight: spacing.sm,
-  },
-  moneyValue: {
-    color: '#1A2030',
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 16,
-  },
   discountMoneyField: {
     minHeight: 44,
     width: 190,
-  },
-  discountPlaceholderText: {
-    color: '#96A0B5',
-  },
-  activeInputBadge: {
-    backgroundColor: '#E0E7FF',
-    borderRadius: radius.round,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-  },
-  activeInputBadgeText: {
-    color: '#3142BD',
-    fontFamily: fonts.semiBold,
-    fontSize: 10,
-    letterSpacing: 0.7,
   },
   amountIndicatorRow: {
     flexDirection: 'row',
@@ -1723,37 +1733,32 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
-  successMiniRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+
+  receiptHeaderSection: {
+    marginBottom: spacing.md,
   },
-  successMiniCard: {
-    backgroundColor: successSurface,
-    borderRadius: radius.md,
-    flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  successMiniLabel: {
-    color: '#5C6577',
-    ...textRoles.label,
-    fontSize: 11,
-    marginBottom: spacing.sm,
-  },
-  successMiniValue: {
-    color: successColorDark,
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-  },
-  successBreakdownCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#D7E3DA',
-    borderRadius: radius.md,
+  receiptDashedLine: {
+    borderColor: '#E6EAF4',
+    borderStyle: 'dashed',
     borderWidth: 1,
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    borderRadius: 1,
+    marginVertical: spacing.md,
+  },
+  receiptMainSection: {
+    marginBottom: spacing.xs,
+  },
+  receiptPaymentSection: {
+    marginBottom: spacing.xs,
+  },
+  successMetaLabelBold: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 14,
+  },
+  successMetaValueBold: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 14,
   },
   successMetaRow: {
     flexDirection: 'row',

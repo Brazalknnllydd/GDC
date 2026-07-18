@@ -20,6 +20,7 @@ import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, spacing } from '../constants/design-system';
 import { colors, textRoles, textSizes } from '../constants/theme';
 import { apiClient } from '../lib/api';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type Product = {
@@ -45,24 +46,7 @@ type SaleRecord = {
   items: SaleItem[];
 };
 
-function normalizeNumber(value: number | string | undefined) {
-  if (typeof value === 'number') {
-    return value;
-  }
 
-  if (typeof value === 'string') {
-    return Number(value) || 0;
-  }
-
-  return 0;
-}
-
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-PH', {

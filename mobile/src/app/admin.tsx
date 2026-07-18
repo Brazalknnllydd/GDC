@@ -19,6 +19,7 @@ import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { apiClient } from '../lib/api';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
 
 type Product = {
   id: number;
@@ -46,24 +47,7 @@ const tabs = [
   { label: 'Settings', icon: Settings, active: false, route: '/admin-settings' as const },
 ];
 
-function normalizeNumber(value: number | string | undefined) {
-  if (typeof value === 'number') {
-    return value;
-  }
 
-  if (typeof value === 'string') {
-    return Number(value) || 0;
-  }
-
-  return 0;
-}
-
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 function startOfDay(date: Date) {
   const next = new Date(date);

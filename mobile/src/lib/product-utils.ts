@@ -3,7 +3,7 @@ export function digitsOnly(value: string) {
 }
 
 export function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
+  return `₱${value.toLocaleString('en-PH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -11,17 +11,20 @@ export function formatPeso(value: number) {
 
 export function formatCompactPeso(value: number) {
   if (value >= 1_000_000) {
-    return `P${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+    return `₱${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
   }
 
   if (value >= 1_000) {
-    return `P${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}K`;
+    return `₱${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}K`;
   }
 
   return formatPeso(value);
 }
 
-export function normalizeNumber(value: number | string) {
+export function normalizeNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined) {
+    return 0;
+  }
   return typeof value === 'number' ? value : Number(value) || 0;
 }
 

@@ -21,6 +21,7 @@ import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { colors, fonts, textRoles } from '../constants/theme';
 import { apiClient } from '../lib/api';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type CustomerRef = {
@@ -78,24 +79,7 @@ type ExportRow = {
   unitPrice: number;
 };
 
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
-function normalizeNumber(value: number | string | undefined) {
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    return Number(value) || 0;
-  }
-
-  return 0;
-}
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-PH', {
