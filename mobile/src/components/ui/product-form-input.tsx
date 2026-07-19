@@ -15,6 +15,7 @@ type ProductFormInputProps = {
   placeholder: string;
   value: string;
   compact?: boolean;
+  dense?: boolean;
   errorMessage?: string;
   onChangeText?: (value: string) => void;
   keyboardType?: KeyboardTypeOptions;
@@ -30,6 +31,7 @@ export function ProductFormInput({
   placeholder,
   value,
   compact = false,
+  dense = false,
   errorMessage,
   onChangeText,
   keyboardType,
@@ -40,15 +42,17 @@ export function ProductFormInput({
   secureTextEntry = false,
 }: ProductFormInputProps) {
   return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.fieldGroup, dense ? styles.fieldGroupDense : undefined]}>
+      <Text style={[styles.label, dense ? styles.labelDense : undefined]}>{label}</Text>
       <View style={styles.inputWrap}>
         <TextInput
           contentStyle={[
             styles.input,
             compact ? styles.inputCompact : undefined,
+            dense ? styles.inputDense : undefined,
             multiline ? styles.inputMultiline : undefined,
             multiline && compact ? styles.inputMultilineCompact : undefined,
+            multiline && dense ? styles.inputMultilineDense : undefined,
           ]}
           editable={editable}
           error={!!errorMessage}
@@ -65,17 +69,21 @@ export function ProductFormInput({
           style={[
             styles.inputShell,
             compact ? styles.inputShellCompact : undefined,
+            dense ? styles.inputShellDense : undefined,
             multiline ? styles.inputShellMultiline : undefined,
             multiline && compact ? styles.inputShellMultilineCompact : undefined,
+            multiline && dense ? styles.inputShellMultilineDense : undefined,
           ]}
           textAlignVertical={multiline ? 'top' : undefined}
           value={value}
         />
         {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
       </View>
-      <HelperText style={styles.errorText} type="error" visible={!!errorMessage}>
-        {errorMessage || ' '}
-      </HelperText>
+      {errorMessage ? (
+        <HelperText style={styles.errorText} type="error" visible>
+          {errorMessage}
+        </HelperText>
+      ) : null}
     </View>
   );
 }
@@ -84,12 +92,20 @@ const styles = StyleSheet.create({
   fieldGroup: {
     marginBottom: spacing.section - 2,
   },
+  fieldGroupDense: {
+    marginBottom: spacing.md,
+  },
   label: {
     color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.medium,
-    letterSpacing: 3,
-    marginBottom: spacing.lg - 2,
+    fontSize: textSizes.body,
+    letterSpacing: 2.2,
+    marginBottom: spacing.sm,
+  },
+  labelDense: {
+    fontSize: textSizes.small,
+    letterSpacing: 2,
+    marginBottom: spacing.xs + 2,
   },
   inputShell: {
     backgroundColor: colors.card,
@@ -98,6 +114,10 @@ const styles = StyleSheet.create({
   },
   inputShellCompact: {
     minHeight: controlHeights.inputCompact,
+  },
+  inputShellDense: {
+    borderRadius: radius.lg,
+    minHeight: 48,
   },
   inputWrap: {
     justifyContent: 'center',
@@ -108,19 +128,28 @@ const styles = StyleSheet.create({
   inputShellMultilineCompact: {
     minHeight: controlHeights.inputMultilineCompact,
   },
+  inputShellMultilineDense: {
+    minHeight: 78,
+  },
   input: {
     color: colors.textStrong,
     ...textRoles.body,
-    fontSize: 18,
+    fontSize: textSizes.medium,
   },
   inputCompact: {
-    fontSize: 16,
+    fontSize: textSizes.bodyLarge,
+  },
+  inputDense: {
+    fontSize: textSizes.body,
   },
   inputMultiline: {
     minHeight: 96,
   },
   inputMultilineCompact: {
     minHeight: 84,
+  },
+  inputMultilineDense: {
+    minHeight: 62,
   },
   rightSlot: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Banknote, CreditCard, QrCode } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
@@ -11,6 +11,7 @@ type CashierRecentSaleItemProps = {
   receiptNumber: string;
   time: string;
   totalAmount: number;
+  onPress?: () => void;
 };
 
 function getPaymentMeta(paymentMethod: string) {
@@ -44,12 +45,13 @@ export function CashierRecentSaleItem({
   receiptNumber,
   time,
   totalAmount,
+  onPress,
 }: CashierRecentSaleItemProps) {
   const paymentMeta = getPaymentMeta(paymentMethod);
   const Icon = paymentMeta.icon;
 
   return (
-    <View style={styles.row}>
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.iconWrap, { backgroundColor: paymentMeta.backgroundColor }]}>
         <Icon color={paymentMeta.iconColor} size={22} strokeWidth={2} />
       </View>
@@ -63,7 +65,7 @@ export function CashierRecentSaleItem({
         </View>
         <Text style={styles.amountText}>{formatPeso(totalAmount)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

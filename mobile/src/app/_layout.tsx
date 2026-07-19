@@ -12,6 +12,28 @@ import { useEffect, useState } from "react";
 
 import { paperTheme } from "../constants/paper-theme";
 import { restoreAuthSession } from "../lib/auth-session";
+import { LogBox } from "react-native";
+
+LogBox.ignoreLogs([
+  '"shadow*" style props are deprecated',
+  'props.pointerEvents is deprecated',
+  '`useNativeDriver` is not supported',
+]);
+
+if (typeof console !== 'undefined') {
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    const msg = args[0];
+    if (typeof msg === 'string' && (
+      msg.includes('"shadow*" style props are deprecated') ||
+      msg.includes('props.pointerEvents is deprecated') ||
+      msg.includes('`useNativeDriver` is not supported')
+    )) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -52,6 +74,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="admin" />
         <Stack.Screen name="admin-products" />
+        <Stack.Screen name="admin-customers" />
         <Stack.Screen name="admin-sales" />
         <Stack.Screen name="admin-reports" />
         <Stack.Screen name="admin-settings" />

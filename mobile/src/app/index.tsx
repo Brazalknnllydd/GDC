@@ -124,7 +124,7 @@ export default function LoginScreen() {
       }
 
       router.replace({
-        pathname: '/cashier',
+        pathname: '/cashier-shift',
         params: {
           name: response.data.user.name,
         },

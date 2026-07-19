@@ -39,20 +39,20 @@ const styles = StyleSheet.create({
   title: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 20,
-    marginBottom: 10,
+    fontSize: textSizes.title,
+    marginBottom: spacing.sm,
   },
   description: {
     color: colors.textHeading,
     ...textRoles.body,
-    fontSize: textSizes.large,
-    lineHeight: 32,
-    marginBottom: spacing.section,
+    fontSize: textSizes.title,
+    lineHeight: 26,
+    marginBottom: spacing.xl,
     maxWidth: 500,
   },
   descriptionCompact: {
-    fontSize: 18,
-    lineHeight: 28,
-    marginBottom: spacing.xl + 2,
+    fontSize: textSizes.medium,
+    lineHeight: 24,
+    marginBottom: spacing.lg,
   },
 });

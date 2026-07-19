@@ -6,6 +6,7 @@ import { spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
+import { ModalActions } from '../ui/modal-actions';
 import { SurfaceCard } from '../ui/surface-card';
 
 type CategoryWithCount = Category & {
@@ -31,13 +32,14 @@ export function ManageCategoriesModal({
 }: ManageCategoriesModalProps) {
   return (
     <AdminModalShell
-      height={640}
-      maxHeight="88%"
+      maxHeight="72%"
       onClose={onClose}
       title="Manage Categories"
       visible={visible}
       footer={
-        <AppButton label="Add New Category" onPress={onCreate} variant="primary" />
+        <ModalActions>
+          <AppButton label="Add New Category" onPress={onCreate} variant="primary" />
+        </ModalActions>
       }>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {categories.length === 0 ? (

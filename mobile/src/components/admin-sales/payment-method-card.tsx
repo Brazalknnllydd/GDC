@@ -21,7 +21,7 @@ export function PaymentMethodCard({ icon: Icon, label, value }: PaymentMethodCar
   return (
     <SurfaceCard style={styles.card}>
       <View style={styles.iconWrap}>
-        <Icon color={colors.textHeading} size={22} strokeWidth={1.9} />
+        <Icon color={colors.textHeading} size={20} strokeWidth={1.9} />
       </View>
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    minHeight: 136,
+    minHeight: 112,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
   },
@@ -44,10 +44,10 @@ const styles = StyleSheet.create({
     borderColor: colors.borderPanel,
     borderRadius: radius.md,
     borderWidth: 1,
-    height: 40,
+    height: 36,
     justifyContent: 'center',
     marginBottom: spacing.md,
-    width: 40,
+    width: 36,
   },
   label: {
     color: colors.textTertiary,
@@ -57,6 +57,6 @@ const styles = StyleSheet.create({
   value: {
     color: colors.textStrong,
     ...textRoles.value,
-    fontSize: 18,
+    fontSize: 16,
   },
 });

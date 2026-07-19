@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Surface, TouchableRipple } from 'react-native-paper';
 
 import { layout, radius, spacing } from '../../constants/design-system';
@@ -43,12 +43,17 @@ export function AppBottomNav<T extends string>({
         return (
           <TouchableRipple
             key={item.key}
-            onPress={() => onSelect(item.key)}
+            onPress={() => {
+              if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                (document.activeElement as any)?.blur();
+              }
+              onSelect(item.key);
+            }}
             style={[styles.tabItem, stretchItems && styles.tabItemStretch]}>
             <View style={styles.tabContent}>
               <Icon
                 color={isActive ? colors.secondary : colors.textHeading}
-                size={22}
+                size={20}
                 strokeWidth={isActive ? 2.3 : 1.9}
               />
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
@@ -84,8 +89,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderInput,
     borderTopWidth: 1,
     flexDirection: 'row',
-    paddingBottom: spacing.sm + 6,
-    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm + 2,
+    paddingTop: spacing.xs + 2,
   },
   tabItem: {
     borderRadius: radius.lg,
@@ -97,7 +102,7 @@ const styles = StyleSheet.create({
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: 48,
     paddingHorizontal: spacing.xs,
     position: 'relative',
   },
@@ -106,7 +111,7 @@ const styles = StyleSheet.create({
     ...textRoles.label,
     fontSize: textSizes.small,
     lineHeight: 15,
-    marginTop: spacing.xs + 1,
+    marginTop: spacing.xs,
     minHeight: 15,
     textAlign: 'center',
   },
@@ -119,7 +124,7 @@ const styles = StyleSheet.create({
     height: 3,
     position: 'absolute',
     top: -layout.screenPaddingTop / 2 + 1,
-    width: 62,
+    width: 54,
   },
   activeTabPill: {
     backgroundColor: colors.surfaceOverlay,
@@ -127,6 +132,6 @@ const styles = StyleSheet.create({
     bottom: -6,
     height: 3,
     position: 'absolute',
-    width: 46,
+    width: 40,
   },
 });

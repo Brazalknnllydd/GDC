@@ -36,13 +36,15 @@ export function CashierDashboardHeader({
         <Text style={styles.timeText}>{formatCashierTime(currentDate)}</Text>
       </View>
 
-      <IconButton
-        icon={() => <Bell color={colors.secondary} size={21} strokeWidth={2.1} />}
-        onPress={() => {}}
-        size={20}
-        style={styles.iconButton}
-      />
+      <View style={styles.iconWrap}>
+        <IconButton
+          icon={() => <Bell color={colors.secondary} size={21} strokeWidth={2.1} />}
+          onPress={() => {}}
+          size={20}
+          style={styles.iconButton}
+        />
         <View style={styles.notificationDot} />
+      </View>
     </Surface>
   );
 }
@@ -101,9 +103,11 @@ const styles = StyleSheet.create({
     fontSize: textSizes.title,
     lineHeight: 22,
   },
+  iconWrap: {
+    position: 'relative',
+  },
   iconButton: {
     margin: 0,
-    position: 'relative',
   },
   notificationDot: {
     backgroundColor: colors.dangerDot,

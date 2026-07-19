@@ -50,35 +50,54 @@ export async function getCashierDashboard(userId: number) {
     },
   });
 
-  const startOfToday = getStartOfToday();
-  const startOfTomorrow = getStartOfTomorrow();
-
-  const todaySales = await prisma.sale.findMany({
+  const todaySales = latestShift?.status === 'OPEN' ? await prisma.sale.findMany({
     where: {
       userId,
-      createdAt: {
-        gte: startOfToday,
-        lt: startOfTomorrow,
-      },
+      shiftId: latestShift.id,
     },
     include: {
+      customer: {
+        select: { name: true },
+      },
       items: {
+        include: {
+          product: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      user: {
         select: {
-          quantity: true,
+          name: true,
         },
       },
     },
     orderBy: {
       createdAt: "desc",
     },
-  });
+  }) : [];
 
-  const recentSales = todaySales.slice(0, 8).map((sale) => ({
+  const recentSales = todaySales.map((sale) => ({
     id: sale.id,
+    customerName: sale.customer?.name ?? null,
     paymentMethod: sale.paymentMethod,
     receiptNumber: sale.receiptNumber,
     time: sale.createdAt.toISOString(),
     totalAmount: toNumber(sale.totalAmount),
+    subtotal: toNumber(sale.subtotal),
+    discountAmount: toNumber(sale.discountAmount),
+    amountPaid: toNumber(sale.amountPaid),
+    changeAmount: toNumber(sale.changeAmount),
+    cashierName: sale.user?.name || "Cashier",
+    createdAt: sale.createdAt.toISOString(),
+    items: sale.items.map((item) => ({
+      price: toNumber(item.price),
+      product: { name: item.product?.name || "Item" },
+      quantity: item.quantity,
+      subtotal: toNumber(item.subtotal),
+    })),
   }));
 
   const salesToday = todaySales.reduce(
@@ -109,6 +128,15 @@ export async function getCashierDashboard(userId: number) {
 
   const cashSalesTotal =
     paymentBreakdown.find((entry) => entry.method.toLowerCase() === "cash")?.total ?? 0;
+
+  let cashReceived = 0;
+  let changeGiven = 0;
+  for (const sale of todaySales) {
+    if (sale.paymentMethod.trim().toLowerCase() === "cash") {
+      cashReceived += toNumber(sale.amountPaid);
+      changeGiven += toNumber(sale.changeAmount);
+    }
+  }
 
   return {
     cashier: {
@@ -148,8 +176,12 @@ export async function getCashierDashboard(userId: number) {
     },
     recentSales,
     totals: {
-      drawerVariance: 0,
+      drawerVariance: latestShift && latestShift.closingCash !== null
+        ? toNumber(latestShift.closingCash) - (toNumber(latestShift.openingCash) + cashSalesTotal)
+        : 0,
       totalReportedSales: salesToday,
+      cashReceived,
+      changeGiven,
     },
   };
 }

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,8 +18,12 @@ import {
   ScanLine,
   Search,
   ShoppingCart,
+  UserCircle2,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
   cashierPaymentMethods,
@@ -25,12 +31,14 @@ import {
 } from '../components/cashier/cashier-screen-data';
 import { CashierBottomNav, type CashierSection } from '../components/cashier/cashier-bottom-nav';
 import { CashierCartItemRow } from '../components/cashier/cashier-cart-item-row';
+import { CashierCustomersSection } from '../components/cashier/cashier-customers-section';
 import { CashierDashboardHeader } from '../components/cashier/cashier-dashboard-header';
 import { CashierHistorySection } from '../components/cashier/cashier-history-section';
 import { CashierInventorySection } from '../components/cashier/cashier-inventory-section';
 import { CashierKeypad } from '../components/cashier/cashier-keypad';
 import { CashierProductCard } from '../components/cashier/cashier-product-card';
 import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
+import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
 import { type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
 import { AppSegmentedControl } from '../components/ui/app-segmented-control';
@@ -54,6 +62,7 @@ import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { apiClient } from '../lib/api';
 
 type CashierParams = {
   name?: string;
@@ -117,6 +126,211 @@ export default function CashierScreen() {
     screenError,
   } = useCashierWorkspace();
 
+  // Shift states
+  const [showOpeningCashModal, setShowOpeningCashModal] = useState(false);
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState('');
+  const [isSavingOpeningCash, setIsSavingOpeningCash] = useState(false);
+  const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
+
+  const handleUpdateOpeningCash = async () => {
+    const cleanInput = openingCashInput.replace(/,/g, '');
+    const amount = Number(cleanInput);
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid positive number');
+      return;
+    }
+
+    setIsSavingOpeningCash(true);
+    try {
+      await apiClient.put('/cashier/shift/opening-cash', {
+        openingCash: amount,
+      });
+      await reloadWorkspace();
+      setShowOpeningCashModal(false);
+      setOpeningCashInput('');
+    } catch (err) {
+      console.error('Failed to update opening cash:', err);
+      alert('Failed to update opening cash. Please try again.');
+    } finally {
+      setIsSavingOpeningCash(false);
+    }
+  };
+
+  async function handlePrintReceipt(sale: any) {
+    if (!sale) return;
+
+    let logoUri = '';
+    try {
+      const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
+      if (!logoAsset.localUri && Platform.OS !== 'web') {
+        await logoAsset.downloadAsync();
+      }
+      if (Platform.OS === 'web') {
+        logoUri = logoAsset.uri;
+      } else {
+        const localUri = logoAsset.localUri || logoAsset.uri;
+        const base64 = await FileSystem.readAsStringAsync(localUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        logoUri = `data:image/jpeg;base64,${base64}`;
+      }
+    } catch (e) {
+      console.error('Failed to load receipt logo:', e);
+    }
+
+    const itemsHtml = sale.items && Array.isArray(sale.items)
+      ? sale.items.map((item: any) => `
+        <tr>
+          <td style="padding: 6px 0; font-family: monospace;">${item.product?.name || 'Item'} x ${item.quantity}</td>
+          <td style="padding: 6px 0; font-family: monospace; text-align: right;">${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}</td>
+        </tr>
+      `).join('')
+      : '';
+
+    const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+          <style>
+            @media print {
+              @page {
+                margin: 0;
+              }
+              body {
+                margin: 1.6cm;
+              }
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              color: #111;
+              padding: 20px;
+              margin: 0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            .logo-img {
+              width: 72px;
+              height: 72px;
+              border-radius: 36px;
+              object-fit: cover;
+              margin-bottom: 8px;
+            }
+            .title {
+              font-size: 20px;
+              font-weight: bold;
+              margin: 0 0 4px;
+            }
+            .subtitle {
+              font-size: 12px;
+              margin: 0;
+            }
+            .divider {
+              border-top: 1px dashed #333;
+              margin: 15px 0;
+            }
+            .details-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+            }
+            .totals-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+              margin-top: 10px;
+            }
+            .totals-table td {
+              padding: 4px 0;
+            }
+            .footer {
+              text-align: center;
+              font-size: 12px;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${logoUri ? `<img src="${logoUri}" class="logo-img" />` : ''}
+            <h1 class="title">GDC POS RECEIPT</h1>
+            <p class="subtitle">GDC Store</p>
+            <p class="subtitle">Date: ${new Date(sale.createdAt).toLocaleString()}</p>
+            <p class="subtitle">Receipt No: ${sale.receiptNumber}</p>
+            <p class="subtitle">Cashier: ${sale.cashierName}</p>
+            <p class="subtitle">Customer: ${sale.customerName ?? sale.customer?.name ?? 'Walk-in'}</p>
+          </div>
+
+          <div class="divider"></div>
+
+          <table class="details-table">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding-bottom: 8px;">Item</th>
+                <th style="text-align: right; padding-bottom: 8px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+
+          <table class="totals-table">
+            <tr>
+              <td>Subtotal:</td>
+              <td style="text-align: right;">${formatPeso(sale.subtotal)}</td>
+            </tr>
+            <tr>
+              <td>Discount:</td>
+              <td style="text-align: right;">- ${formatPeso(sale.discountAmount)}</td>
+            </tr>
+            <tr style="font-weight: bold; font-size: 16px;">
+              <td>TOTAL:</td>
+              <td style="text-align: right;">${formatPeso(sale.totalAmount)}</td>
+            </tr>
+            <tr>
+              <td>Amount Paid:</td>
+              <td style="text-align: right;">${formatPeso(sale.amountPaid)}</td>
+            </tr>
+            <tr>
+              <td>Change:</td>
+              <td style="text-align: right;">${formatPeso(sale.changeAmount)}</td>
+            </tr>
+          </table>
+
+          <div class="divider"></div>
+
+          <div class="footer">
+            <p style="margin: 0 0 6px;">Thank you for shopping with us!</p>
+            <p style="margin: 0;">Please visit again.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.print();
+        } else {
+          alert('Popup blocker is active. Please allow popups to view receipt.');
+        }
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (error) {
+      console.error('Failed to print receipt:', error);
+      alert('Could not print receipt.');
+    }
+  }
+
   const cashierName = useMemo(() => {
     if (dashboard.cashier.name) {
       return dashboard.cashier.name;
@@ -154,6 +368,8 @@ export default function CashierScreen() {
     cartSubtotal,
     changeAmount,
     completedSale,
+    customerId,
+    customerName,
     handleCompleteSale,
     handleKeypadBackspace,
     handleKeypadPress,
@@ -164,6 +380,8 @@ export default function CashierScreen() {
     saleError,
     setActiveCheckoutInput,
     setPaymentMethod,
+    setCustomerId,
+    setCustomerName,
     setShowCartModal,
     setShowCheckoutModal,
     setShowSuccessModal,
@@ -181,6 +399,12 @@ export default function CashierScreen() {
     },
     shiftId: dashboard.currentShift?.id ?? null,
   });
+
+  // Customer selector state (checkout modal)
+  const [customerType, setCustomerType] = useState<'walkin' | 'registered'>('walkin');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<{ id: number; name: string; phoneNumber?: string | null }[]>([]);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -401,11 +625,25 @@ export default function CashierScreen() {
             isTablet ? styles.scrollContentTablet : undefined,
           ]}
           showsVerticalScrollIndicator={false}>
-          <CashierDashboardHeader cashierName={cashierDisplayName} currentDate={currentDate} />
+          <CashierDashboardHeader 
+            cashierName={cashierDisplayName} 
+            currentDate={currentDate} 
+          />
 
           {activeSection === 'register' ? renderRegisterSection() : null}
           {activeSection === 'history' ? (
-            <CashierHistorySection dashboard={dashboard} />
+            <CashierHistorySection
+              dashboard={dashboard}
+              onEditOpeningCash={() => {
+                setOpeningCashInput(
+                  dashboard.currentShift?.openingCash !== undefined
+                    ? String(dashboard.currentShift.openingCash)
+                    : ''
+                );
+                setShowOpeningCashModal(true);
+              }}
+              onSelectSale={(sale) => setSelectedSaleDetails(sale)}
+            />
           ) : null}
           {activeSection === 'inventory' ? (
             <CashierInventorySection
@@ -414,9 +652,13 @@ export default function CashierScreen() {
               products={products}
             />
           ) : null}
+          {activeSection === 'customers' ? (
+            <CashierCustomersSection />
+          ) : null}
           {activeSection === 'settings' ? (
             <CashierSettingsSection
               cashierName={cashierName}
+              onCloseShift={() => setShowCloseShiftModal(true)}
               onLogout={() => {
                 void clearAuthSession().finally(() => {
                   router.replace('/');
@@ -462,6 +704,52 @@ export default function CashierScreen() {
           onSelect={setActiveSection}
         />
       </View>
+
+
+      {/* Shift Close Modal */}
+      <ShiftCloseModal
+        shiftId={dashboard.currentShift?.id}
+        visible={showCloseShiftModal}
+        onClose={() => setShowCloseShiftModal(false)}
+        onSuccess={async () => {
+          setShowCloseShiftModal(false);
+          await reloadWorkspace();
+          // Optionally redirect back to login or cashier-shift
+          router.replace('/cashier-shift');
+        }}
+      />
+      {/* Opening Cash Input Modal */}
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Cancel"
+              onPress={() => setShowOpeningCashModal(false)}
+              variant="secondary"
+            />
+            <AppButton
+              disabled={isSavingOpeningCash}
+              label={isSavingOpeningCash ? 'Saving...' : 'Save'}
+              onPress={handleUpdateOpeningCash}
+              variant="primary"
+            />
+          </ModalActions>
+        }
+        height={260}
+        onClose={() => setShowOpeningCashModal(false)}
+        title="Set Opening Cash"
+        visible={showOpeningCashModal}>
+        <View style={styles.modalInputWrap}>
+          <Text style={styles.modalInputLabel}>Opening Cash Amount (₱)</Text>
+          <TextInput
+            style={styles.modalTextInput}
+            keyboardType="numeric"
+            placeholder="0.00"
+            value={openingCashInput}
+            onChangeText={setOpeningCashInput}
+          />
+        </View>
+      </AdminModalShell>
 
       <AdminModalShell
         footer={
@@ -524,7 +812,7 @@ export default function CashierScreen() {
         onClose={() => setShowCartModal(false)}
         title="Cart Details"
         visible={!showInlineCart && showCartModal}>
-        <ScrollView contentContainerStyle={styles.cartModalContent}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.cartModalContent}>
           <View style={styles.checkoutInputIndicator}>
             <Text style={styles.checkoutInputIndicatorLabel}>NOW EDITING</Text>
             <Text style={styles.checkoutInputIndicatorValue}>
@@ -592,6 +880,7 @@ export default function CashierScreen() {
         title="Checkout"
         visible={showCheckoutModal}>
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.checkoutModalContent}
           showsVerticalScrollIndicator={false}>
           <View style={styles.checkoutSummaryCard}>
@@ -665,6 +954,117 @@ export default function CashierScreen() {
                 })}
               </View>
             </>
+          ) : null}
+
+          <Text style={styles.checkoutFieldLabel}>CUSTOMER</Text>
+          <View style={styles.customerTypeRow}>
+            <Pressable
+              onPress={() => {
+                setCustomerType('walkin');
+                setCustomerId(null);
+                setCustomerName(null);
+                setCustomerSearch('');
+                setCustomerResults([]);
+              }}
+              style={[
+                styles.customerTypeOption,
+                customerType === 'walkin' && styles.customerTypeOptionActive,
+              ]}
+            >
+              <View style={[
+                styles.customerTypeRadio,
+                customerType === 'walkin' && styles.customerTypeRadioActive,
+              ]}>
+                {customerType === 'walkin' && <View style={styles.customerTypeRadioDot} />}
+              </View>
+              <Text style={[
+                styles.customerTypeLabel,
+                customerType === 'walkin' && styles.customerTypeLabelActive,
+              ]}>Walk-in Customer</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setCustomerType('registered')}
+              style={[
+                styles.customerTypeOption,
+                customerType === 'registered' && styles.customerTypeOptionActive,
+              ]}
+            >
+              <View style={[
+                styles.customerTypeRadio,
+                customerType === 'registered' && styles.customerTypeRadioActive,
+              ]}>
+                {customerType === 'registered' && <View style={styles.customerTypeRadioDot} />}
+              </View>
+              <Text style={[
+                styles.customerTypeLabel,
+                customerType === 'registered' && styles.customerTypeLabelActive,
+              ]}>Registered Customer</Text>
+            </Pressable>
+          </View>
+
+          {customerType === 'registered' ? (
+            <View style={styles.customerSearchWrap}>
+              {customerId ? (
+                <Pressable
+                  onPress={() => { setCustomerId(null); setCustomerName(null); setCustomerSearch(''); setCustomerResults([]); }}
+                  style={styles.customerSelectedRow}
+                >
+                  <UserCircle2 color={colors.secondary} size={20} strokeWidth={2} />
+                  <Text style={styles.customerSelectedName}>{customerName}</Text>
+                  <Text style={styles.customerClearText}>Change</Text>
+                </Pressable>
+              ) : (
+                <>
+                  <View style={styles.customerSearchBox}>
+                    <Search color={colors.textTertiary} size={16} strokeWidth={2} />
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={async (text) => {
+                        setCustomerSearch(text);
+                        if (!text.trim()) { setCustomerResults([]); return; }
+                        try {
+                          setIsSearchingCustomers(true);
+                          const res = await apiClient.get<{ data: { id: number; name: string; phoneNumber?: string | null }[] }>(
+                            `/customers?search=${encodeURIComponent(text.trim())}`
+                          );
+                          setCustomerResults(res.data.data);
+                        } catch {
+                          setCustomerResults([]);
+                        } finally {
+                          setIsSearchingCustomers(false);
+                        }
+                      }}
+                      placeholder="Search by name or phone..."
+                      placeholderTextColor={colors.textSubtle}
+                      style={styles.customerSearchInput}
+                      value={customerSearch}
+                    />
+                  </View>
+                  {isSearchingCustomers ? (
+                    <Text style={styles.customerSearchHint}>Searching...</Text>
+                  ) : customerResults.length > 0 ? (
+                    <View style={styles.customerResultsList}>
+                      {customerResults.slice(0, 5).map((c) => (
+                        <Pressable
+                          key={c.id}
+                          onPress={() => { setCustomerId(c.id); setCustomerName(c.name); setCustomerResults([]); setCustomerSearch(''); }}
+                          style={styles.customerResultRow}
+                        >
+                          <UserCircle2 color={colors.textSecondary} size={16} strokeWidth={2} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.customerResultName}>{c.name}</Text>
+                            {c.phoneNumber ? <Text style={styles.customerResultMeta}>{c.phoneNumber}</Text> : null}
+                          </View>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : customerSearch.trim() ? (
+                    <Text style={styles.customerSearchHint}>No customers found.</Text>
+                  ) : null}
+                </>
+              )}
+            </View>
           ) : null}
 
           <Text style={styles.checkoutFieldLabel}>PAYMENT METHOD</Text>
@@ -760,7 +1160,10 @@ export default function CashierScreen() {
             <AppButton
               icon={({ color, size }) => <QrCode color={color} size={size} strokeWidth={2.1} />}
               label="View Receipt"
-              onPress={() => setShowSuccessModal(false)}
+              onPress={() => {
+                setShowSuccessModal(false);
+                setSelectedSaleDetails(completedSale);
+              }}
               variant="successOutline"
             />
           </ModalActions>
@@ -770,6 +1173,7 @@ export default function CashierScreen() {
         title="Payment Success"
         visible={showSuccessModal}>
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.successModalContent}
           showsVerticalScrollIndicator={false}>
           <View style={styles.successIconWrap}>
@@ -801,18 +1205,22 @@ export default function CashierScreen() {
               </View>
 
               <View style={styles.successBreakdownCard}>
+                {completedSale.discountAmount > 0 ? (
+                  <>
+                    <View style={styles.successMetaRow}>
+                      <Text style={styles.successMetaLabel}>Subtotal</Text>
+                      <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
+                    </View>
+                    <View style={styles.successMetaRow}>
+                      <Text style={styles.successMetaLabel}>Discount</Text>
+                      <Text style={styles.successMetaValue}>
+                        - {formatPeso(completedSale.discountAmount)}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
                 <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Original Price</Text>
-                  <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Discount</Text>
-                  <Text style={styles.successMetaValue}>
-                    - {formatPeso(completedSale.discountAmount)}
-                  </Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Discounted Price</Text>
+                  <Text style={styles.successMetaLabel}>Total Price</Text>
                   <Text style={styles.successMetaValue}>
                     {formatPeso(completedSale.totalAmount)}
                   </Text>
@@ -838,6 +1246,12 @@ export default function CashierScreen() {
               </View>
 
               <View style={styles.successMetaRow}>
+                <Text style={styles.successMetaLabel}>Customer</Text>
+                <Text style={styles.successMetaValue}>
+                  {completedSale.customerName ?? 'Walk-in'}
+                </Text>
+              </View>
+              <View style={styles.successMetaRow}>
                 <Text style={styles.successMetaLabel}>Receipt No</Text>
                 <Text style={styles.successMetaValue}>{completedSale.receiptNumber}</Text>
               </View>
@@ -858,6 +1272,105 @@ export default function CashierScreen() {
             </SurfaceCard>
           ) : null}
         </ScrollView>
+      </AdminModalShell>
+
+      {/* Sale Details / Digital Receipt Modal */}
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Print Receipt"
+              onPress={() => handlePrintReceipt(selectedSaleDetails)}
+              variant="primary"
+            />
+            <AppButton
+              label="Close"
+              onPress={() => setSelectedSaleDetails(null)}
+              variant="secondary"
+            />
+          </ModalActions>
+        }
+        height={Math.min(height * 0.85, 680)}
+        onClose={() => setSelectedSaleDetails(null)}
+        title="Receipt Details"
+        visible={selectedSaleDetails !== null}>
+        {selectedSaleDetails ? (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+            {/* Store Header */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: colors.secondary }}>GDC STORE</Text>
+              <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary }}>POS Receipt</Text>
+            </View>
+
+            <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Receipt No</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.textStrong }}>#{selectedSaleDetails.receiptNumber}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Date & Time</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatReceiptDateTime(selectedSaleDetails.createdAt || selectedSaleDetails.time)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Cashier</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{selectedSaleDetails.cashierName}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Customer</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>
+                  {selectedSaleDetails.customerName ?? selectedSaleDetails.customer?.name ?? 'Walk-in'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Payment Method</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.secondary }}>{formatPaymentMethod(selectedSaleDetails.paymentMethod)}</Text>
+              </View>
+            </SurfaceCard>
+
+            <Text style={{ fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.2, color: colors.textSecondary, marginBottom: 8 }}>ITEMS PURCHASED</Text>
+            <SurfaceCard style={{ paddingVertical: 8, paddingHorizontal: 16, marginBottom: 16 }}>
+              {selectedSaleDetails.items && selectedSaleDetails.items.map((item: any, idx: number) => (
+                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomColor: colors.divider, borderBottomWidth: idx === selectedSaleDetails.items.length - 1 ? 0 : 1 }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.textStrong }}>{item.product?.name || 'Item'}</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary }}>{item.quantity} x {formatPeso(item.price)}</Text>
+                  </View>
+                  <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.textStrong, alignSelf: 'center' }}>
+                    {formatPeso(item.price * item.quantity)}
+                  </Text>
+                </View>
+              ))}
+            </SurfaceCard>
+
+            <SurfaceCard style={{ padding: 16 }}>
+              {selectedSaleDetails.discountAmount > 0 ? (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Subtotal</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatPeso(selectedSaleDetails.subtotal)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Discount</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.danger }}>- {formatPeso(selectedSaleDetails.discountAmount)}</Text>
+                  </View>
+                  <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 8 }} />
+                </>
+              ) : null}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.textStrong }}>TOTAL AMOUNT</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.secondary }}>{formatPeso(selectedSaleDetails.totalAmount)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Amount Paid</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatPeso(selectedSaleDetails.amountPaid)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.success }}>Change</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.success }}>{formatPeso(selectedSaleDetails.changeAmount)}</Text>
+              </View>
+            </SurfaceCard>
+          </ScrollView>
+        ) : null}
       </AdminModalShell>
     </SafeAreaView>
   );
@@ -1413,6 +1926,127 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     textAlign: 'center',
   },
+  customerTypeRow: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  customerTypeOption: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  customerTypeOptionActive: {
+    backgroundColor: colors.surfaceBrandMuted,
+    borderColor: colors.secondary,
+  },
+  customerTypeRadio: {
+    alignItems: 'center',
+    borderColor: colors.borderMuted,
+    borderRadius: 9,
+    borderWidth: 2,
+    height: 18,
+    justifyContent: 'center',
+    width: 18,
+  },
+  customerTypeRadioActive: {
+    borderColor: colors.secondary,
+  },
+  customerTypeRadioDot: {
+    backgroundColor: colors.secondary,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  customerTypeLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  customerTypeLabelActive: {
+    color: colors.secondary,
+  },
+  customerSearchWrap: {
+    marginBottom: spacing.md,
+  },
+  customerSearchBox: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  customerSearchInput: {
+    color: colors.textStrong,
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+  },
+  customerSearchHint: {
+    color: colors.textSubtle,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  customerResultsList: {
+    backgroundColor: colors.card,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
+  customerResultRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.divider,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  customerResultName: {
+    color: colors.textStrong,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  customerResultMeta: {
+    color: colors.textSubtle,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+  },
+  customerSelectedRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceBrandMuted,
+    borderColor: colors.secondary,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  customerSelectedName: {
+    color: colors.secondary,
+    flex: 1,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  customerClearText: {
+    color: colors.textSubtle,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+  },
   successModalContent: {
     paddingBottom: spacing.sm,
   },
@@ -1528,5 +2162,187 @@ const styles = StyleSheet.create({
     fontSize: textSizes.small + 1,
     marginTop: spacing.lg,
     textAlign: 'center',
+  },
+  botFab: {
+    position: 'absolute',
+    bottom: 95,
+    right: 20,
+    backgroundColor: colors.secondary,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(19, 25, 39, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '75%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    borderBottomColor: colors.borderSoft,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  botTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  botIconBadge: {
+    backgroundColor: colors.surfaceBrandMuted,
+    borderRadius: 12,
+    padding: 8,
+  },
+  modalTitle: {
+    color: colors.textStrong,
+    ...textRoles.value,
+    fontSize: 16,
+  },
+  modalSubtitle: {
+    color: colors.success,
+    ...textRoles.label,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  closeButton: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: 20,
+    padding: 6,
+  },
+  messagesList: {
+    padding: 16,
+    gap: 12,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginVertical: 4,
+  },
+  messageRowUser: {
+    justifyContent: 'flex-end',
+  },
+  messageRowBot: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    borderRadius: 18,
+    maxWidth: '82%',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    flexShrink: 1,
+  },
+  messageBubbleUser: {
+    backgroundColor: colors.secondary,
+    borderBottomRightRadius: 4,
+  },
+  messageBubbleBot: {
+    backgroundColor: colors.surfaceInfo,
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    ...textRoles.body,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  messageTextUser: {
+    color: colors.white,
+  },
+  messageTextBot: {
+    color: colors.textDark,
+  },
+  messageTime: {
+    ...textRoles.label,
+    fontSize: 9,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  messageTimeUser: {
+    color: colors.textOnSecondaryMuted,
+  },
+  messageTimeBot: {
+    color: colors.textSubtle,
+  },
+  loadingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  loadingText: {
+    color: colors.textSubtle,
+    ...textRoles.label,
+    fontSize: 12,
+  },
+  inputArea: {
+    alignItems: 'center',
+    borderTopColor: colors.borderSoft,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  chatInput: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: 24,
+    color: colors.textStrong,
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  sendButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 44,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.surfaceOverlayMuted,
+  },
+  modalInputWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  modalInputLabel: {
+    color: colors.textSecondary,
+    ...textRoles.label,
+    marginBottom: spacing.sm,
+  },
+  modalTextInput: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: radius.md,
+    color: colors.textStrong,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    minHeight: 46,
+    paddingHorizontal: 16,
   },
 });

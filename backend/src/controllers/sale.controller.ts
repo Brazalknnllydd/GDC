@@ -139,10 +139,16 @@ export const createSale = async (
       receiptNumber,
       subtotal,
       discountAmount = 0,
+      taxAmount = 0,
       totalAmount,
       amountPaid,
       changeAmount,
       paymentMethod = "Cash",
+      paymentReference,
+      status,
+      approvedByUserId,
+      notes,
+      isPrinted,
       customerId,
       userId: requestedUserId,
       shiftId,
@@ -151,10 +157,16 @@ export const createSale = async (
       receiptNumber?: string;
       subtotal?: number;
       discountAmount?: number;
+      taxAmount?: number;
       totalAmount?: number;
       amountPaid?: number;
       changeAmount?: number;
       paymentMethod?: string;
+      paymentReference?: string | null;
+      status?: string;
+      approvedByUserId?: number | null;
+      notes?: string | null;
+      isPrinted?: boolean;
       customerId?: number | null;
       userId?: number;
       shiftId?: number | null;
@@ -203,18 +215,37 @@ export const createSale = async (
       });
     }
 
+    let finalShiftId = shiftId;
+    if (!isAdmin && !finalShiftId) {
+      const activeShift = await prisma.shift.findFirst({
+        where: { userId: saleUserId, status: 'OPEN' },
+      });
+      if (!activeShift) {
+        return res.status(403).json({
+          message: "You must have an open shift to process sales.",
+        });
+      }
+      finalShiftId = activeShift.id;
+    }
+
     const saleInput = {
       receiptNumber,
       subtotal,
       discountAmount,
+      taxAmount,
       totalAmount,
       amountPaid,
       changeAmount,
       paymentMethod,
       userId: saleUserId,
       items,
+      ...(paymentReference !== undefined ? { paymentReference } : {}),
+      ...(status !== undefined ? { status } : {}),
+      ...(approvedByUserId !== undefined ? { approvedByUserId } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+      ...(isPrinted !== undefined ? { isPrinted } : {}),
       ...(customerId !== undefined ? { customerId } : {}),
-      ...(shiftId !== undefined ? { shiftId } : {}),
+      ...(finalShiftId !== undefined && finalShiftId !== null ? { shiftId: finalShiftId } : {}),
     };
 
     const sale = await createSaleWithInventoryUpdate(saleInput);

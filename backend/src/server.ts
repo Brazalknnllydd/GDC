@@ -11,7 +11,10 @@ import customerRoutes from "./routes/customer.routes.js";
 import saleRoutes from "./routes/sale.routes.js";
 import inventoryLogRoutes from "./routes/inventory-log.routes.js";
 import staffRoutes from "./routes/staff.routes.js";
+import chatbotRoutes from "./routes/chatbot.routes.js";
+import shiftRoutes from "./routes/shift.routes.js";
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
@@ -28,6 +31,8 @@ app.use("/cashier", cashierRoutes);
 app.use("/sales", saleRoutes);
 app.use("/inventory-logs", inventoryLogRoutes);
 app.use("/staff", staffRoutes);
+app.use("/chatbot", chatbotRoutes);
+app.use("/shifts", shiftRoutes);
 
 app.get("/", (_req, res) => {
   res.json({

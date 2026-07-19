@@ -16,6 +16,10 @@ import { AdminLineChart } from '../components/ui/admin-line-chart';
 import { AdminMetricCard } from '../components/ui/admin-metric-card';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
+import {
+  ReportExportOptions,
+  type ReportExportFormat,
+} from '../components/ui/report-export-options';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, spacing } from '../constants/design-system';
 import { colors, textRoles, textSizes } from '../constants/theme';
@@ -24,6 +28,7 @@ import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
 import type { SaleRecord } from '../lib/sales-types';
+import { downloadWebPdfReport } from '../lib/web-pdf-export';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type Product = {
@@ -76,6 +81,28 @@ function formatMonthRangeLabel(range: MonthRangeValue) {
   return formatMonthLabel(range.startMonth || range.endMonth);
 }
 
+function formatMonthRangeForFilename(range: MonthRangeValue) {
+  if (!range.startMonth && !range.endMonth) {
+    return 'all-months';
+  }
+
+  const months = [range.startMonth || range.endMonth, range.endMonth || range.startMonth]
+    .filter((value): value is Date => Boolean(value))
+    .map((value) =>
+      value.toLocaleDateString('en-PH', {
+        month: 'short',
+        year: 'numeric',
+      })
+    )
+    .map((value) => value.replace(/\s+/g, '-').toLowerCase());
+
+  return [...new Set(months)].join('-to-');
+}
+
+function escapeCsvValue(value: string | number) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
 function escapeHtml(value: string | number) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -100,6 +127,8 @@ export default function AdminReportsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [screenError, setScreenError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportVisible, setIsExportVisible] = useState(false);
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ReportExportFormat>('excel');
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [reportMonthRange, setReportMonthRange] = useState<MonthRangeValue>(() => {
@@ -164,22 +193,20 @@ export default function AdminReportsScreen() {
     return `data:image/jpeg;base64,${base64}`;
   }
 
-  function openPrintableWebReport(html: string) {
-    if (typeof window === 'undefined') {
-      throw new Error('Print preview is not available in this environment.');
+  function downloadWebFile(content: string, fileName: string, mimeType: string) {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      throw new Error('Web download is not available in this environment.');
     }
 
-    const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=960,height=720');
-
-    if (!reportWindow) {
-      throw new Error('Please allow pop-ups to export the PDF report.');
-    }
-
-    reportWindow.document.open();
-    reportWindow.document.write(html);
-    reportWindow.document.close();
-    reportWindow.focus();
-    setTimeout(() => reportWindow.print(), 400);
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
   }
 
   async function shareFile(uri: string) {
@@ -197,6 +224,75 @@ export default function AdminReportsScreen() {
     });
   }
 
+  async function exportExcelReport() {
+    const rangeLabel = formatMonthRangeLabel(reportMonthRange);
+    const lines = [
+      [escapeCsvValue('GDC Inventory Pro Reports Summary')],
+      [escapeCsvValue(`Range: ${rangeLabel}`)],
+      [escapeCsvValue(`Generated: ${formatDateTime(new Date().toISOString())}`)],
+      [],
+      [escapeCsvValue('Summary')],
+      [escapeCsvValue('Discounts Given'), escapeCsvValue(formatPeso(totals.discounts))],
+      [escapeCsvValue('Items Sold'), escapeCsvValue(totals.itemsSold)],
+      [escapeCsvValue('Average Basket'), escapeCsvValue(totals.averageBasket.toFixed(1))],
+      [escapeCsvValue('Active Categories'), escapeCsvValue(totals.activeCategories)],
+      [],
+      [escapeCsvValue('Payment Method'), escapeCsvValue('Total'), escapeCsvValue('Share')],
+      ...paymentDistribution.map((payment) =>
+        [payment.label, payment.amount, payment.percentageText].map(escapeCsvValue)
+      ),
+      [],
+      [escapeCsvValue('Category'), escapeCsvValue('Catalog Coverage')],
+      ...categoryPerformance.map((category) =>
+        [category.label, `${category.percentage}%`].map(escapeCsvValue)
+      ),
+    ];
+    const csvContent = lines.map((line) => line.join(',')).join('\n');
+    const fileName = `gdc-reports-summary-${formatMonthRangeForFilename(reportMonthRange)}.csv`;
+
+    if (Platform.OS === 'web') {
+      downloadWebFile(csvContent, fileName, 'text/csv;charset=utf-8;');
+      return;
+    }
+
+    const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+    await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    const available = await Sharing.isAvailableAsync();
+    if (!available) {
+      Alert.alert('Sharing unavailable', 'File sharing is not available on this device.');
+      return;
+    }
+
+    await Sharing.shareAsync(fileUri, {
+      UTI: 'public.comma-separated-values-text',
+      dialogTitle: 'Share Excel Report',
+      mimeType: 'text/csv',
+    });
+  }
+
+  async function handleExportReport() {
+    if (selectedExportFormat === 'pdf') {
+      await handleExportPdf();
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setScreenError('');
+      await exportExcelReport();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export the report right now.';
+      setScreenError(message);
+      Alert.alert('Export failed', message);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   async function handleExportPdf() {
     try {
       setIsExporting(true);
@@ -205,6 +301,7 @@ export default function AdminReportsScreen() {
       const logoDataUri = await getLogoDataUri();
       const rangeLabel = formatMonthRangeLabel(reportMonthRange);
       const generatedAt = formatDateTime(new Date().toISOString());
+      const fileName = `gdc-reports-summary-${formatMonthRangeForFilename(reportMonthRange)}.pdf`;
       const categoryRows =
         categoryPerformance.length > 0
           ? categoryPerformance
@@ -429,7 +526,42 @@ export default function AdminReportsScreen() {
       `;
 
       if (Platform.OS === 'web') {
-        openPrintableWebReport(html);
+        await downloadWebPdfReport({
+          fileName,
+          title: 'Admin Reports',
+          subtitle: 'GDC Inventory Pro',
+          metadata: [
+            { label: 'Month Range', value: rangeLabel },
+            { label: 'Generated', value: generatedAt },
+          ],
+          summary: [
+            { label: 'Discounts Given', value: formatPeso(totals.discounts) },
+            { label: 'Items Sold', value: String(totals.itemsSold) },
+            { label: 'Average Basket', value: totals.averageBasket.toFixed(1) },
+            { label: 'Active Categories', value: String(totals.activeCategories) },
+          ],
+          tables: [
+            {
+              headers: ['Payment Method', 'Total', 'Share'],
+              rows: paymentDistribution.map((payment) => [
+                payment.label,
+                payment.amount,
+                payment.percentageText,
+              ]),
+              title: 'Payment Distribution',
+            },
+            {
+              emptyText: 'No category coverage data available.',
+              headers: ['Category', 'Coverage'],
+              rows: categoryPerformance.map((category) => [
+                category.label,
+                `${category.percentage}%`,
+              ]),
+              title: 'Catalog Category Coverage',
+            },
+          ],
+          footer: 'Prepared by GDC Inventory Pro',
+        });
         return;
       }
 
@@ -463,7 +595,7 @@ export default function AdminReportsScreen() {
           <View style={[styles.rangeActionsBlock, compactPhone && styles.rangeActionsBlockCompact]}>
             <Pressable
               disabled={isExporting}
-              onPress={handleExportPdf}
+              onPress={() => setIsExportVisible((current) => !current)}
               style={[
                 styles.toolbarIconButton,
                 compactPhone && styles.toolbarIconButtonCompact,
@@ -524,17 +656,28 @@ export default function AdminReportsScreen() {
         ) : null}
       </SurfaceCard>
 
-      <AdminMetricGrid>
-        {reportMetrics.map((metric) => (
-          <AdminMetricCard
-            key={metric.title}
-            detail={metric.detail}
-            title={metric.title}
-            tone={metric.tone}
-            value={metric.value}
-          />
-        ))}
-      </AdminMetricGrid>
+      {isExportVisible ? (
+        <ReportExportOptions
+          format={selectedExportFormat}
+          isExporting={isExporting}
+          onExport={handleExportReport}
+          onFormatChange={setSelectedExportFormat}
+        />
+      ) : null}
+
+      <View style={isExportVisible ? styles.metricsAfterExport : undefined}>
+        <AdminMetricGrid>
+          {reportMetrics.map((metric) => (
+            <AdminMetricCard
+              key={metric.title}
+              detail={metric.detail}
+              title={metric.title}
+              tone={metric.tone}
+              value={metric.value}
+            />
+          ))}
+        </AdminMetricGrid>
+      </View>
 
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Monthly Report Trend</Text>
@@ -725,6 +868,9 @@ const styles = StyleSheet.create({
   rangeActionText: {
     color: colors.textHeading,
     ...textRoles.label,
+  },
+  metricsAfterExport: {
+    marginTop: layout.cardGap,
   },
   sectionHeaderRow: {
     alignItems: 'center',

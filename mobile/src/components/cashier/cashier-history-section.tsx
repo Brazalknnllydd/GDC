@@ -1,28 +1,47 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 import type { CashierDashboardResponse } from './cashier-screen-data';
 import { cashierPerformanceCards } from './cashier-screen-data';
 import { CashierPaymentBreakdownCard } from './cashier-payment-breakdown-card';
 import { CashierPerformanceCard } from './cashier-performance-card';
-import { CashierRecentSaleItem } from './cashier-recent-sale-item';
 import { CashierShiftCard } from './cashier-shift-card';
+import { PaginationControls } from '../ui/pagination-controls';
 import { SectionHeading } from '../ui/section-heading';
 import { SurfaceCard } from '../ui/surface-card';
 import { spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { formatPeso } from '../../lib/product-utils';
+import { formatCashierTime, formatPaymentMethod } from '../../lib/cashier-formatters';
 
 type CashierHistorySectionProps = {
   dashboard: CashierDashboardResponse;
+  onEditOpeningCash?: () => void;
+  onSelectSale?: (sale: any) => void;
 };
 
-export function CashierHistorySection({ dashboard }: CashierHistorySectionProps) {
+export function CashierHistorySection({
+  dashboard,
+  onEditOpeningCash,
+  onSelectSale,
+}: CashierHistorySectionProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+
+  const totalPages = Math.ceil(dashboard.recentSales.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedSales = dashboard.recentSales.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <>
       {dashboard.currentShift ? (
         <CashierShiftCard
           startedAt={dashboard.currentShift.startedAt}
           status={dashboard.currentShift.status}
+          openingCash={dashboard.currentShift.openingCash}
+          expectedCashOnHand={dashboard.currentShift.expectedCashOnHand}
+          onEditOpeningCash={onEditOpeningCash}
         />
       ) : null}
 
@@ -45,25 +64,61 @@ export function CashierHistorySection({ dashboard }: CashierHistorySectionProps)
       <SectionHeading style={styles.sectionHeaderLabel}>TODAY'S RECENT SALES</SectionHeading>
 
       <SurfaceCard style={styles.recentSalesCard}>
-        {dashboard.recentSales.length > 0 ? (
-          dashboard.recentSales.map((sale) => (
-            <CashierRecentSaleItem
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
+          <Text style={[styles.headerCell, { flex: 1 }]}>TIME</Text>
+          <Text style={[styles.headerCell, { flex: 1 }]}>METHOD</Text>
+          <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>TOTAL</Text>
+        </View>
+
+        {/* Table Rows */}
+        {paginatedSales.length > 0 ? (
+          paginatedSales.map((sale, index) => (
+            <TouchableOpacity
               key={sale.id}
-              paymentMethod={sale.paymentMethod}
-              receiptNumber={sale.receiptNumber}
-              time={sale.time}
-              totalAmount={sale.totalAmount}
-            />
+              style={[
+                styles.tableRow,
+                index === paginatedSales.length - 1 && styles.tableRowLast,
+              ]}
+              onPress={() => onSelectSale?.(sale)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.rowCell, styles.receiptText, { flex: 1.5 }]}>
+                #{sale.receiptNumber}
+              </Text>
+              <Text style={[styles.rowCell, styles.timeText, { flex: 1 }]}>
+                {formatCashierTime(new Date(sale.time))}
+              </Text>
+              <Text style={[styles.rowCell, styles.methodText, { flex: 1 }]}>
+                {formatPaymentMethod(sale.paymentMethod)}
+              </Text>
+              <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right' }]}>
+                {formatPeso(sale.totalAmount)}
+              </Text>
+            </TouchableOpacity>
           ))
         ) : (
           <Text style={styles.emptySalesText}>No sales recorded for this cashier today.</Text>
         )}
+
+        {/* Pagination Footer */}
+        <View style={{ paddingVertical: 16, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: colors.borderPanel, backgroundColor: colors.surfaceSoft }}>
+          <PaginationControls
+            borderless
+            currentPage={currentPage - 1}
+            onPageChange={(p) => setCurrentPage(p + 1)}
+            totalPages={totalPages}
+          />
+        </View>
       </SurfaceCard>
 
       <CashierPaymentBreakdownCard
         drawerVariance={dashboard.totals.drawerVariance}
         paymentBreakdown={dashboard.paymentBreakdown}
         totalReportedSales={dashboard.totals.totalReportedSales}
+        cashReceived={dashboard.totals.cashReceived}
+        changeGiven={dashboard.totals.changeGiven}
       />
     </>
   );
@@ -87,7 +142,7 @@ const styles = StyleSheet.create({
   recentSalesCard: {
     marginBottom: spacing.section,
     overflow: 'hidden',
-    paddingVertical: spacing.sm,
+    paddingVertical: 0,
   },
   emptySalesText: {
     color: colors.textTertiary,
@@ -96,5 +151,87 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
     textAlign: 'left',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+  },
+  headerCell: {
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    color: colors.textSecondary,
+    letterSpacing: 1.2,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  tableRowLast: {
+    borderBottomWidth: 0,
+  },
+  rowCell: {
+    fontSize: textSizes.body,
+    fontFamily: fonts.regular,
+    color: colors.textStrong,
+  },
+  receiptText: {
+    fontFamily: fonts.bold,
+    color: colors.textDark,
+  },
+  timeText: {
+    color: colors.textSecondary,
+  },
+  methodText: {
+    color: colors.textSecondary,
+  },
+  totalText: {
+    fontFamily: fonts.bold,
+    color: colors.secondary,
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    backgroundColor: colors.surfaceSoft,
+  },
+  pageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderPanel,
+    backgroundColor: colors.card,
+    gap: 4,
+  },
+  pageButtonDisabled: {
+    opacity: 0.5,
+    borderColor: colors.divider,
+  },
+  pageButtonText: {
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+    color: colors.secondary,
+  },
+  pageButtonTextDisabled: {
+    color: colors.textTertiary,
+  },
+  pageInfoText: {
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+    color: colors.textSecondary,
   },
 });

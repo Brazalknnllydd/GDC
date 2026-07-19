@@ -12,52 +12,52 @@ import { colors } from './theme';
 
 export const spacing = {
   xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 22,
-  section: 28,
-  block: 34,
+  sm: 6,
+  md: 9,
+  lg: 12,
+  xl: 15,
+  xxl: 17,
+  section: 21,
+  block: 26,
 };
 
 export const radius = {
-  sm: 10,
-  md: 12,
-  lg: 16,
-  xl: 18,
-  xxl: 22,
+  sm: 7,
+  md: 9,
+  lg: 12,
+  xl: 14,
+  xxl: 18,
   round: 999,
 };
 
 export const iconSizes = {
-  sm: 16,
-  md: 22,
-  lg: 24,
-  xl: 31,
+  sm: 15,
+  md: 18,
+  lg: 20,
+  xl: 25,
 };
 
 export const controlHeights = {
-  sm: 42,
-  md: 52,
-  lg: 62,
-  xl: 86,
-  inputCompact: 62,
-  input: 86,
-  inputMultilineCompact: 118,
-  inputMultiline: 132,
-  iconButton: 44,
-  fab: 72,
+  sm: 34,
+  md: 42,
+  lg: 50,
+  xl: 66,
+  inputCompact: 48,
+  input: 64,
+  inputMultilineCompact: 88,
+  inputMultiline: 104,
+  iconButton: 36,
+  fab: 58,
 };
 
 export const layout = {
   headerPaddingX: spacing.xxl,
   screenPaddingX: spacing.xxl,
-  screenPaddingTop: spacing.xxl,
-  screenPaddingBottom: 120,
-  cardGap: spacing.md + 2,
-  floatingContentPadding: 178,
-  floatingContentPaddingCompact: 164,
+  screenPaddingTop: spacing.xl,
+  screenPaddingBottom: 94,
+  cardGap: spacing.md,
+  floatingContentPadding: 140,
+  floatingContentPaddingCompact: 132,
 };
 
 export const shadows = {

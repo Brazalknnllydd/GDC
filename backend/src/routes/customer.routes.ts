@@ -13,6 +13,6 @@ const router = Router();
 router.get("/", requireAuth, requireRole(["Admin", "Cashier"]), getCustomers);
 router.post("/", requireAuth, requireRole(["Admin", "Cashier"]), createCustomer);
 router.put("/:id", requireAuth, requireRole(["Admin", "Cashier"]), updateCustomer);
-router.delete("/:id", requireAuth, requireRole(["Admin"]), deleteCustomer);
+router.delete("/:id", requireAuth, requireRole(["Admin", "Cashier"]), deleteCustomer);
 
 export default router;

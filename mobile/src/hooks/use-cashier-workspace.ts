@@ -25,6 +25,8 @@ const emptyDashboard: CashierDashboardResponse = {
   totals: {
     drawerVariance: 0,
     totalReportedSales: 0,
+    cashReceived: 0,
+    changeGiven: 0,
   },
 };
 

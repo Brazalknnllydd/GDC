@@ -25,8 +25,12 @@ export function AdminBarChart({
   }));
   const maxValue = Math.max(...values, 0);
   const normalizedMax = maxValue > 0 ? maxValue : 1;
-  const barWidth = Math.max(Math.min(chartWidth / Math.max(data.length * 2.6, 6), 38), 16);
-  const spacing = Math.max(Math.min(chartWidth / Math.max(data.length * 2.1, 6), 28), 10);
+  const initialSpacing = compactPhone ? 10 : 14;
+  const barWidth = Math.max(Math.min(chartWidth / (data.length * 2.5), 48), 16);
+  const totalBarWidth = data.length * barWidth;
+  const remainingSpace = chartWidth - initialSpacing - totalBarWidth;
+  const spacing = data.length > 0 ? Math.max(remainingSpace / data.length, 10) : 10;
+  const endSpacing = spacing;
 
   return (
     <View style={styles.wrap}>
@@ -41,7 +45,8 @@ export function AdminBarChart({
         hideAxesAndRules={false}
         hideOrigin
         hideRules={false}
-        initialSpacing={compactPhone ? 10 : 14}
+        initialSpacing={initialSpacing}
+        endSpacing={endSpacing}
         isAnimated
         maxValue={normalizedMax}
         noOfSections={4}
@@ -66,12 +71,12 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     width: '100%',
+    paddingBottom: 8,
   },
   xAxisLabel: {
     color: colors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: textSizes.smallCaps,
-    marginTop: 8,
   },
   yAxisLabel: {
     color: colors.textSecondary,

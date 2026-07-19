@@ -58,15 +58,15 @@ export function AdminMetricCard({
   valueColor,
   titleColor = colors.textHeading,
   detailColor,
-  minHeight = 158,
+  minHeight = 134,
   width = '47.5%',
-  paddingHorizontal = 22,
-  paddingVertical = 22,
-  titleMarginBottom = 24,
-  valueMarginBottom = 8,
-  titleLetterSpacing = 2.2,
-  valueFontSize = 24,
-  valueLineHeight = 29,
+  paddingHorizontal = 18,
+  paddingVertical = 18,
+  titleMarginBottom = 18,
+  valueMarginBottom = 6,
+  titleLetterSpacing = 1.8,
+  valueFontSize = 21,
+  valueLineHeight = 26,
   infoDialogTitle,
   infoDialogValue,
 }: AdminMetricCardProps) {
@@ -81,25 +81,25 @@ export function AdminMetricCard({
     : isCompactPhone
       ? Math.min(titleLetterSpacing, 1.3)
       : titleLetterSpacing;
-  const resolvedTitleFontSize = isNarrowPhone ? 13 : isCompactPhone ? 14 : textSizes.medium;
-  const resolvedTitleLineHeight = isNarrowPhone ? 17 : isCompactPhone ? 18 : 22;
+  const resolvedTitleFontSize = isNarrowPhone ? 12 : isCompactPhone ? 13 : textSizes.body;
+  const resolvedTitleLineHeight = isNarrowPhone ? 16 : isCompactPhone ? 17 : 20;
   const resolvedValueFontSize = isNarrowPhone
-    ? Math.min(valueFontSize, 20)
+      ? Math.min(valueFontSize, 18)
     : isCompactPhone
-      ? Math.min(valueFontSize, 22)
+      ? Math.min(valueFontSize, 20)
       : valueFontSize;
   const resolvedValueLineHeight = isNarrowPhone
-    ? Math.min(valueLineHeight, 24)
+    ? Math.min(valueLineHeight, 22)
     : isCompactPhone
-      ? Math.min(valueLineHeight, 27)
+      ? Math.min(valueLineHeight, 24)
       : valueLineHeight;
-  const resolvedMinHeight = isNarrowPhone ? Math.max(minHeight, 138) : isCompactPhone ? Math.max(minHeight, 150) : minHeight;
-  const resolvedPaddingHorizontal = isNarrowPhone ? 14 : isCompactPhone ? 18 : paddingHorizontal;
-  const resolvedPaddingVertical = isNarrowPhone ? 16 : isCompactPhone ? 20 : paddingVertical;
+  const resolvedMinHeight = isNarrowPhone ? Math.max(minHeight, 118) : isCompactPhone ? Math.max(minHeight, 126) : minHeight;
+  const resolvedPaddingHorizontal = isNarrowPhone ? 12 : isCompactPhone ? 15 : paddingHorizontal;
+  const resolvedPaddingVertical = isNarrowPhone ? 13 : isCompactPhone ? 15 : paddingVertical;
   const resolvedTitleMarginBottom = isNarrowPhone
     ? Math.min(titleMarginBottom, 12)
     : isCompactPhone
-      ? Math.min(titleMarginBottom, 16)
+      ? Math.min(titleMarginBottom, 14)
       : titleMarginBottom;
   const resolvedValueMarginBottom = isNarrowPhone ? Math.min(valueMarginBottom, 8) : valueMarginBottom;
 
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
   title: {
     ...textRoles.label,
     flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: textSizes.body,
+    lineHeight: 18,
     minHeight: 20,
     textTransform: 'uppercase',
   },
@@ -228,8 +228,8 @@ const styles = StyleSheet.create({
   },
   detail: {
     ...textRoles.label,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
   },
   detailNarrow: {
     fontSize: 12,

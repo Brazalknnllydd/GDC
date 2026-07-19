@@ -1,17 +1,24 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { formatCashierTime } from '../../lib/cashier-formatters';
+import { formatPeso } from '../../lib/product-utils';
 
 type CashierShiftCardProps = {
   startedAt: string;
   status: string;
+  openingCash?: number;
+  expectedCashOnHand?: number;
+  onEditOpeningCash?: () => void;
 };
 
 export function CashierShiftCard({
   startedAt,
   status,
+  openingCash,
+  expectedCashOnHand,
+  onEditOpeningCash,
 }: CashierShiftCardProps) {
   const startedAtDate = new Date(startedAt);
 
@@ -29,11 +36,29 @@ export function CashierShiftCard({
       <View style={styles.divider} />
 
       <View style={styles.bottomRow}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.metaLabel}>STARTED AT</Text>
           <Text style={styles.metaValue}>{formatCashierTime(startedAtDate)}</Text>
         </View>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.metaLabel}>OPENING CASH</Text>
+          <Text style={styles.metaValue}>
+            {openingCash !== undefined ? formatPeso(openingCash) : 'Not set'}
+          </Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Text style={styles.metaLabel}>EXPECTED CASH</Text>
+          <Text style={styles.metaValue}>
+            {expectedCashOnHand !== undefined ? formatPeso(expectedCashOnHand) : 'Not set'}
+          </Text>
+        </View>
       </View>
+
+      {onEditOpeningCash ? (
+        <TouchableOpacity style={styles.editButton} onPress={onEditOpeningCash} activeOpacity={0.8}>
+          <Text style={styles.editButtonText}>Update Opening Cash</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -98,5 +123,18 @@ const styles = StyleSheet.create({
     ...textRoles.value,
     fontSize: textSizes.medium,
     marginTop: 6,
+  },
+  editButton: {
+    alignItems: 'center',
+    backgroundColor: colors.overlayInverse12,
+    borderRadius: radius.md,
+    marginTop: spacing.lg,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  editButtonText: {
+    color: colors.textInverse,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
   },
 });

@@ -92,15 +92,15 @@ export const fonts = {
 export const textSizes = {
   xsmall: 10,
   smallCaps: 11,
-  small: 12,
-  body: 14,
-  bodyLarge: 15,
-  medium: 16,
-  title: 18,
-  titleLarge: 20,
-  large: 22,
-  xlarge: 24,
-  hero: 30,
+  small: 11,
+  body: 12,
+  bodyLarge: 13,
+  medium: 14,
+  title: 16,
+  titleLarge: 17,
+  large: 18,
+  xlarge: 20,
+  hero: 24,
 };
 
 // Typography rule:

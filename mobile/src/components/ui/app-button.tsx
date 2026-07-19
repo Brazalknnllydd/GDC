@@ -41,6 +41,13 @@ const sizeHeights: Record<AppButtonSize, number> = {
   xl: controlHeights.xl,
 };
 
+const sizePaddings: Record<AppButtonSize, number> = {
+  sm: spacing.sm,
+  md: spacing.lg,
+  lg: spacing.lg,
+  xl: spacing.lg,
+};
+
 const variantStyles: Record<
   AppButtonVariant,
   {
@@ -118,6 +125,7 @@ export function AppButton({
         {
           justifyContent: 'center',
           minHeight: sizeHeights[size],
+          paddingHorizontal: sizePaddings[size],
         },
       ]}
       disabled={disabled}
@@ -137,7 +145,7 @@ export function AppButton({
       uppercase={false}>
       <View style={styles.inner}>
         {icon ? (
-          <View style={styles.iconWrap}>{icon({ color: variantStyle.textColor, size: 18 })}</View>
+          <View style={styles.iconWrap}>{icon({ color: variantStyle.textColor, size: 16 })}</View>
         ) : null}
         <Text
           style={[
@@ -171,11 +179,11 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.bodyLarge,
-    lineHeight: 18,
+    lineHeight: 17,
     textAlign: 'center',
   },
   labelCompact: {
     fontSize: textSizes.body,
-    lineHeight: 17,
+    lineHeight: 16,
   },
 });

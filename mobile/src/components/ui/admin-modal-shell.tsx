@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -7,13 +8,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { X } from 'lucide-react-native';
-import { IconButton, Modal, Portal, Surface } from 'react-native-paper';
+import { IconButton, Portal, Surface } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
 
 type AdminModalShellProps = {
   children: ReactNode;
+  compact?: boolean;
   footer?: ReactNode;
   headerLead?: ReactNode;
   height?: ViewStyle['height'];
@@ -40,6 +42,7 @@ function resolveViewportLength(
 
 export function AdminModalShell({
   children,
+  compact = false,
   footer,
   headerLead,
   height,
@@ -49,73 +52,84 @@ export function AdminModalShell({
   visible,
 }: AdminModalShellProps) {
   const { height: viewportHeight, width } = useWindowDimensions();
-  const modalWidth = Math.min(width - 24, width >= 900 ? 760 : width >= 640 ? 680 : width);
+  const modalWidth = Math.min(width - 24, width >= 900 ? 720 : width >= 640 ? 640 : width);
   const resolvedHeight = resolveViewportLength(height, viewportHeight);
   const resolvedMaxHeight = resolveViewportLength(maxHeight, viewportHeight);
 
+  if (!visible) return null;
+
   return (
     <Portal>
-      <Modal
-        contentContainerStyle={styles.backdrop}
-        dismissable
-        onDismiss={onClose}
-        visible={visible}>
-        <Surface
-          style={[
-            styles.card,
-            {
-              height: resolvedHeight,
-              maxHeight: resolvedMaxHeight,
-              width: modalWidth,
-            },
-          ]}>
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              {headerLead}
-              <Text style={styles.title}>{title}</Text>
+      <Pressable onPress={onClose} style={styles.backdropOverlay}>
+        <Pressable onPress={() => undefined} style={{ width: modalWidth }}>
+          <Surface
+            style={[
+              styles.card,
+              {
+                height: resolvedHeight,
+                maxHeight: resolvedMaxHeight,
+                width: modalWidth,
+              },
+            ]}>
+            <View style={[styles.header, compact ? styles.headerCompact : undefined]}>
+              <View style={styles.titleRow}>
+                {headerLead}
+                <Text style={[styles.title, compact ? styles.titleCompact : undefined]}>
+                  {title}
+                </Text>
+              </View>
+              <IconButton
+                icon={() => <X color={colors.textTertiary} size={25} strokeWidth={2.1} />}
+                onPress={onClose}
+                size={22}
+                style={styles.closeButton}
+              />
             </View>
-            <IconButton
-              icon={() => <X color={colors.textTertiary} size={25} strokeWidth={2.1} />}
-              onPress={onClose}
-              size={22}
-              style={styles.closeButton}
-            />
-          </View>
 
-          <View style={styles.body}>{children}</View>
+            <View style={[styles.body, compact ? styles.bodyCompact : undefined]}>{children}</View>
 
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </Surface>
-      </Modal>
+            {footer ? (
+              <View style={[styles.footer, compact ? styles.footerCompact : undefined]}>
+                {footer}
+              </View>
+            ) : null}
+          </Surface>
+        </Pressable>
+      </Pressable>
     </Portal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  backdropOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: colors.overlayScrim,
     justifyContent: 'center',
-    marginHorizontal: 12,
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 12,
   },
   card: {
     alignSelf: 'center',
     backgroundColor: colors.card,
-    borderRadius: radius.xxl,
-    display: 'flex',
+    borderRadius: radius.xl,
     elevation: 3,
     flexShrink: 1,
     overflow: 'hidden',
   },
   header: {
     alignItems: 'center',
-    borderBottomColor: colors.dividerStrong,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  headerCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   titleRow: {
     alignItems: 'center',
@@ -126,7 +140,10 @@ const styles = StyleSheet.create({
   title: {
     color: colors.textHeading,
     ...textRoles.value,
-    fontSize: 18,
+    fontSize: 17,
+  },
+  titleCompact: {
+    fontSize: 16,
   },
   closeButton: {
     margin: 0,
@@ -134,13 +151,19 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     minHeight: 0,
-    paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  bodyCompact: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
   },
   footer: {
-    borderTopColor: colors.dividerStrong,
-    borderTopWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  footerCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
 });

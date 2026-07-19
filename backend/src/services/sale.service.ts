@@ -13,10 +13,16 @@ export type CreateSaleInput = {
   receiptNumber: string;
   subtotal: number;
   discountAmount?: number;
+  taxAmount?: number;
   totalAmount: number;
   amountPaid: number;
   changeAmount: number;
   paymentMethod?: string;
+  paymentReference?: string | null;
+  status?: string;
+  approvedByUserId?: number | null;
+  notes?: string | null;
+  isPrinted?: boolean;
   customerId?: number | null;
   userId: number;
   shiftId?: number | null;
@@ -42,10 +48,16 @@ export async function createSaleWithInventoryUpdate({
   receiptNumber,
   subtotal,
   discountAmount = 0,
+  taxAmount = 0,
   totalAmount,
   amountPaid,
   changeAmount,
   paymentMethod = "Cash",
+  paymentReference,
+  status = "completed",
+  approvedByUserId,
+  notes,
+  isPrinted = false,
   customerId,
   userId,
   shiftId,
@@ -136,10 +148,16 @@ export async function createSaleWithInventoryUpdate({
         receiptNumber: receiptNumber.trim(),
         subtotal,
         discountAmount,
+        taxAmount,
         totalAmount,
         amountPaid,
         changeAmount,
         paymentMethod: normalizedPaymentMethod,
+        paymentReference: paymentReference ?? null,
+        status,
+        approvedByUserId: typeof approvedByUserId === "number" ? approvedByUserId : null,
+        notes: notes ?? null,
+        isPrinted,
         customerId: typeof customerId === "number" ? customerId : null,
         userId,
         shiftId: typeof shiftId === "number" ? shiftId : null,

@@ -16,12 +16,16 @@ type CashierPaymentBreakdownCardProps = {
   drawerVariance: number;
   paymentBreakdown: PaymentBreakdownEntry[];
   totalReportedSales: number;
+  cashReceived?: number;
+  changeGiven?: number;
 };
 
 export function CashierPaymentBreakdownCard({
   drawerVariance,
   paymentBreakdown,
   totalReportedSales,
+  cashReceived,
+  changeGiven,
 }: CashierPaymentBreakdownCardProps) {
   const { compactPhone } = useResponsiveLayout();
 
@@ -48,6 +52,21 @@ export function CashierPaymentBreakdownCard({
         <Text style={styles.totalLabel}>Total Reported Sales</Text>
         <Text style={styles.totalValue}>{formatPeso(totalReportedSales)}</Text>
       </View>
+
+      {cashReceived !== undefined && cashReceived > 0 ? (
+        <View style={[styles.totalRow, compactPhone && styles.totalRowCompact]}>
+          <Text style={styles.totalLabel}>Total Cash Received</Text>
+          <Text style={styles.totalValue}>{formatPeso(cashReceived)}</Text>
+        </View>
+      ) : null}
+
+      {changeGiven !== undefined && changeGiven > 0 ? (
+        <View style={[styles.totalRow, compactPhone && styles.totalRowCompact]}>
+          <Text style={styles.totalLabel}>Change Returned</Text>
+          <Text style={[styles.totalValue, { color: colors.danger }]}>- {formatPeso(changeGiven)}</Text>
+        </View>
+      ) : null}
+
       <View style={[styles.totalRow, compactPhone && styles.totalRowCompact]}>
         <Text style={styles.totalLabel}>Drawer Reconciliation</Text>
         <Text style={styles.balanceValue}>{formatDrawerStatus(drawerVariance)}</Text>

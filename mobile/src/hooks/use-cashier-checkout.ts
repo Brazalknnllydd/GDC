@@ -22,11 +22,14 @@ export type CompletedSale = {
   cashierName: string;
   changeAmount: number;
   createdAt: string;
+  customerId?: number | null;
+  customerName?: string | null;
   discountAmount: number;
   paymentMethod: string;
   receiptNumber: string;
   subtotal: number;
   totalAmount: number;
+  items?: { product?: { name: string }; price: number; quantity: number; subtotal: number }[];
 };
 
 export type ActiveCheckoutInput =
@@ -104,6 +107,8 @@ export function useCashierCheckout({
   const [activeCheckoutInput, setActiveCheckoutInput] = useState<ActiveCheckoutInput>({
     type: 'amount',
   });
+  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerName, setCustomerName] = useState<string | null>(null);
 
   const cartItemCount = useMemo(
     () => cart.reduce((sum, item) => sum + item.quantity, 0),
@@ -243,6 +248,8 @@ export function useCashierCheckout({
     setPaymentMethod('Cash');
     setSaleError('');
     setActiveCheckoutInput({ type: 'amount' });
+    setCustomerId(null);
+    setCustomerName(null);
     setShowCartModal(false);
     setShowCheckoutModal(false);
   }
@@ -266,6 +273,7 @@ export function useCashierCheckout({
       await apiClient.post('/sales', {
         amountPaid: amountReceived,
         changeAmount,
+        customerId: customerId ?? null,
         discountAmount: cartDiscountTotal,
         items: cart.map((item) => ({
           price: item.price,
@@ -285,11 +293,19 @@ export function useCashierCheckout({
         cashierName: cashierDisplayName,
         changeAmount,
         createdAt: new Date().toISOString(),
+        customerId,
+        customerName,
         discountAmount: cartDiscountTotal,
         paymentMethod,
         receiptNumber,
         subtotal: cartGrossSubtotal,
         totalAmount: cartSubtotal,
+        items: cart.map((item) => ({
+          price: item.price,
+          product: { name: item.name },
+          quantity: item.quantity,
+          subtotal: getCartItemNetTotal(item),
+        })),
       });
       setCart([]);
       resetSaleFlow();
@@ -321,6 +337,8 @@ export function useCashierCheckout({
     cartSubtotal,
     changeAmount,
     completedSale,
+    customerId,
+    customerName,
     handleCompleteSale,
     handleKeypadBackspace,
     handleKeypadPress,
@@ -331,6 +349,8 @@ export function useCashierCheckout({
     saleError,
     setActiveCheckoutInput,
     setAmountReceivedInput,
+    setCustomerId,
+    setCustomerName,
     setPaymentMethod,
     setSaleError,
     setShowCartModal,

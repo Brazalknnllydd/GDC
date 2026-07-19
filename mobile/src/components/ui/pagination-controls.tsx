@@ -5,25 +5,72 @@ import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 
 type PaginationControlsProps = {
   currentPage: number;
-  endItem: number;
+  endItem?: number;
   onPageChange: (page: number) => void;
-  startItem: number;
-  totalItems: number;
+  startItem?: number;
+  totalItems?: number;
   totalPages: number;
-  visiblePageNumbers: number[];
+  visiblePageNumbers?: number[];
+  borderless?: boolean;
 };
 
 export function PaginationControls({
   currentPage,
-  endItem,
+  endItem = 0,
   onPageChange,
-  startItem,
-  totalItems,
+  startItem = 0,
+  totalItems = 0,
   totalPages,
-  visiblePageNumbers,
+  visiblePageNumbers = [],
+  borderless = false,
 }: PaginationControlsProps) {
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 430;
+
+  if (borderless) {
+    return (
+      <View style={styles.borderlessContainer}>
+        <Text style={styles.summaryTextBorderless}>
+          {`Page ${currentPage + 1} of ${totalPages || 1}`}
+        </Text>
+        <View style={styles.borderlessButtonsRow}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={currentPage === 0}
+            onPress={() => onPageChange(Math.max(currentPage - 1, 0))}
+            style={[
+              styles.borderlessTextButton,
+              currentPage === 0 && styles.borderlessTextButtonDisabled,
+            ]}>
+            <Text
+              style={[
+                styles.borderlessTextButtonLabel,
+                currentPage === 0 && styles.borderlessTextButtonLabelDisabled,
+              ]}>
+              Previous
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={currentPage >= totalPages - 1}
+            onPress={() => onPageChange(Math.min(currentPage + 1, totalPages - 1))}
+            style={[
+              styles.borderlessTextButton,
+              currentPage >= totalPages - 1 && styles.borderlessTextButtonDisabled,
+            ]}>
+            <Text
+              style={[
+                styles.borderlessTextButtonLabel,
+                currentPage >= totalPages - 1 && styles.borderlessTextButtonLabelDisabled,
+              ]}>
+              Next
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.card, isCompactPhone ? styles.cardCompact : undefined]}>
@@ -238,5 +285,50 @@ const styles = StyleSheet.create({
     color: colors.textSubtle,
     fontFamily: fonts.regular,
     fontSize: textSizes.medium,
+  },
+  cardBorderless: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    marginTop: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  borderlessContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  summaryTextBorderless: {
+    color: '#344054',
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
+  borderlessButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  borderlessTextButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D0D5DD',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  borderlessTextButtonDisabled: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F2F4F7',
+    opacity: 0.6,
+  },
+  borderlessTextButtonLabel: {
+    color: '#344054',
+    fontFamily: fonts.semiBold,
+    fontSize: 14,
+  },
+  borderlessTextButtonLabelDisabled: {
+    color: '#D0D5DD',
   },
 });

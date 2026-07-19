@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import { AppBottomNav } from '../ui/app-bottom-nav';
 
-export type CashierSection = 'register' | 'history' | 'inventory' | 'settings';
+export type CashierSection = 'register' | 'history' | 'inventory' | 'customers' | 'settings';
 
 type CashierBottomNavItem = {
   icon: ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;

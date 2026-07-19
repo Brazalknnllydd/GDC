@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CalendarDays, Download, History, QrCode, WalletCards } from 'lucide-react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CalendarDays, Download, History, QrCode, WalletCards, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -19,8 +19,9 @@ import { AppButton } from '../components/ui/app-button';
 import { layout, radius, spacing } from '../constants/design-system';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { SurfaceCard } from '../components/ui/surface-card';
-import { colors, fonts, textRoles } from '../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
@@ -237,9 +238,9 @@ export default function AdminSalesScreen() {
   const { compactPhone } = useResponsiveLayout();
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState<HistoryFilter>('All');
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
-  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [isExportVisible, setIsExportVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
   const [showOverviewMonthRangePicker, setShowOverviewMonthRangePicker] = useState(false);
   const [overviewCalendarYear, setOverviewCalendarYear] = useState(new Date().getFullYear());
   const [overviewMonthRange, setOverviewMonthRange] = useState<MonthRangeValue>(() => {
@@ -259,6 +260,10 @@ export default function AdminSalesScreen() {
   });
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [screenError, setScreenError] = useState('');
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [selectedHistoryFilter, historyMonthRange]);
 
   useEffect(() => {
     async function loadSales() {
@@ -368,6 +373,13 @@ export default function AdminSalesScreen() {
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
       });
   }, [sales, historyMonthRange, selectedHistoryFilter]);
+
+  const itemsPerPage = 10;
+  const totalHistoryPages = Math.ceil(historyTransactions.length / itemsPerPage) || 1;
+  const paginatedHistoryTransactions = useMemo(() => {
+    const start = (historyPage - 1) * itemsPerPage;
+    return historyTransactions.slice(start, start + itemsPerPage);
+  }, [historyTransactions, historyPage]);
 
   const historyEntries = useMemo<HistoryEntry[]>(() => {
     return historyTransactions.flatMap((sale) =>
@@ -947,141 +959,167 @@ export default function AdminSalesScreen() {
 
       <View style={[styles.footerActions, compactPhone && styles.footerActionsCompact]}>
         <AppButton
-          icon={({ color, size }) => <History color={color} size={size} strokeWidth={2.1} />}
-          label="Sales History"
-          variant="secondary"
-          onPress={() => {
-            setIsHistoryVisible((current) => !current);
-            setIsExportVisible(false);
-          }}
-        />
-        <AppButton
           icon={({ color, size }) => <Download color={color} size={size} strokeWidth={2.1} />}
           label="Export Report"
           variant="primary"
           onPress={() => {
             setIsExportVisible((current) => !current);
-            setIsHistoryVisible(false);
           }}
         />
       </View>
 
-      {isHistoryVisible ? (
-        <SurfaceCard style={[styles.historyCard, compactPhone && styles.historyCardCompact]}>
-          <View style={styles.historyHeader}>
-            <View style={styles.rangeTextBlock}>
-              <Text style={styles.cardHeading}>Sales History</Text>
-              <Text style={styles.historySubtitle}>
-                See which cashier sold which product, the price, and the date sold.
-              </Text>
-            </View>
-            <View style={styles.historyBadge}>
-              <Text style={styles.historyBadgeText}>{historyEntries.length} items</Text>
-            </View>
+      <SurfaceCard style={[styles.historyCard, compactPhone && styles.historyCardCompact]}>
+        <View style={styles.historyHeader}>
+          <View style={styles.rangeTextBlock}>
+            <Text style={styles.cardHeading}>Sales History</Text>
+            <Text style={styles.historySubtitle}>
+              See which cashier sold which product, the price, and the date sold.
+            </Text>
+          </View>
+          <View style={styles.historyBadge}>
+            <Text style={styles.historyBadgeText}>{historyEntries.length} items</Text>
+          </View>
+        </View>
+
+        <View style={[styles.historyRangeHeader, compactPhone && styles.historyRangeHeaderCompact]}>
+          <View style={styles.rangeTextBlock}>
+            <Text style={styles.historyRangeLabel}>Month Range</Text>
+            <Text style={styles.historyRangeValue}>{formatMonthRangeLabel(historyMonthRange)}</Text>
           </View>
 
-          <View style={[styles.historyRangeHeader, compactPhone && styles.historyRangeHeaderCompact]}>
-            <View style={styles.rangeTextBlock}>
-              <Text style={styles.historyRangeLabel}>Month Range</Text>
-              <Text style={styles.historyRangeValue}>{formatMonthRangeLabel(historyMonthRange)}</Text>
-            </View>
+          <Pressable
+            onPress={() => setShowMonthRangePicker((current) => !current)}
+            style={[styles.historyCalendarButton, compactPhone && styles.historyCalendarButtonCompact]}>
+            <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
+            <Text style={styles.historyCalendarButtonText}>
+              {showMonthRangePicker ? 'Hide Calendar' : 'Choose Range'}
+            </Text>
+          </Pressable>
+        </View>
 
+        {showMonthRangePicker ? (
+          <View>
+            <MonthRangePicker
+              displayYear={historyCalendarYear}
+              onChangeRange={setHistoryMonthRange}
+              onChangeYear={setHistoryCalendarYear}
+              range={historyMonthRange}
+            />
+
+            <View style={[styles.historyRangeActions, compactPhone && styles.historyRangeActionsCompact]}>
+              <Pressable
+                onPress={() => {
+                  const now = new Date();
+                  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                  setHistoryMonthRange({
+                    endMonth: currentMonth,
+                    startMonth: currentMonth,
+                  });
+                  setHistoryCalendarYear(now.getFullYear());
+                }}
+                style={styles.historyRangeActionButton}>
+                <Text style={styles.historyRangeActionText}>This Month</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setHistoryMonthRange({ endMonth: null, startMonth: null });
+                  setHistoryCalendarYear(new Date().getFullYear());
+                }}
+                style={styles.historyRangeActionButton}>
+                <Text style={styles.historyRangeActionText}>Clear</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.historyFilterRow}>
+          {(['All', 'Cash', 'GCash'] as const).map((filter) => (
             <Pressable
-              onPress={() => setShowMonthRangePicker((current) => !current)}
-              style={[styles.historyCalendarButton, compactPhone && styles.historyCalendarButtonCompact]}>
-              <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
-              <Text style={styles.historyCalendarButtonText}>
-                {showMonthRangePicker ? 'Hide Calendar' : 'Choose Range'}
+              key={filter}
+              onPress={() => setSelectedHistoryFilter(filter)}
+              style={[
+                styles.historyFilterChip,
+                selectedHistoryFilter === filter && styles.historyFilterChipActive,
+              ]}>
+              <Text
+                style={[
+                  styles.historyFilterText,
+                  selectedHistoryFilter === filter && styles.historyFilterTextActive,
+                ]}>
+                {filter}
               </Text>
             </Pressable>
-          </View>
+          ))}
+        </ScrollView>
 
-          {showMonthRangePicker ? (
-            <View>
-              <MonthRangePicker
-                displayYear={historyCalendarYear}
-                onChangeRange={setHistoryMonthRange}
-                onChangeYear={setHistoryCalendarYear}
-                range={historyMonthRange}
-              />
-
-              <View style={[styles.historyRangeActions, compactPhone && styles.historyRangeActionsCompact]}>
-                <Pressable
-                  onPress={() => {
-                    const now = new Date();
-                    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                    setHistoryMonthRange({
-                      endMonth: currentMonth,
-                      startMonth: currentMonth,
-                    });
-                    setHistoryCalendarYear(now.getFullYear());
-                  }}
-                  style={styles.historyRangeActionButton}>
-                  <Text style={styles.historyRangeActionText}>This Month</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    setHistoryMonthRange({ endMonth: null, startMonth: null });
-                    setHistoryCalendarYear(new Date().getFullYear());
-                  }}
-                  style={styles.historyRangeActionButton}>
-                  <Text style={styles.historyRangeActionText}>Clear</Text>
-                </Pressable>
-              </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          contentContainerStyle={{ minWidth: '100%' }}
+        >
+          <View style={[styles.table, { minWidth: '100%' }]}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 100 }]}>RECEIPT NO</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>DATE SOLD</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CASHIER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CUSTOMER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1, minWidth: 80 }]}>PAYMENT</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 90, textAlign: 'right' }]}>TOTAL</Text>
             </View>
-          ) : null}
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.historyFilterRow}>
-            {(['All', 'Cash', 'GCash'] as const).map((filter) => (
-              <Pressable
-                key={filter}
-                onPress={() => setSelectedHistoryFilter(filter)}
-                style={[
-                  styles.historyFilterChip,
-                  selectedHistoryFilter === filter && styles.historyFilterChipActive,
-                ]}>
-                <Text
-                  style={[
-                    styles.historyFilterText,
-                    selectedHistoryFilter === filter && styles.historyFilterTextActive,
-                  ]}>
-                  {filter}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <View style={styles.historyList}>
-            {historyEntries.length > 0 ? (
-              <FlashList
-                data={historyEntries}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
-                keyExtractor={(entry) => entry.id}
-                renderItem={({ item: entry }) => (
-                  <View style={styles.historyRow}>
-                    <View style={styles.historyRowMain}>
-                      <Text style={styles.historyReceipt}>{entry.productName}</Text>
-                      <Text style={styles.historyMeta}>Cashier: {entry.cashierName}</Text>
-                      <Text style={styles.historyMeta}>Date sold: {entry.dateSold}</Text>
-                    </View>
-
-                    <View style={styles.historyAmountColumn}>
-                      <Text style={styles.historyAmount}>{entry.price}</Text>
-                    </View>
+            {/* Table Rows */}
+            <View style={styles.tableRows}>
+              {paginatedHistoryTransactions.length > 0 ? (
+                paginatedHistoryTransactions.map((sale) => (
+                  <View key={sale.id} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { flex: 1.2, minWidth: 100, fontFamily: fonts.semiBold, color: '#101828' }]}>
+                      {sale.receiptNumber}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.6, minWidth: 140 }]}>
+                      {formatDateTime(sale.createdAt)}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110 }]}>
+                      {sale.user?.name || 'Cashier'}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110, color: sale.customer ? '#475467' : '#98A2B3' }]}>
+                      {sale.customer?.name || 'Walk-in'}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1, minWidth: 80 }]}>
+                      {sale.paymentMethod}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 90, textAlign: 'right', fontFamily: fonts.semiBold, color: '#101828' }]}>
+                      {formatPeso(normalizeNumber(sale.totalAmount))}
+                    </Text>
                   </View>
-                )}
-                scrollEnabled={false}
+                ))
+              ) : (
+                <View style={styles.emptyTableRow}>
+                  <Text style={styles.emptyStateText}>No history found for this filter.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Table Footer Pagination */}
+            <View style={styles.tableFooter}>
+              <PaginationControls
+                borderless
+                currentPage={historyPage - 1}
+                endItem={Math.min(historyPage * itemsPerPage, historyTransactions.length)}
+                onPageChange={(page) => setHistoryPage(page + 1)}
+                startItem={(historyPage - 1) * itemsPerPage + 1}
+                totalItems={historyTransactions.length}
+                totalPages={totalHistoryPages}
+                visiblePageNumbers={Array.from({ length: Math.min(5, totalHistoryPages) }, (_, i) => i)}
               />
-            ) : (
-              <Text style={styles.emptyStateText}>No history found for this filter.</Text>
-            )}
+            </View>
           </View>
-        </SurfaceCard>
-      ) : null}
+        </ScrollView>
+      </SurfaceCard>
 
       {isExportVisible ? (
         <SurfaceCard style={styles.exportCard}>
@@ -1469,5 +1507,56 @@ const styles = StyleSheet.create({
     ...textRoles.label,
     fontSize: 13,
     marginTop: spacing.md,
+  },
+  table: {
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  tableHeader: {
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  tableHeaderCell: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
+  },
+  tableRows: {
+    backgroundColor: '#FFFFFF',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    gap: spacing.md,
+  },
+  tableCell: {
+    color: '#475467',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
+  emptyTableRow: {
+    padding: 32,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  tableFooter: {
+    backgroundColor: colors.surfaceSoft,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
 });

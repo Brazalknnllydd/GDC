@@ -38,9 +38,10 @@ import {
 } from '../lib/product-utils';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
-import { FilterChip } from '../components/ui/filter-chip';
+import { AppSelect } from '../components/ui/app-select';
 import { InventoryStatCard } from '../components/ui/inventory-stat-card';
 import { PaginationControls } from '../components/ui/pagination-controls';
+import { SurfaceCard } from '../components/ui/surface-card';
 import { ProductListItem } from '../components/ui/product-list-item';
 import { SectionHeading } from '../components/ui/section-heading';
 import { AppButton } from '../components/ui/app-button';
@@ -73,6 +74,7 @@ export default function AdminProductsScreen() {
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
 
   const [productName, setProductName] = useState('');
+  const [productDescription, setProductDescription] = useState('');
   const [categoryValue, setCategoryValue] = useState('');
   const [barcode, setBarcode] = useState('');
   const [costPrice, setCostPrice] = useState('');
@@ -152,6 +154,7 @@ export default function AdminProductsScreen() {
   function resetProductForm() {
     setEditingProductId(null);
     setProductName('');
+    setProductDescription('');
     setCategoryValue(categories[0]?.name || '');
     setBarcode('');
     setCostPrice('');
@@ -177,6 +180,7 @@ export default function AdminProductsScreen() {
   function openEditProductModal(product: Product) {
     setEditingProductId(product.id);
     setProductName(product.name);
+    setProductDescription(product.description || '');
     setCategoryValue(product.category.name);
     setBarcode(product.barcode || '');
     setCostPrice(String(normalizeNumber(product.costPrice)));
@@ -471,6 +475,7 @@ export default function AdminProductsScreen() {
     const formData = new FormData();
 
     formData.append('name', productName.trim());
+    formData.append('description', productDescription.trim());
     formData.append('barcode', barcode.trim());
     formData.append('costPrice', costPrice);
     formData.append('price', unitPrice);
@@ -707,22 +712,21 @@ export default function AdminProductsScreen() {
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-        {categoryChips.map((category) => (
-          <FilterChip
-            key={category}
-            active={selectedCategory === category}
-            label={category}
-            onPress={() => setSelectedCategory(category)}
-          />
-        ))}
-      </ScrollView>
-
-      <Text style={styles.filterSummaryText}>
-        {selectedCategory === 'All'
-          ? `Showing ${filteredProducts.length} of ${products.length} products`
-          : `Showing ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'} in ${selectedCategory}`}
-      </Text>
+      <View style={styles.filterRow}>
+        <AppSelect
+          options={categoryChips}
+          value={selectedCategory}
+          onValueChange={setSelectedCategory}
+          placeholder="Select category"
+          style={styles.categorySelect}
+        />
+        
+        <Text style={styles.filterSummaryText}>
+          {selectedCategory === 'All'
+            ? `Showing ${filteredProducts.length} of ${products.length} products`
+            : `Showing ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'} in ${selectedCategory}`}
+        </Text>
+      </View>
 
       <SectionHeading style={styles.sectionHeading}>PRODUCTS</SectionHeading>
       {feedback ? (
@@ -743,44 +747,68 @@ export default function AdminProductsScreen() {
         </View>
       ) : null}
       {screenError ? <Text style={styles.screenErrorText}>{screenError}</Text> : null}
-      <View style={styles.productsList}>
+      <SurfaceCard style={[styles.tableCard, isCompactPhone && styles.tableCardCompact]}>
         {isLoadingProducts ? (
           <Text style={styles.emptyStateText}>Loading inventory...</Text>
         ) : filteredProducts.length > 0 ? (
-          <FlashList
-            data={paginatedProducts}
-            ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
-            keyExtractor={(product) => String(product.id)}
-            renderItem={({ item: product }) => (
-              <ProductListItem
-                category={product.category.name}
-                imageUrl={product.imageUrl}
-                low={product.stock <= lowStockThreshold}
-                name={product.name}
-                onDelete={() => requestDeleteProduct(product)}
-                onEdit={() => openEditProductModal(product)}
-                price={formatPeso(normalizeNumber(product.price))}
-                sku={product.barcode || `ID-${product.id}`}
-                unitsText={`${product.stock} ${product.unit} in stock`}
-              />
-            )}
-            scrollEnabled={false}
-          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={{ minWidth: '100%' }}
+          >
+            <View style={[styles.table, { minWidth: '100%' }]}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 3.2, minWidth: 160 }]}>PRODUCT NAME</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 150 }]}>DESCRIPTION</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>CATEGORY</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 120 }]}>BARCODE</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>WEIGHT</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>PRICE</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>STOCK</Text>
+                <Text style={[styles.tableHeaderCell, { width: 160, textAlign: 'right' }]}>ACTIONS</Text>
+              </View>
+
+              <View style={styles.tableRows}>
+                {paginatedProducts.map((product) => (
+                  <ProductListItem
+                    key={product.id}
+                    category={product.category.name}
+                    description={product.description}
+                    imageUrl={product.imageUrl}
+                    low={product.stock <= lowStockThreshold}
+                    name={product.name}
+                    onDelete={() => requestDeleteProduct(product)}
+                    onEdit={() => openEditProductModal(product)}
+                    price={formatPeso(normalizeNumber(product.price))}
+                    sku={product.barcode || `ID-${product.id}`}
+                    weightText={product.weight ? `${product.weight} ${product.unit}` : '-'}
+                    stockText={String(product.stock)}
+                  />
+                ))}
+              </View>
+
+              {/* Table Footer with Pagination */}
+              <View style={styles.tableFooter}>
+                <PaginationControls
+                  borderless
+                  currentPage={productPage}
+                  endItem={productPageEnd}
+                  onPageChange={setProductPage}
+                  startItem={productPageStart}
+                  totalItems={filteredProducts.length}
+                  totalPages={totalProductPages}
+                  visiblePageNumbers={visiblePageNumbers}
+                />
+              </View>
+            </View>
+          </ScrollView>
         ) : (
-          <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
+          <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
+          </View>
         )}
-      </View>
-      {!isLoadingProducts && filteredProducts.length > 0 ? (
-        <PaginationControls
-          currentPage={productPage}
-          endItem={productPageEnd}
-          onPageChange={setProductPage}
-          startItem={productPageStart}
-          totalItems={filteredProducts.length}
-          totalPages={totalProductPages}
-          visiblePageNumbers={visiblePageNumbers}
-        />
-      ) : null}
+      </SurfaceCard>
 
       <AddCategoryModal
         isSavingCategory={isSavingCategory}
@@ -833,10 +861,12 @@ export default function AdminProductsScreen() {
         }}
         onRequestCreateCategory={openCategoryModalFromProduct}
         onProductNameChange={setProductName}
+        onProductDescriptionChange={setProductDescription}
         onSave={handleSaveProduct}
         onUnitPriceChange={(value) => setUnitPrice(digitsOnly(value))}
         onWeightVolumeChange={setWeightVolume}
         productActionLabel={editingProductId ? 'Update Product' : 'Add Product'}
+        productDescription={productDescription}
         productName={productName}
         selectedCategory={categoryValue}
         submittingLabel={editingProductId ? 'Updating...' : 'Saving...'}
@@ -905,15 +935,20 @@ const styles = StyleSheet.create({
     fontSize: 17,
     marginLeft: spacing.sm + 2,
   },
-  chipsRow: {
-    gap: spacing.md,
-    paddingVertical: spacing.xl + 4,
+  filterRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.lg,
+    marginTop: spacing.md,
+  },
+  categorySelect: {
+    minWidth: 180,
   },
   filterSummaryText: {
     color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
-    marginBottom: 12,
   },
   sectionHeading: {
     marginBottom: 18,
@@ -950,8 +985,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 12,
   },
-  productsList: {
-    minHeight: 60,
+  tableCard: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: 'hidden',
+  },
+  tableCardCompact: {
+    marginHorizontal: -spacing.md,
+    borderRadius: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
   },
   listSpacer: {
     height: 14,
@@ -961,5 +1004,36 @@ const styles = StyleSheet.create({
     ...textRoles.body,
     fontSize: 15,
     lineHeight: 22,
+  },
+  table: {
+    backgroundColor: colors.card,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  tableHeader: {
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  tableHeaderCell: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
+  },
+  tableRows: {
+    backgroundColor: '#FFFFFF',
+  },
+  tableFooter: {
+    backgroundColor: colors.surfaceSoft,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
 });

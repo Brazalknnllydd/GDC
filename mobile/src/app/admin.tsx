@@ -1,26 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   BarChart3,
+  Bot,
   CalendarDays,
   FileText,
   LayoutDashboard,
   Package,
   ReceiptText,
   Settings,
-} from 'lucide-react-native';
-import { useLocalSearchParams } from 'expo-router';
+  TrendingUp,
+  Users,
+  X,
+} from "lucide-react-native";
+import { useLocalSearchParams } from "expo-router";
 
-import { radius, spacing } from '../constants/design-system';
-import { colors, textRoles, textSizes } from '../constants/theme';
-import { AdminMetricCard } from '../components/ui/admin-metric-card';
-import { AdminBarChart } from '../components/ui/admin-bar-chart';
-import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
-import { AdminPageScreen } from '../components/ui/admin-page-screen';
-import { SurfaceCard } from '../components/ui/surface-card';
-import { apiClient } from '../lib/api';
-import { formatPeso, normalizeNumber } from '../lib/product-utils';
-import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { radius, spacing } from "../constants/design-system";
+import { colors, fonts, textRoles, textSizes } from "../constants/theme";
+import { AdminMetricCard } from "../components/ui/admin-metric-card";
+import { AdminBarChart } from "../components/ui/admin-bar-chart";
+import { AdminMetricGrid } from "../components/ui/admin-metric-grid";
+import { AdminPageScreen } from "../components/ui/admin-page-screen";
+import { AiChatModal } from "../components/ui/ai-chat-modal";
+import { AppFab } from "../components/ui/app-fab";
+import { PaginationControls } from "../components/ui/pagination-controls";
+import { SurfaceCard } from "../components/ui/surface-card";
+import { apiClient } from "../lib/api";
+import { formatPeso, normalizeNumber } from "../lib/product-utils";
+import { usePagination } from "../hooks/use-pagination";
+import { useResponsiveLayout } from "../hooks/use-responsive-layout";
 
 type Product = {
   id: number;
@@ -41,11 +49,48 @@ type SaleRecord = {
 };
 
 const tabs = [
-  { label: 'Dashboard', icon: LayoutDashboard, active: true, route: '/admin' as const },
-  { label: 'Products', icon: Package, active: false, route: '/admin-products' as const },
-  { label: 'Sales', icon: ReceiptText, active: false, route: '/admin-sales' as const },
-  { label: 'Reports', icon: BarChart3, active: false, route: '/admin-reports' as const },
-  { label: 'Settings', icon: Settings, active: false, route: '/admin-settings' as const },
+  {
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    active: true,
+    route: "/admin" as const,
+  },
+  {
+    label: "Products",
+    icon: Package,
+    active: false,
+    route: "/admin-products" as const,
+  },
+  {
+    label: "Customers",
+    icon: Users,
+    active: false,
+    route: "/admin-customers" as const,
+  },
+  {
+    label: "Sales",
+    icon: ReceiptText,
+    active: false,
+    route: "/admin-sales" as const,
+  },
+  {
+    label: "Shifts",
+    icon: FileText,
+    active: false,
+    route: "/admin-shifts" as const,
+  },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    active: false,
+    route: "/admin-reports" as const,
+  },
+  {
+    label: "Settings",
+    icon: Settings,
+    active: false,
+    route: "/admin-settings" as const,
+  },
 ];
 
 function startOfDay(date: Date) {
@@ -55,7 +100,9 @@ function startOfDay(date: Date) {
 }
 
 function isToday(value: string) {
-  return startOfDay(new Date(value)).getTime() === startOfDay(new Date()).getTime();
+  return (
+    startOfDay(new Date(value)).getTime() === startOfDay(new Date()).getTime()
+  );
 }
 
 export default function AdminScreen() {
@@ -64,60 +111,72 @@ export default function AdminScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [screenError, setScreenError] = useState('');
+  const [screenError, setScreenError] = useState("");
+  const [showBot, setShowBot] = useState(false);
 
   const displayName = useMemo(() => {
-    if (typeof params.name === 'string' && params.name.trim()) {
+    if (typeof params.name === "string" && params.name.trim()) {
       return params.name.trim();
     }
 
-    return 'Admin';
+    return "Admin";
   }, [params.name]);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        setScreenError('');
-        const [productsResponse, categoriesResponse, salesResponse] = await Promise.all([
-          apiClient.get<Product[]>('/products'),
-          apiClient.get<Category[]>('/categories'),
-          apiClient.get<SaleRecord[]>('/sales'),
-        ]);
+        setScreenError("");
+        const [productsResponse, categoriesResponse, salesResponse] =
+          await Promise.all([
+            apiClient.get<Product[]>("/products"),
+            apiClient.get<Category[]>("/categories"),
+            apiClient.get<SaleRecord[]>("/sales"),
+          ]);
 
         setProducts(productsResponse.data);
         setCategories(categoriesResponse.data);
         setSales(
           salesResponse.data.sort(
             (left, right) =>
-              new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
-          )
+              new Date(right.createdAt).getTime() -
+              new Date(left.createdAt).getTime(),
+          ),
         );
       } catch {
-        setScreenError('Could not load dashboard data right now.');
+        setScreenError("Could not load dashboard data right now.");
       }
     }
 
     loadDashboardData();
   }, []);
 
-  const todaySales = useMemo(() => sales.filter((sale) => isToday(sale.createdAt)), [sales]);
+  const todaySales = useMemo(
+    () => sales.filter((sale) => isToday(sale.createdAt)),
+    [sales],
+  );
   const todaySalesTotal = useMemo(
-    () => todaySales.reduce((sum, sale) => sum + normalizeNumber(sale.totalAmount), 0),
-    [todaySales]
+    () =>
+      todaySales.reduce(
+        (sum, sale) => sum + normalizeNumber(sale.totalAmount),
+        0,
+      ),
+    [todaySales],
   );
   const lowStockCount = useMemo(
     () => products.filter((product) => product.stock <= 10).length,
-    [products]
+    [products],
   );
   const weeklyRevenueChart = useMemo(() => {
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const totals = labels.map((_, index) =>
       sales.reduce((sum, sale) => {
         const saleDate = new Date(sale.createdAt);
         const day = saleDate.getDay();
         const mondayBasedDay = day === 0 ? 6 : day - 1;
-        return mondayBasedDay === index ? sum + normalizeNumber(sale.totalAmount) : sum;
-      }, 0)
+        return mondayBasedDay === index
+          ? sum + normalizeNumber(sale.totalAmount)
+          : sum;
+      }, 0),
     );
 
     return { labels, values: totals };
@@ -134,30 +193,58 @@ export default function AdminScreen() {
       {
         detail: `${sales.length} total transactions`,
         detailColor: colors.textHeading,
-        title: 'TRANSACTIONS',
+        title: "TRANSACTIONS",
         value: String(sales.length),
       },
       {
         detail: `${categories.length} active categories`,
         detailColor: colors.textHeading,
-        title: 'CATEGORIES',
+        title: "CATEGORIES",
         value: String(categories.length),
       },
       {
         detail: `${lowStockCount} low in stock`,
         detailColor: lowStockCount > 0 ? colors.danger : colors.textHeading,
-        title: 'PRODUCTS',
+        title: "PRODUCTS",
         value: String(products.length),
       },
     ],
-    [categories.length, lowStockCount, products.length, sales.length, todaySales.length, todaySalesTotal]
+    [
+      categories.length,
+      lowStockCount,
+      products.length,
+      sales.length,
+      todaySales.length,
+      todaySalesTotal,
+    ],
   );
+  const {
+    endItem: salesPageEnd,
+    page: salesPage,
+    paginatedItems: paginatedSales,
+    setPage: setSalesPage,
+    startItem: salesPageStart,
+    totalPages: totalSalesPages,
+    visiblePageNumbers,
+  } = usePagination({
+    items: sales,
+    itemsPerPage: 10,
+  });
 
   return (
     <AdminPageScreen
       title="Dashboard"
       introDescription={`Good morning, ${displayName}. Here's today's business snapshot.`}
-      bottomNavItems={tabs}>
+      bottomNavItems={tabs}
+      floatingContent={
+        <AppFab
+          icon={<Bot color="#FFFFFF" size={28} strokeWidth={2.2} />}
+          onPress={() => setShowBot(true)}
+          style={{ position: 'absolute', bottom: 95, right: 20, zIndex: 10 }}
+        />
+      }
+    >
+      <AiChatModal visible={showBot} onClose={() => setShowBot(false)} />
       <AdminMetricGrid>
         {summaryCards.map((card) => (
           <AdminMetricCard
@@ -178,11 +265,27 @@ export default function AdminScreen() {
         ))}
       </AdminMetricGrid>
 
-      <SurfaceCard style={[styles.revenueCard, compactPhone && styles.revenueCardCompact]}>
-        <View style={[styles.revenueHeader, compactPhone && styles.revenueHeaderCompact]}>
+      <SurfaceCard
+        style={[styles.revenueCard, compactPhone && styles.revenueCardCompact]}
+      >
+        <View
+          style={[
+            styles.revenueHeader,
+            compactPhone && styles.revenueHeaderCompact,
+          ]}
+        >
           <Text style={styles.revenueTitle}>Weekly Revenue</Text>
-          <View style={[styles.periodPill, compactPhone && styles.periodPillCompact]}>
-            <CalendarDays color={colors.textHeading} size={14} strokeWidth={1.9} />
+          <View
+            style={[
+              styles.periodPill,
+              compactPhone && styles.periodPillCompact,
+            ]}
+          >
+            <CalendarDays
+              color={colors.textHeading}
+              size={14}
+              strokeWidth={1.9}
+            />
             <Text style={styles.periodText}>LIVE DATA</Text>
           </View>
         </View>
@@ -194,7 +297,9 @@ export default function AdminScreen() {
             values={weeklyRevenueChart.values}
           />
         ) : (
-          <Text style={styles.emptyCardText}>Revenue will appear once sales are recorded.</Text>
+          <Text style={styles.emptyCardText}>
+            Revenue will appear once sales are recorded.
+          </Text>
         )}
       </SurfaceCard>
 
@@ -202,44 +307,84 @@ export default function AdminScreen() {
         <Text style={styles.transactionsHeading}>RECENT TRANSACTIONS</Text>
       </View>
 
-      <View style={styles.transactionsList}>
+      <SurfaceCard
+        style={[styles.tableCard, compactPhone && styles.tableCardCompact]}
+      >
         {sales.length > 0 ? (
-          sales.slice(0, 5).map((transaction) => (
-            <SurfaceCard
-              key={transaction.id}
-              style={[styles.transactionCard, compactPhone && styles.transactionCardCompact]}>
-              <View style={[styles.receiptBadge, compactPhone && styles.receiptBadgeCompact]}>
-                <FileText color={colors.secondary} size={25} strokeWidth={1.9} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={{ minWidth: "100%" }}
+          >
+            <View style={[styles.table, { minWidth: "100%" }]}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>
+                  RECEIPT NO.
+                </Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>
+                  DATE SOLD
+                </Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>
+                  PAYMENT
+                </Text>
+                <Text
+                  style={[
+                    styles.tableHeaderCell,
+                    { width: 120, textAlign: "right" },
+                  ]}
+                >
+                  TOTAL
+                </Text>
               </View>
-
-              <View style={[styles.transactionBody, compactPhone && styles.transactionBodyCompact]}>
-                <View>
-                  <Text style={styles.transactionTitle}>{transaction.receiptNumber}</Text>
-                  <Text style={styles.transactionMeta}>
-                    {transaction.paymentMethod} |{' '}
-                    {new Date(transaction.createdAt).toLocaleString('en-PH', {
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      month: 'short',
-                    })}
-                  </Text>
-                </View>
-
-                <View style={styles.transactionAmountWrap}>
-                  <Text style={styles.transactionAmount}>
-                    {formatPeso(normalizeNumber(transaction.totalAmount))}
-                  </Text>
-                </View>
+              <View style={styles.tableRows}>
+                {paginatedSales.map((transaction) => (
+                  <View key={transaction.id} style={styles.tableRow}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { flex: 1.5, fontFamily: fonts.medium },
+                      ]}
+                    >
+                      {transaction.receiptNumber}
+                    </Text>
+                    <Text style={[styles.tableCellSecondary, { flex: 1.5 }]}>
+                      {new Date(transaction.createdAt).toLocaleString("en-PH", {
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </Text>
+                    <Text style={[styles.tableCellSecondary, { flex: 1 }]}>
+                      {transaction.paymentMethod}
+                    </Text>
+                    <Text style={[styles.tableCellAmount, { width: 120 }]}>
+                      {formatPeso(normalizeNumber(transaction.totalAmount))}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            </SurfaceCard>
-          ))
+              <View style={styles.tableFooter}>
+                <PaginationControls
+                  borderless
+                  currentPage={salesPage}
+                  endItem={salesPageEnd}
+                  onPageChange={(page) => setSalesPage(page)}
+                  startItem={salesPageStart}
+                  totalItems={sales.length}
+                  totalPages={totalSalesPages}
+                  visiblePageNumbers={visiblePageNumbers}
+                />
+              </View>
+            </View>
+          </ScrollView>
         ) : (
-          <SurfaceCard style={styles.emptyCard}>
+          <View style={styles.emptyCard}>
             <Text style={styles.emptyCardText}>No transactions yet.</Text>
-          </SurfaceCard>
+          </View>
         )}
-      </View>
+      </SurfaceCard>
 
       {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
     </AdminPageScreen>
@@ -260,13 +405,13 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
   },
   revenueHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 26,
   },
   revenueHeaderCompact: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -276,16 +421,16 @@ const styles = StyleSheet.create({
     fontSize: 21,
   },
   periodPill: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: colors.surfaceNeutral,
     borderRadius: radius.sm,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 9,
   },
   periodPillCompact: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 7,
   },
@@ -294,9 +439,9 @@ const styles = StyleSheet.create({
     ...textRoles.label,
   },
   transactionsHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: spacing.lg,
     marginTop: spacing.block,
   },
@@ -306,63 +451,71 @@ const styles = StyleSheet.create({
     fontSize: textSizes.medium,
     letterSpacing: 2.2,
   },
-  transactionsList: {
-    gap: 14,
+  tableCard: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: "hidden",
   },
-  transactionCard: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: radius.xl,
-    paddingVertical: 20,
+  tableCardCompact: {
+    marginHorizontal: -spacing.md,
+    borderRadius: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
   },
-  transactionCardCompact: {
-    alignItems: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+  table: {
+    backgroundColor: colors.card,
+    minWidth: 800,
   },
-  receiptBadge: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceNeutral,
-    borderRadius: 12,
-    height: 60,
-    justifyContent: 'center',
-    marginRight: 16,
-    width: 60,
+  tableHeader: {
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    flexDirection: "row",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: spacing.md,
   },
-  receiptBadgeCompact: {
-    height: 48,
-    marginRight: 12,
-    width: 48,
+  tableHeaderCell: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
   },
-  transactionBody: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  tableRows: {
+    backgroundColor: "#FFFFFF",
   },
-  transactionBodyCompact: {
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: spacing.sm,
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: spacing.md,
   },
-  transactionTitle: {
+  tableCell: {
     color: colors.textStrong,
-    ...textRoles.value,
-    fontSize: 19,
-    marginBottom: 4,
+    ...textRoles.body,
+    fontSize: 15,
   },
-  transactionMeta: {
-    color: colors.textHeading,
-    ...textRoles.label,
+  tableCellSecondary: {
+    color: colors.textSecondary,
+    ...textRoles.body,
     fontSize: 14,
   },
-  transactionAmountWrap: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
+  tableCellAmount: {
     color: colors.secondary,
-    ...textRoles.value,
-    fontSize: 20,
+    fontFamily: fonts.semiBold,
+    fontSize: 16,
+    textAlign: "right",
+  },
+  tableFooter: {
+    backgroundColor: colors.surfaceSoft,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   emptyCard: {
     paddingHorizontal: spacing.xl,

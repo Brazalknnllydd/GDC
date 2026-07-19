@@ -43,11 +43,11 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: radius.round,
     justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.xl - 2,
+    minHeight: 38,
+    paddingHorizontal: spacing.lg,
   },
   chipCompact: {
-    minHeight: 40,
+    minHeight: 36,
     paddingHorizontal: spacing.md + 2,
   },
   chipActive: {
@@ -57,10 +57,10 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.bodyLarge,
+    fontSize: textSizes.body,
   },
   chipTextCompact: {
-    fontSize: 14,
+    fontSize: textSizes.small,
   },
   chipTextActive: {
     color: colors.textInverse,

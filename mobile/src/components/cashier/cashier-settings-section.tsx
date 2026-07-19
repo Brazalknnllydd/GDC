@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, Store } from 'lucide-react-native';
 
 import { AppButton } from '../ui/app-button';
 import { SectionHeading } from '../ui/section-heading';
@@ -13,6 +13,7 @@ type CashierSettingsSectionProps = {
   role: string;
   username: string;
   onLogout: () => void;
+  onCloseShift?: () => void;
 };
 
 export function CashierSettingsSection({
@@ -20,6 +21,7 @@ export function CashierSettingsSection({
   role,
   username,
   onLogout,
+  onCloseShift,
 }: CashierSettingsSectionProps) {
   const { compactPhone } = useResponsiveLayout();
 
@@ -34,6 +36,18 @@ export function CashierSettingsSection({
         <Text style={styles.settingsCopy}>
           This section is ready for cashier profile, printer, and terminal preferences next.
         </Text>
+        
+        {onCloseShift && (
+          <AppButton
+            fullWidth={compactPhone}
+            icon={({ color, size }) => <Store color={color} size={size} strokeWidth={2.1} />}
+            label="End Shift"
+            onPress={onCloseShift}
+            style={styles.endShiftButton}
+            variant="secondary"
+          />
+        )}
+
         <AppButton
           fullWidth={compactPhone}
           icon={({ color, size }) => <LogOut color={color} size={size} strokeWidth={2.1} />}

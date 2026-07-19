@@ -23,7 +23,7 @@ export function AdminPageHeader({
     <Surface elevation={1} style={styles.header}>
       <View style={styles.headerIdentity}>
         <Avatar.Image
-          size={54}
+          size={46}
           source={require('../../../assets/images/logo.jpg')}
           style={styles.avatar}
         />
@@ -40,9 +40,9 @@ export function AdminPageHeader({
 
       <View style={styles.headerIconWrap}>
         <IconButton
-          icon={() => <Bell color={colors.textSecondary} size={22} strokeWidth={2.05} />}
+          icon={() => <Bell color={colors.textSecondary} size={20} strokeWidth={2.05} />}
           onPress={() => {}}
-          size={22}
+          size={20}
           style={styles.headerIconButton}
         />
         {showNotificationDot ? <View style={styles.notificationDot} /> : null}
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: layout.headerPaddingX,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.md,
   },
   headerIdentity: {
     alignItems: 'center',
@@ -73,17 +73,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: colors.secondary,
     ...textRoles.heading,
-    lineHeight: 28,
+    lineHeight: 25,
   },
   headerTitleCompact: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 22,
   },
   headerSubtitle: {
     color: colors.textHeading,
     fontFamily: fonts.medium,
     fontSize: textSizes.smallCaps,
-    letterSpacing: 2.6,
+    letterSpacing: 2.2,
     marginTop: 2,
   },
   headerSubtitleCompact: {
@@ -107,10 +107,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.round,
     borderColor: colors.card,
     borderWidth: 1.5,
-    height: 10,
+    height: 9,
     position: 'absolute',
     right: 1,
     top: 1,
-    width: 10,
+    width: 9,
   },
 });
