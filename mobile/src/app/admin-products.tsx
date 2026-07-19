@@ -766,7 +766,7 @@ export default function AdminProductsScreen() {
                 <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>WEIGHT</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>PRICE</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>STOCK</Text>
-                <Text style={[styles.tableHeaderCell, { width: 160, textAlign: 'right' }]}>ACTIONS</Text>
+                <Text style={[styles.tableHeaderCell, { width: 100, textAlign: 'right' }]}>ACTIONS</Text>
               </View>
 
               <View style={styles.tableRows}>

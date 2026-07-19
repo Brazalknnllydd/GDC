@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 8,
-    width: 160,
+    width: 100,
   },
   actionButton: {
     alignItems: 'center',
