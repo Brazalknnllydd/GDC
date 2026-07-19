@@ -6,12 +6,13 @@ import {
   getCustomers,
   updateCustomer,
 } from "../controllers/customer.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/", getCustomers);
-router.post("/", createCustomer);
-router.put("/:id", updateCustomer);
-router.delete("/:id", deleteCustomer);
+router.get("/", requireAuth, requireRole(["Admin", "Cashier"]), getCustomers);
+router.post("/", requireAuth, requireRole(["Admin", "Cashier"]), createCustomer);
+router.put("/:id", requireAuth, requireRole(["Admin", "Cashier"]), updateCustomer);
+router.delete("/:id", requireAuth, requireRole(["Admin", "Cashier"]), deleteCustomer);
 
 export default router;

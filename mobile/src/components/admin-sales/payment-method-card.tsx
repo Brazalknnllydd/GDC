@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { ComponentType } from 'react';
 
 import { radius, spacing } from '../../constants/design-system';
-import { textRoles } from '../../constants/theme';
+import { colors, textRoles } from '../../constants/theme';
 import { SurfaceCard } from '../ui/surface-card';
 
 type IconProps = {
@@ -21,7 +21,7 @@ export function PaymentMethodCard({ icon: Icon, label, value }: PaymentMethodCar
   return (
     <SurfaceCard style={styles.card}>
       <View style={styles.iconWrap}>
-        <Icon color="#2C3140" size={22} strokeWidth={1.9} />
+        <Icon color={colors.textHeading} size={20} strokeWidth={1.9} />
       </View>
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
@@ -34,29 +34,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    minHeight: 136,
+    minHeight: 112,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#F4F6FB',
-    borderColor: '#DCE2EF',
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderPanel,
     borderRadius: radius.md,
     borderWidth: 1,
-    height: 40,
+    height: 36,
     justifyContent: 'center',
     marginBottom: spacing.md,
-    width: 40,
+    width: 36,
   },
   label: {
-    color: '#6A6F80',
+    color: colors.textTertiary,
     ...textRoles.label,
     marginBottom: spacing.sm,
   },
   value: {
-    color: '#161B29',
+    color: colors.textStrong,
     ...textRoles.value,
-    fontSize: 18,
+    fontSize: 16,
   },
 });

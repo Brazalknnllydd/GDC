@@ -2,14 +2,15 @@ import type { ReactNode } from 'react';
 import {
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Button } from 'react-native-paper';
 
-import { radius, spacing } from '../../constants/design-system';
-import { fonts } from '../../constants/theme';
+import { controlHeights, radius, spacing } from '../../constants/design-system';
+import { colors, fonts, textSizes } from '../../constants/theme';
 
 type AppButtonVariant =
   | 'primary'
@@ -34,10 +35,17 @@ type AppButtonProps = {
 };
 
 const sizeHeights: Record<AppButtonSize, number> = {
-  sm: 42,
-  md: 52,
-  lg: 62,
-  xl: 86,
+  sm: controlHeights.sm,
+  md: controlHeights.md,
+  lg: controlHeights.lg,
+  xl: controlHeights.xl,
+};
+
+const sizePaddings: Record<AppButtonSize, number> = {
+  sm: spacing.sm,
+  md: spacing.lg,
+  lg: spacing.lg,
+  xl: spacing.lg,
 };
 
 const variantStyles: Record<
@@ -51,46 +59,46 @@ const variantStyles: Record<
   }
 > = {
   danger: {
-    backgroundColor: '#C62828',
-    borderColor: '#C62828',
+    backgroundColor: colors.dangerStrong,
+    borderColor: colors.dangerStrong,
     borderWidth: 0,
     mode: 'contained',
-    textColor: '#FFFFFF',
+    textColor: colors.textInverse,
   },
   dangerOutline: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E3B6B2',
+    backgroundColor: colors.card,
+    borderColor: colors.borderDangerSoft,
     borderWidth: 1.2,
     mode: 'outlined',
-    textColor: '#B3261E',
+    textColor: colors.dangerStrong,
   },
   primary: {
-    backgroundColor: '#1A237E',
-    borderColor: '#1A237E',
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
     borderWidth: 0,
     mode: 'contained',
-    textColor: '#FFFFFF',
+    textColor: colors.textInverse,
   },
   secondary: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#AEB5D0',
+    backgroundColor: colors.card,
+    borderColor: colors.borderInfoStrong,
     borderWidth: 1.2,
     mode: 'outlined',
-    textColor: '#495098',
+    textColor: colors.infoStrong,
   },
   success: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: colors.success,
+    borderColor: colors.success,
     borderWidth: 0,
     mode: 'contained',
-    textColor: '#FFFFFF',
+    textColor: colors.textInverse,
   },
   successOutline: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: colors.surfaceSuccess,
+    borderColor: colors.borderSuccess,
     borderWidth: 1.2,
     mode: 'outlined',
-    textColor: '#047857',
+    textColor: colors.successStrong,
   },
 };
 
@@ -105,6 +113,8 @@ export function AppButton({
   style,
   variant = 'primary',
 }: AppButtonProps) {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
   const variantStyle = variantStyles[variant];
 
   return (
@@ -115,6 +125,7 @@ export function AppButton({
         {
           justifyContent: 'center',
           minHeight: sizeHeights[size],
+          paddingHorizontal: sizePaddings[size],
         },
       ]}
       disabled={disabled}
@@ -134,9 +145,16 @@ export function AppButton({
       uppercase={false}>
       <View style={styles.inner}>
         {icon ? (
-          <View style={styles.iconWrap}>{icon({ color: variantStyle.textColor, size: 18 })}</View>
+          <View style={styles.iconWrap}>{icon({ color: variantStyle.textColor, size: 16 })}</View>
         ) : null}
-        <Text style={[styles.label, { color: variantStyle.textColor }]}>{label}</Text>
+        <Text
+          style={[
+            styles.label,
+            isCompactPhone ? styles.labelCompact : undefined,
+            { color: variantStyle.textColor },
+          ]}>
+          {label}
+        </Text>
       </View>
     </Button>
   );
@@ -160,7 +178,12 @@ const styles = StyleSheet.create({
   label: {
     includeFontPadding: false,
     fontFamily: fonts.semiBold,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
+    lineHeight: 17,
     textAlign: 'center',
+  },
+  labelCompact: {
+    fontSize: textSizes.body,
+    lineHeight: 16,
   },
 });

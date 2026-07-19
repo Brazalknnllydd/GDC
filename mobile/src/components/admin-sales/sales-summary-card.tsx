@@ -1,4 +1,4 @@
-import { textSizes } from '../../constants/theme';
+import { colors, textSizes } from '../../constants/theme';
 import { AdminMetricCard } from '../ui/admin-metric-card';
 
 type SalesSummaryCardProps = {
@@ -21,12 +21,12 @@ export function SalesSummaryCard({
       paddingHorizontal={16}
       paddingVertical={16}
       title={title}
-      titleColor="#262B39"
+      titleColor={colors.textHeading}
       titleLetterSpacing={2}
       titleMarginBottom={14}
       tone={detailTone}
       value={value}
-      valueColor="#111D77"
+      valueColor={colors.secondary}
       valueFontSize={textSizes.large}
       valueLineHeight={24}
       valueMarginBottom={10}

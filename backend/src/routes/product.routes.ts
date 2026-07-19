@@ -8,18 +8,19 @@ import {
   updateProduct,
   deleteProduct,
 } from "../controllers/product.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { productImageUpload } from "../middleware/product-image-upload.js";
 
 const router = Router();
 
-router.get("/", getProducts);
-router.get("/barcode/:barcode", getProductByBarcode);
-router.get("/:id", getProductById);
+router.get("/", requireAuth, requireRole(["Admin", "Cashier"]), getProducts);
+router.get("/barcode/:barcode", requireAuth, requireRole(["Admin", "Cashier"]), getProductByBarcode);
+router.get("/:id", requireAuth, requireRole(["Admin", "Cashier"]), getProductById);
 
-router.post("/", productImageUpload.single("image"), createProduct);
+router.post("/", requireAuth, requireRole(["Admin"]), productImageUpload.single("image"), createProduct);
 
-router.put("/:id", productImageUpload.single("image"), updateProduct);
+router.put("/:id", requireAuth, requireRole(["Admin"]), productImageUpload.single("image"), updateProduct);
 
-router.delete("/:id", deleteProduct);
+router.delete("/:id", requireAuth, requireRole(["Admin"]), deleteProduct);
 
 export default router;

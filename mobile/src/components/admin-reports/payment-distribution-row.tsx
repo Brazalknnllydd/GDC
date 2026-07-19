@@ -25,6 +25,9 @@ export function PaymentDistributionRow({
   percentageText,
   tone = 'primary',
 }: PaymentDistributionRowProps) {
+  const iconColor =
+    tone === 'success' ? colors.successBright : tone === 'warning' ? colors.warning : colors.info;
+
   return (
     <View style={styles.row}>
       <View style={styles.left}>
@@ -34,11 +37,7 @@ export function PaymentDistributionRow({
             tone === 'success' && styles.iconSuccess,
             tone === 'warning' && styles.iconWarning,
           ]}>
-          <Icon
-            color={tone === 'success' ? '#1F8A39' : tone === 'warning' ? '#A76300' : '#2750FF'}
-            size={18}
-            strokeWidth={2}
-          />
+          <Icon color={iconColor} size={18} strokeWidth={2} />
         </View>
         <Text style={styles.label}>{label}</Text>
       </View>
@@ -63,7 +62,7 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#E9EEFF',
+    backgroundColor: colors.surfaceInfo,
     borderRadius: radius.md,
     height: 34,
     justifyContent: 'center',
@@ -71,17 +70,17 @@ const styles = StyleSheet.create({
     width: 34,
   },
   iconSuccess: {
-    backgroundColor: '#E8F7EC',
+    backgroundColor: colors.surfaceSuccessMuted,
   },
   iconWarning: {
-    backgroundColor: '#FFF4DE',
+    backgroundColor: colors.surfaceWarningSoft,
   },
   label: {
-    color: '#1F2330',
+    color: colors.textStrong,
     ...textRoles.body,
   },
   amount: {
-    color: '#343A49',
+    color: colors.textHeading,
     ...textRoles.label,
   },
 });

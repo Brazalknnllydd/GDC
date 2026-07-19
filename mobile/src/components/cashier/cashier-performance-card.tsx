@@ -2,7 +2,9 @@ import type { ComponentType } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
+import { SurfaceCard } from '../ui/surface-card';
 
 type CashierPerformanceCardProps = {
   icon: ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
@@ -15,53 +17,69 @@ export function CashierPerformanceCard({
   label,
   value,
 }: CashierPerformanceCardProps) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.iconBadge}>
-        <Icon color={colors.secondary} size={24} strokeWidth={2} />
-      </View>
+  const { compactPhone } = useResponsiveLayout();
 
-      <View style={styles.content}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{value}</Text>
+  return (
+    <SurfaceCard style={[styles.card, compactPhone && styles.cardCompact]}>
+      <View style={styles.contentWrap}>
+        <View style={styles.iconBadge}>
+          <Icon color={colors.secondary} size={24} strokeWidth={2} />
+        </View>
+
+        <View style={styles.content}>
+          <Text style={[styles.label, compactPhone && styles.labelCompact]}>{label}</Text>
+          <Text style={[styles.value, compactPhone && styles.valueCompact]}>{value}</Text>
+        </View>
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    minHeight: 182,
+    minHeight: 160,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    width: '48%',
+    flexBasis: '48.8%',
+  },
+  cardCompact: {
+    minHeight: 144,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  contentWrap: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   iconBadge: {
     alignItems: 'center',
-    backgroundColor: '#F5F7FD',
+    backgroundColor: colors.surfaceHeader,
     borderRadius: radius.md,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   content: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    marginTop: spacing.xl,
   },
   label: {
-    color: '#353C47',
+    color: colors.textHeading,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     letterSpacing: 2,
     marginBottom: spacing.md,
+  },
+  labelCompact: {
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.1,
+    marginBottom: spacing.sm,
   },
   value: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 18,
+    fontSize: textSizes.title,
+  },
+  valueCompact: {
+    fontSize: textSizes.medium,
   },
 });

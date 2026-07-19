@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 
-import { radius, shadows } from '../../constants/design-system';
+import { controlHeights, radius, shadows } from '../../constants/design-system';
+import { colors } from '../../constants/theme';
 
 type AppFabProps = {
   icon: ReactNode;
@@ -27,11 +28,11 @@ const styles = StyleSheet.create({
   },
   fab: {
     alignItems: 'center',
-    backgroundColor: '#1A237E',
+    backgroundColor: colors.secondary,
     borderRadius: radius.round,
-    height: 72,
+    height: controlHeights.fab,
     justifyContent: 'center',
-    width: 72,
+    width: controlHeights.fab,
     ...shadows.floating,
   },
 });

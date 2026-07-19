@@ -7,12 +7,15 @@ import {
 } from 'react-native';
 import { HelperText, TextInput } from 'react-native-paper';
 
-import { textRoles, textSizes } from '../../constants/theme';
+import { controlHeights, radius, spacing } from '../../constants/design-system';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 
 type ProductFormInputProps = {
   label: string;
   placeholder: string;
   value: string;
+  compact?: boolean;
+  dense?: boolean;
   errorMessage?: string;
   onChangeText?: (value: string) => void;
   keyboardType?: KeyboardTypeOptions;
@@ -27,6 +30,8 @@ export function ProductFormInput({
   label,
   placeholder,
   value,
+  compact = false,
+  dense = false,
   errorMessage,
   onChangeText,
   keyboardType,
@@ -37,11 +42,18 @@ export function ProductFormInput({
   secureTextEntry = false,
 }: ProductFormInputProps) {
   return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.fieldGroup, dense ? styles.fieldGroupDense : undefined]}>
+      <Text style={[styles.label, dense ? styles.labelDense : undefined]}>{label}</Text>
       <View style={styles.inputWrap}>
         <TextInput
-          contentStyle={[styles.input, multiline ? styles.inputMultiline : undefined]}
+          contentStyle={[
+            styles.input,
+            compact ? styles.inputCompact : undefined,
+            dense ? styles.inputDense : undefined,
+            multiline ? styles.inputMultiline : undefined,
+            multiline && compact ? styles.inputMultilineCompact : undefined,
+            multiline && dense ? styles.inputMultilineDense : undefined,
+          ]}
           editable={editable}
           error={!!errorMessage}
           keyboardType={keyboardType}
@@ -49,63 +61,105 @@ export function ProductFormInput({
           multiline={multiline}
           numberOfLines={numberOfLines}
           onChangeText={onChangeText}
-          outlineColor="#C8CDDD"
+          outlineColor={colors.borderStrong}
           placeholder={placeholder}
           right={rightSlot ? <TextInput.Affix text="" /> : undefined}
           secureTextEntry={secureTextEntry}
-          selectionColor="#1A237E"
-          style={[styles.inputShell, multiline ? styles.inputShellMultiline : undefined]}
+          selectionColor={colors.secondary}
+          style={[
+            styles.inputShell,
+            compact ? styles.inputShellCompact : undefined,
+            dense ? styles.inputShellDense : undefined,
+            multiline ? styles.inputShellMultiline : undefined,
+            multiline && compact ? styles.inputShellMultilineCompact : undefined,
+            multiline && dense ? styles.inputShellMultilineDense : undefined,
+          ]}
           textAlignVertical={multiline ? 'top' : undefined}
           value={value}
         />
         {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
       </View>
-      <HelperText style={styles.errorText} type="error" visible={!!errorMessage}>
-        {errorMessage || ' '}
-      </HelperText>
+      {errorMessage ? (
+        <HelperText style={styles.errorText} type="error" visible>
+          {errorMessage}
+        </HelperText>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fieldGroup: {
-    marginBottom: 26,
+    marginBottom: spacing.section - 2,
+  },
+  fieldGroupDense: {
+    marginBottom: spacing.md,
   },
   label: {
-    color: '#373C4A',
+    color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.medium,
-    letterSpacing: 3,
-    marginBottom: 14,
+    fontSize: textSizes.body,
+    letterSpacing: 2.2,
+    marginBottom: spacing.sm,
+  },
+  labelDense: {
+    fontSize: textSizes.small,
+    letterSpacing: 2,
+    marginBottom: spacing.xs + 2,
   },
   inputShell: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    minHeight: 86,
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    minHeight: controlHeights.input,
+  },
+  inputShellCompact: {
+    minHeight: controlHeights.inputCompact,
+  },
+  inputShellDense: {
+    borderRadius: radius.lg,
+    minHeight: 48,
   },
   inputWrap: {
     justifyContent: 'center',
   },
   inputShellMultiline: {
-    minHeight: 132,
+    minHeight: controlHeights.inputMultiline,
+  },
+  inputShellMultilineCompact: {
+    minHeight: controlHeights.inputMultilineCompact,
+  },
+  inputShellMultilineDense: {
+    minHeight: 78,
   },
   input: {
-    color: '#14171F',
+    color: colors.textStrong,
     ...textRoles.body,
-    fontSize: 18,
+    fontSize: textSizes.medium,
+  },
+  inputCompact: {
+    fontSize: textSizes.bodyLarge,
+  },
+  inputDense: {
+    fontSize: textSizes.body,
   },
   inputMultiline: {
     minHeight: 96,
   },
+  inputMultilineCompact: {
+    minHeight: 84,
+  },
+  inputMultilineDense: {
+    minHeight: 62,
+  },
   rightSlot: {
     position: 'absolute',
-    right: 16,
+    right: spacing.lg,
   },
   errorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
-    marginTop: 6,
+    marginTop: spacing.sm - 2,
     minHeight: 22,
     paddingHorizontal: 0,
   },

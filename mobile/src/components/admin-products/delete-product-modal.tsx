@@ -29,7 +29,7 @@ export function DeleteProductModal({
       visible={visible}
       headerLead={
         <View style={styles.iconWrap}>
-          <AlertTriangle color="#B3261E" size={18} strokeWidth={2.2} />
+          <AlertTriangle color={colors.dangerStrong} size={18} strokeWidth={2.2} />
         </View>
       }
       footer={
@@ -59,7 +59,7 @@ export function DeleteProductModal({
 const styles = StyleSheet.create({
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#FDECEC',
+    backgroundColor: colors.surfaceDangerMuted,
     borderRadius: radius.round,
     height: 34,
     justifyContent: 'center',
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   message: {
-    color: '#222734',
+    color: colors.textHeading,
     ...textRoles.body,
     fontSize: 18,
     lineHeight: 28,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   subMessage: {
-    color: '#667085',
+    color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
     lineHeight: 20,

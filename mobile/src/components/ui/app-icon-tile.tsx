@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
-import { textRoles } from '../../constants/theme';
+import { colors, textRoles } from '../../constants/theme';
 
 type AppIconTileProps = {
   icon: ReactNode;
@@ -24,8 +24,8 @@ export function AppIconTile({ icon, label, onPress }: AppIconTileProps) {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   label: {
-    color: '#555C6F',
+    color: colors.textSecondary,
     ...textRoles.label,
     marginTop: 10,
     textAlign: 'center',

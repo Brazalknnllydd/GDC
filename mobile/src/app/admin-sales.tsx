@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CalendarDays, Download, History, QrCode, WalletCards } from 'lucide-react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CalendarDays, Download, History, QrCode, WalletCards, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -18,9 +19,12 @@ import { AppButton } from '../components/ui/app-button';
 import { layout, radius, spacing } from '../constants/design-system';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { SurfaceCard } from '../components/ui/surface-card';
-import { colors, fonts, textRoles } from '../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type CustomerRef = {
@@ -56,15 +60,6 @@ type SaleRecord = {
 };
 
 type HistoryFilter = 'All' | 'Cash' | 'GCash';
-type ExportFormat = 'excel' | 'pdf';
-type HistoryEntry = {
-  id: string;
-  cashierName: string;
-  dateSold: string;
-  price: string;
-  productName: string;
-};
-
 type ExportRow = {
   cashierName: string;
   customerName: string;
@@ -77,25 +72,16 @@ type ExportRow = {
   totalSaleAmount: number;
   unitPrice: number;
 };
+type HistoryEntry = {
+  id: string;
+  cashierName: string;
+  dateSold: string;
+  price: string;
+  productName: string;
+};
+type ExportFormat = 'excel' | 'pdf';
 
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
-function normalizeNumber(value: number | string | undefined) {
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    return Number(value) || 0;
-  }
-
-  return 0;
-}
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-PH', {
@@ -239,12 +225,22 @@ function escapeHtml(value: string | number) {
     .replace(/'/g, '&#39;');
 }
 
+const pdfColors = {
+  border: colors.borderPanel,
+  card: colors.surfaceSubtle,
+  label: colors.muted,
+  text: colors.textStrong,
+  title: colors.secondary,
+  thBackground: colors.surfaceBrandSoft,
+};
+
 export default function AdminSalesScreen() {
+  const { compactPhone } = useResponsiveLayout();
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState<HistoryFilter>('All');
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
-  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [isExportVisible, setIsExportVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
   const [showOverviewMonthRangePicker, setShowOverviewMonthRangePicker] = useState(false);
   const [overviewCalendarYear, setOverviewCalendarYear] = useState(new Date().getFullYear());
   const [overviewMonthRange, setOverviewMonthRange] = useState<MonthRangeValue>(() => {
@@ -264,6 +260,10 @@ export default function AdminSalesScreen() {
   });
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [screenError, setScreenError] = useState('');
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [selectedHistoryFilter, historyMonthRange]);
 
   useEffect(() => {
     async function loadSales() {
@@ -334,6 +334,7 @@ export default function AdminSalesScreen() {
     }));
   }, [filteredSales]);
 
+
   const topProducts = useMemo(() => {
     const aggregated = new Map<string, { quantity: number; total: number }>();
 
@@ -372,6 +373,13 @@ export default function AdminSalesScreen() {
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
       });
   }, [sales, historyMonthRange, selectedHistoryFilter]);
+
+  const itemsPerPage = 10;
+  const totalHistoryPages = Math.ceil(historyTransactions.length / itemsPerPage) || 1;
+  const paginatedHistoryTransactions = useMemo(() => {
+    const start = (historyPage - 1) * itemsPerPage;
+    return historyTransactions.slice(start, start + itemsPerPage);
+  }, [historyTransactions, historyPage]);
 
   const historyEntries = useMemo<HistoryEntry[]>(() => {
     return historyTransactions.flatMap((sale) =>
@@ -620,12 +628,12 @@ export default function AdminSalesScreen() {
           <style>
             body {
               font-family: Arial, sans-serif;
-              color: #1b1f2d;
+              color: ${pdfColors.text};
               padding: 24px;
             }
             .header {
               align-items: center;
-              border-bottom: 2px solid #d9def0;
+              border-bottom: 2px solid ${pdfColors.border};
               display: flex;
               gap: 16px;
               padding-bottom: 18px;
@@ -637,13 +645,13 @@ export default function AdminSalesScreen() {
               width: 64px;
             }
             .brand-title {
-              color: #1a237e;
+              color: ${pdfColors.title};
               font-size: 24px;
               font-weight: 700;
               margin: 0;
             }
             .brand-subtitle {
-              color: #5d6476;
+              color: ${colors.textSecondary};
               font-size: 12px;
               letter-spacing: 2px;
               margin: 4px 0 0;
@@ -662,8 +670,8 @@ export default function AdminSalesScreen() {
               margin: 22px 0;
             }
             .summary-card {
-              background: #f6f7fb;
-              border: 1px solid #dce1ee;
+              background: ${pdfColors.card};
+              border: 1px solid ${pdfColors.border};
               border-radius: 14px;
               box-sizing: border-box;
               min-width: 220px;
@@ -671,20 +679,20 @@ export default function AdminSalesScreen() {
               width: calc(50% - 6px);
             }
             .summary-label {
-              color: #6b7280;
+              color: ${pdfColors.label};
               font-size: 11px;
               letter-spacing: 1px;
               margin: 0 0 8px;
               text-transform: uppercase;
             }
             .summary-value {
-              color: #1a237e;
+              color: ${pdfColors.title};
               font-size: 22px;
               font-weight: 700;
               margin: 0;
             }
             h2 {
-              color: #1a237e;
+              color: ${pdfColors.title};
               font-size: 18px;
               margin: 28px 0 12px;
             }
@@ -694,17 +702,17 @@ export default function AdminSalesScreen() {
               width: 100%;
             }
             th, td {
-              border: 1px solid #dce1ee;
+              border: 1px solid ${pdfColors.border};
               font-size: 11px;
               padding: 8px 10px;
               text-align: left;
             }
             th {
-              background: #eef2ff;
-              color: #1a237e;
+              background: ${pdfColors.thBackground};
+              color: ${pdfColors.title};
             }
             .footer {
-              color: #6b7280;
+              color: ${pdfColors.label};
               font-size: 10px;
               margin-top: 24px;
               text-align: right;
@@ -839,12 +847,12 @@ export default function AdminSalesScreen() {
       bottomNavItems={salesTabs}
       introChildren={
         <View style={styles.dateRow}>
-          <CalendarDays color="#707688" size={15} strokeWidth={1.9} />
+          <CalendarDays color={colors.textTertiary} size={15} strokeWidth={1.9} />
           <Text style={styles.dateText}>{displayDate}</Text>
         </View>
       }>
-      <SurfaceCard style={styles.overviewFilterCard}>
-        <View style={styles.historyRangeHeader}>
+      <SurfaceCard style={[styles.overviewFilterCard, compactPhone && styles.overviewFilterCardCompact]}>
+        <View style={[styles.historyRangeHeader, compactPhone && styles.historyRangeHeaderCompact]}>
           <View style={styles.rangeTextBlock}>
             <Text style={styles.historyRangeLabel}>Overview Month Range</Text>
             <Text style={styles.historyRangeValue}>{formatMonthRangeLabel(overviewMonthRange)}</Text>
@@ -852,7 +860,7 @@ export default function AdminSalesScreen() {
 
           <Pressable
             onPress={() => setShowOverviewMonthRangePicker((current) => !current)}
-            style={styles.historyCalendarButton}>
+            style={[styles.historyCalendarButton, compactPhone && styles.historyCalendarButtonCompact]}>
             <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
             <Text style={styles.historyCalendarButtonText}>
               {showOverviewMonthRangePicker ? 'Hide Calendar' : 'Choose Range'}
@@ -869,7 +877,7 @@ export default function AdminSalesScreen() {
               range={overviewMonthRange}
             />
 
-            <View style={styles.historyRangeActions}>
+            <View style={[styles.historyRangeActions, compactPhone && styles.historyRangeActionsCompact]}>
               <Pressable
                 onPress={() => {
                   const now = new Date();
@@ -910,7 +918,7 @@ export default function AdminSalesScreen() {
         <SalesSummaryCard title="AVG SALE" value={formatPeso(totals.averageSale)} detail="Average per sale" />
       </AdminMetricGrid>
 
-      <SurfaceCard style={styles.analyticsCard}>
+      <SurfaceCard style={[styles.analyticsCard, compactPhone && styles.analyticsCardCompact]}>
         <View style={styles.analyticsHeader}>
           <View>
             <Text style={styles.analyticsTitle}>Revenue Analytics</Text>
@@ -919,7 +927,7 @@ export default function AdminSalesScreen() {
         </View>
 
         {chartBars.labels.length > 0 ? (
-          <View style={styles.chartShell}>
+          <View style={[styles.chartShell, compactPhone && styles.chartShellCompact]}>
             <AdminBarChart height={240} labels={chartBars.labels} values={chartBars.values} />
           </View>
         ) : (
@@ -949,140 +957,169 @@ export default function AdminSalesScreen() {
         </View>
       </SurfaceCard>
 
-      <View style={styles.footerActions}>
-        <AppButton
-          icon={({ color, size }) => <History color={color} size={size} strokeWidth={2.1} />}
-          label="Sales History"
-          variant="secondary"
-          onPress={() => {
-            setIsHistoryVisible((current) => !current);
-            setIsExportVisible(false);
-          }}
-        />
+      <View style={[styles.footerActions, compactPhone && styles.footerActionsCompact]}>
         <AppButton
           icon={({ color, size }) => <Download color={color} size={size} strokeWidth={2.1} />}
           label="Export Report"
           variant="primary"
           onPress={() => {
             setIsExportVisible((current) => !current);
-            setIsHistoryVisible(false);
           }}
         />
       </View>
 
-      {isHistoryVisible ? (
-        <SurfaceCard style={styles.historyCard}>
-          <View style={styles.historyHeader}>
-            <View style={styles.rangeTextBlock}>
-              <Text style={styles.cardHeading}>Sales History</Text>
-              <Text style={styles.historySubtitle}>
-                See which cashier sold which product, the price, and the date sold.
-              </Text>
-            </View>
-            <View style={styles.historyBadge}>
-              <Text style={styles.historyBadgeText}>{historyEntries.length} items</Text>
-            </View>
+      <SurfaceCard style={[styles.historyCard, compactPhone && styles.historyCardCompact]}>
+        <View style={styles.historyHeader}>
+          <View style={styles.rangeTextBlock}>
+            <Text style={styles.cardHeading}>Sales History</Text>
+            <Text style={styles.historySubtitle}>
+              See which cashier sold which product, the price, and the date sold.
+            </Text>
+          </View>
+          <View style={styles.historyBadge}>
+            <Text style={styles.historyBadgeText}>{historyEntries.length} items</Text>
+          </View>
+        </View>
+
+        <View style={[styles.historyRangeHeader, compactPhone && styles.historyRangeHeaderCompact]}>
+          <View style={styles.rangeTextBlock}>
+            <Text style={styles.historyRangeLabel}>Month Range</Text>
+            <Text style={styles.historyRangeValue}>{formatMonthRangeLabel(historyMonthRange)}</Text>
           </View>
 
-          <View style={styles.historyRangeHeader}>
-            <View style={styles.rangeTextBlock}>
-              <Text style={styles.historyRangeLabel}>Month Range</Text>
-              <Text style={styles.historyRangeValue}>{formatMonthRangeLabel(historyMonthRange)}</Text>
-            </View>
+          <Pressable
+            onPress={() => setShowMonthRangePicker((current) => !current)}
+            style={[styles.historyCalendarButton, compactPhone && styles.historyCalendarButtonCompact]}>
+            <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
+            <Text style={styles.historyCalendarButtonText}>
+              {showMonthRangePicker ? 'Hide Calendar' : 'Choose Range'}
+            </Text>
+          </Pressable>
+        </View>
 
+        {showMonthRangePicker ? (
+          <View>
+            <MonthRangePicker
+              displayYear={historyCalendarYear}
+              onChangeRange={setHistoryMonthRange}
+              onChangeYear={setHistoryCalendarYear}
+              range={historyMonthRange}
+            />
+
+            <View style={[styles.historyRangeActions, compactPhone && styles.historyRangeActionsCompact]}>
+              <Pressable
+                onPress={() => {
+                  const now = new Date();
+                  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                  setHistoryMonthRange({
+                    endMonth: currentMonth,
+                    startMonth: currentMonth,
+                  });
+                  setHistoryCalendarYear(now.getFullYear());
+                }}
+                style={styles.historyRangeActionButton}>
+                <Text style={styles.historyRangeActionText}>This Month</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setHistoryMonthRange({ endMonth: null, startMonth: null });
+                  setHistoryCalendarYear(new Date().getFullYear());
+                }}
+                style={styles.historyRangeActionButton}>
+                <Text style={styles.historyRangeActionText}>Clear</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.historyFilterRow}>
+          {(['All', 'Cash', 'GCash'] as const).map((filter) => (
             <Pressable
-              onPress={() => setShowMonthRangePicker((current) => !current)}
-              style={styles.historyCalendarButton}>
-              <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
-              <Text style={styles.historyCalendarButtonText}>
-                {showMonthRangePicker ? 'Hide Calendar' : 'Choose Range'}
+              key={filter}
+              onPress={() => setSelectedHistoryFilter(filter)}
+              style={[
+                styles.historyFilterChip,
+                selectedHistoryFilter === filter && styles.historyFilterChipActive,
+              ]}>
+              <Text
+                style={[
+                  styles.historyFilterText,
+                  selectedHistoryFilter === filter && styles.historyFilterTextActive,
+                ]}>
+                {filter}
               </Text>
             </Pressable>
-          </View>
+          ))}
+        </ScrollView>
 
-          {showMonthRangePicker ? (
-            <View>
-              <MonthRangePicker
-                displayYear={historyCalendarYear}
-                onChangeRange={setHistoryMonthRange}
-                onChangeYear={setHistoryCalendarYear}
-                range={historyMonthRange}
-              />
-
-              <View style={styles.historyRangeActions}>
-                <Pressable
-                  onPress={() => {
-                    const now = new Date();
-                    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                    setHistoryMonthRange({
-                      endMonth: currentMonth,
-                      startMonth: currentMonth,
-                    });
-                    setHistoryCalendarYear(now.getFullYear());
-                  }}
-                  style={styles.historyRangeActionButton}>
-                  <Text style={styles.historyRangeActionText}>This Month</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    setHistoryMonthRange({ endMonth: null, startMonth: null });
-                    setHistoryCalendarYear(new Date().getFullYear());
-                  }}
-                  style={styles.historyRangeActionButton}>
-                  <Text style={styles.historyRangeActionText}>Clear</Text>
-                </Pressable>
-              </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          contentContainerStyle={{ minWidth: '100%' }}
+        >
+          <View style={[styles.table, { minWidth: '100%' }]}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 100 }]}>RECEIPT NO</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>DATE SOLD</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CASHIER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CUSTOMER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1, minWidth: 80 }]}>PAYMENT</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 90, textAlign: 'right' }]}>TOTAL</Text>
             </View>
-          ) : null}
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.historyFilterRow}>
-            {(['All', 'Cash', 'GCash'] as const).map((filter) => (
-              <Pressable
-                key={filter}
-                onPress={() => setSelectedHistoryFilter(filter)}
-                style={[
-                  styles.historyFilterChip,
-                  selectedHistoryFilter === filter && styles.historyFilterChipActive,
-                ]}>
-                <Text
-                  style={[
-                    styles.historyFilterText,
-                    selectedHistoryFilter === filter && styles.historyFilterTextActive,
-                  ]}>
-                  {filter}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <View style={styles.historyList}>
-            {historyEntries.length > 0 ? (
-              historyEntries.map((entry, index) => (
-                <View key={entry.id}>
-                  <View style={styles.historyRow}>
-                    <View style={styles.historyRowMain}>
-                      <Text style={styles.historyReceipt}>{entry.productName}</Text>
-                      <Text style={styles.historyMeta}>Cashier: {entry.cashierName}</Text>
-                      <Text style={styles.historyMeta}>Date sold: {entry.dateSold}</Text>
-                    </View>
-
-                    <View style={styles.historyAmountColumn}>
-                      <Text style={styles.historyAmount}>{entry.price}</Text>
-                    </View>
+            {/* Table Rows */}
+            <View style={styles.tableRows}>
+              {paginatedHistoryTransactions.length > 0 ? (
+                paginatedHistoryTransactions.map((sale) => (
+                  <View key={sale.id} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { flex: 1.2, minWidth: 100, fontFamily: fonts.semiBold, color: '#101828' }]}>
+                      {sale.receiptNumber}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.6, minWidth: 140 }]}>
+                      {formatDateTime(sale.createdAt)}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110 }]}>
+                      {sale.user?.name || 'Cashier'}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110, color: sale.customer ? '#475467' : '#98A2B3' }]}>
+                      {sale.customer?.name || 'Walk-in'}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1, minWidth: 80 }]}>
+                      {sale.paymentMethod}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 90, textAlign: 'right', fontFamily: fonts.semiBold, color: '#101828' }]}>
+                      {formatPeso(normalizeNumber(sale.totalAmount))}
+                    </Text>
                   </View>
-                  {index < historyEntries.length - 1 ? <View style={styles.separator} /> : null}
+                ))
+              ) : (
+                <View style={styles.emptyTableRow}>
+                  <Text style={styles.emptyStateText}>No history found for this filter.</Text>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.emptyStateText}>No history found for this filter.</Text>
-            )}
+              )}
+            </View>
+
+            {/* Table Footer Pagination */}
+            <View style={styles.tableFooter}>
+              <PaginationControls
+                borderless
+                currentPage={historyPage - 1}
+                endItem={Math.min(historyPage * itemsPerPage, historyTransactions.length)}
+                onPageChange={(page) => setHistoryPage(page + 1)}
+                startItem={(historyPage - 1) * itemsPerPage + 1}
+                totalItems={historyTransactions.length}
+                totalPages={totalHistoryPages}
+                visiblePageNumbers={Array.from({ length: Math.min(5, totalHistoryPages) }, (_, i) => i)}
+              />
+            </View>
           </View>
-        </SurfaceCard>
-      ) : null}
+        </ScrollView>
+      </SurfaceCard>
 
       {isExportVisible ? (
         <SurfaceCard style={styles.exportCard}>
@@ -1146,7 +1183,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   dateText: {
-    color: '#697082',
+    color: colors.textTertiary,
     fontFamily: fonts.medium,
     fontSize: 13,
     marginLeft: 6,
@@ -1157,10 +1194,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
+  overviewFilterCardCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
   analyticsCard: {
     marginTop: layout.cardGap + spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+  },
+  analyticsCardCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   analyticsHeader: {
     alignItems: 'center',
@@ -1173,13 +1218,13 @@ const styles = StyleSheet.create({
     ...textRoles.value,
   },
   analyticsSubtitle: {
-    color: '#6A7285',
+    color: colors.textTertiary,
     ...textRoles.label,
     marginTop: spacing.xs,
   },
   chartShell: {
-    backgroundColor: '#F6F7FB',
-    borderColor: '#DCE1EE',
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderPanel,
     borderRadius: layout.cardGap,
     borderWidth: 1,
     minHeight: 240,
@@ -1188,6 +1233,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.md,
     position: 'relative',
+  },
+  chartShellCompact: {
+    minHeight: 208,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+    paddingTop: spacing.sm,
   },
   paymentMethodsRow: {
     flexDirection: 'row',
@@ -1215,7 +1266,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   separator: {
-    backgroundColor: '#E5E8F0',
+    backgroundColor: colors.divider,
     height: 1,
     width: '100%',
   },
@@ -1224,10 +1275,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.section,
   },
+  footerActionsCompact: {
+    flexDirection: 'column',
+  },
   historyCard: {
     marginTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+  },
+  historyCardCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   historyHeader: {
     alignItems: 'flex-start',
@@ -1237,13 +1295,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   historySubtitle: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 14,
     maxWidth: '88%',
   },
   historyBadge: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.surfaceBrandSoft,
     borderRadius: radius.round,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
@@ -1259,18 +1317,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  historyRangeHeaderCompact: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
   rangeTextBlock: {
     flex: 1,
     minWidth: 0,
   },
   historyRangeLabel: {
-    color: '#6B7280',
+    color: colors.muted,
     ...textRoles.label,
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   historyRangeValue: {
-    color: '#1B1F2D',
+    color: colors.textStrong,
     ...textRoles.value,
     fontSize: 18,
     lineHeight: 28,
@@ -1278,8 +1340,8 @@ const styles = StyleSheet.create({
   historyCalendarButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#F4F6FF',
-    borderColor: '#C7D3FF',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfoStrong,
     borderRadius: radius.round,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1289,6 +1351,12 @@ const styles = StyleSheet.create({
     minWidth: 148,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
+  },
+  historyCalendarButtonCompact: {
+    minHeight: 42,
+    minWidth: 0,
+    paddingHorizontal: spacing.md,
+    width: '100%',
   },
   historyCalendarButtonText: {
     color: colors.secondary,
@@ -1300,16 +1368,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
+  historyRangeActionsCompact: {
+    flexWrap: 'wrap',
+  },
   historyRangeActionButton: {
-    backgroundColor: '#F3F4F8',
-    borderColor: '#D4D9E7',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
     borderRadius: radius.round,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   historyRangeActionText: {
-    color: '#40485A',
+    color: colors.textHeading,
     ...textRoles.label,
   },
   historyFilterRow: {
@@ -1318,8 +1389,8 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   historyFilterChip: {
-    backgroundColor: '#F3F4F8',
-    borderColor: '#D4D9E7',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
     borderRadius: radius.round,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
@@ -1330,11 +1401,11 @@ const styles = StyleSheet.create({
     borderColor: colors.secondary,
   },
   historyFilterText: {
-    color: '#40485A',
+    color: colors.textHeading,
     ...textRoles.label,
   },
   historyFilterTextActive: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
   },
   historyList: {
     paddingTop: 2,
@@ -1349,12 +1420,12 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   historyReceipt: {
-    color: '#1B1F2D',
+    color: colors.textStrong,
     ...textRoles.value,
     marginBottom: 4,
   },
   historyMeta: {
-    color: '#6B7280',
+    color: colors.muted,
     ...textRoles.label,
     lineHeight: 18,
     marginBottom: 2,
@@ -1369,7 +1440,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   historyChange: {
-    color: '#6B7280',
+    color: colors.muted,
     ...textRoles.label,
   },
   exportCard: {
@@ -1378,7 +1449,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   exportSubtitle: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 14,
     marginBottom: spacing.md,
@@ -1388,16 +1459,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   exportOption: {
-    backgroundColor: '#F8F9FC',
-    borderColor: '#D4D9E7',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderMuted,
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   exportOptionActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#AEBBFF',
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderInfoStrong,
   },
   exportOptionHeader: {
     alignItems: 'center',
@@ -1406,34 +1477,86 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   exportOptionTitle: {
-    color: '#161B29',
+    color: colors.textStrong,
     ...textRoles.value,
   },
   exportOptionBody: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 14,
     lineHeight: 22,
   },
   recommendedPill: {
-    backgroundColor: '#DFF6E5',
+    backgroundColor: colors.surfaceSuccessMuted,
     borderRadius: radius.round,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
   recommendedPillText: {
-    color: '#15803D',
+    color: colors.successBright,
     ...textRoles.label,
   },
   emptyStateText: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 15,
+    lineHeight: 22,
   },
   screenErrorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: spacing.md,
+  },
+  table: {
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  tableHeader: {
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  tableHeaderCell: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
+  },
+  tableRows: {
+    backgroundColor: '#FFFFFF',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    gap: spacing.md,
+  },
+  tableCell: {
+    color: '#475467',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
+  emptyTableRow: {
+    padding: 32,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  tableFooter: {
+    backgroundColor: colors.surfaceSoft,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
 });

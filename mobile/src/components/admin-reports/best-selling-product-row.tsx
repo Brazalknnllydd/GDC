@@ -56,14 +56,14 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   units: {
-    color: '#73798A',
+    color: colors.textSubtle,
     ...textRoles.label,
   },
   right: {
     alignItems: 'flex-end',
   },
   amount: {
-    color: '#1E2230',
+    color: colors.textStrong,
     ...textRoles.value,
     marginBottom: 3,
   },
@@ -72,9 +72,9 @@ const styles = StyleSheet.create({
     ...textRoles.label,
   },
   noteSuccess: {
-    color: '#0F9D3F',
+    color: colors.successBright,
   },
   noteMuted: {
-    color: '#73798A',
+    color: colors.textSubtle,
   },
 });

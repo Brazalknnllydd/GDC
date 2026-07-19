@@ -3,7 +3,7 @@ import { Bell } from 'lucide-react-native';
 import { Avatar, IconButton, Surface } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { formatCashierDate, formatCashierTime } from '../../lib/cashier-formatters';
 
 type CashierDashboardHeaderProps = {
@@ -36,13 +36,15 @@ export function CashierDashboardHeader({
         <Text style={styles.timeText}>{formatCashierTime(currentDate)}</Text>
       </View>
 
-      <IconButton
-        icon={() => <Bell color={colors.secondary} size={21} strokeWidth={2.1} />}
-        onPress={() => {}}
-        size={20}
-        style={styles.iconButton}
-      />
+      <View style={styles.iconWrap}>
+        <IconButton
+          icon={() => <Bell color={colors.secondary} size={21} strokeWidth={2.1} />}
+          onPress={() => {}}
+          size={20}
+          style={styles.iconButton}
+        />
         <View style={styles.notificationDot} />
+      </View>
     </Surface>
   );
 }
@@ -63,7 +65,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   logo: {
-    borderColor: '#D9DEEA',
+    borderColor: colors.borderStrong,
     borderRadius: radius.round,
     borderWidth: 1,
     marginRight: spacing.md,
@@ -73,9 +75,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   greetingLabel: {
-    color: '#404757',
+    color: colors.textHeading,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.1,
     marginBottom: 3,
   },
@@ -90,23 +92,25 @@ const styles = StyleSheet.create({
     minWidth: 84,
   },
   dateText: {
-    color: '#424858',
+    color: colors.textHeading,
     fontFamily: fonts.regular,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     marginBottom: 2,
   },
   timeText: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 18,
+    fontSize: textSizes.title,
     lineHeight: 22,
+  },
+  iconWrap: {
+    position: 'relative',
   },
   iconButton: {
     margin: 0,
-    position: 'relative',
   },
   notificationDot: {
-    backgroundColor: '#D92926',
+    backgroundColor: colors.dangerDot,
     borderRadius: radius.round,
     height: 6,
     position: 'absolute',

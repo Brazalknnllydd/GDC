@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 
 export type MonthRangeValue = {
   endMonth: Date | null;
@@ -16,30 +17,23 @@ type MonthRangePickerProps = {
   range: MonthRangeValue;
 };
 
-const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const months = Array.from({ length: 12 }, (_, month) => ({
+  label: new Date(2024, month, 1).toLocaleDateString('en-PH', { month: 'short' }),
+  value: month,
+}));
 
 function startOfMonth(year: number, month: number) {
   return new Date(year, month, 1);
 }
 
-function isSameMonth(left: Date | null, right: Date | null) {
-  if (!left || !right) {
-    return false;
-  }
-
-  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
+function getMonthTime(value: Date | null) {
+  return value ? startOfMonth(value.getFullYear(), value.getMonth()).getTime() : null;
 }
 
-function isMonthBetween(target: Date, start: Date | null, end: Date | null) {
-  if (!start || !end) {
-    return false;
-  }
-
-  const targetValue = target.getFullYear() * 12 + target.getMonth();
-  const startValue = start.getFullYear() * 12 + start.getMonth();
-  const endValue = end.getFullYear() * 12 + end.getMonth();
-
-  return targetValue > startValue && targetValue < endValue;
+function getOrderedRange(left: Date, right: Date): MonthRangeValue {
+  return left.getTime() <= right.getTime()
+    ? { startMonth: left, endMonth: right }
+    : { startMonth: right, endMonth: left };
 }
 
 export function MonthRangePicker({
@@ -48,10 +42,25 @@ export function MonthRangePicker({
   onChangeYear,
   range,
 }: MonthRangePickerProps) {
-  function handleSelectMonth(monthIndex: number) {
-    const selectedMonth = startOfMonth(displayYear, monthIndex);
+  const [pendingStart, setPendingStart] = useState<Date | null>(null);
+  const startTime = getMonthTime(range.startMonth);
+  const endTime = getMonthTime(range.endMonth);
 
-    if (!range.startMonth) {
+  const selectedRange = useMemo(() => {
+    const start = startTime ?? endTime;
+    const end = endTime ?? startTime;
+
+    return {
+      end,
+      start,
+    };
+  }, [endTime, startTime]);
+
+  function handleSelectMonth(month: number) {
+    const selectedMonth = startOfMonth(displayYear, month);
+
+    if (!pendingStart) {
+      setPendingStart(selectedMonth);
       onChangeRange({
         endMonth: selectedMonth,
         startMonth: selectedMonth,
@@ -59,96 +68,81 @@ export function MonthRangePicker({
       return;
     }
 
-    if (range.startMonth && range.endMonth && isSameMonth(range.startMonth, range.endMonth)) {
-      if (isSameMonth(selectedMonth, range.startMonth)) {
-        onChangeRange({
-          endMonth: selectedMonth,
-          startMonth: selectedMonth,
-        });
-        return;
-      }
-
-      if (selectedMonth.getTime() < range.startMonth.getTime()) {
-        onChangeRange({
-          endMonth: range.startMonth,
-          startMonth: selectedMonth,
-        });
-        return;
-      }
-
-      onChangeRange({
-        endMonth: selectedMonth,
-        startMonth: range.startMonth,
-      });
-      return;
-    }
-
-    onChangeRange({
-      endMonth: selectedMonth,
-      startMonth: selectedMonth,
-    });
+    onChangeRange(getOrderedRange(pendingStart, selectedMonth));
+    setPendingStart(null);
   }
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Pressable onPress={() => onChangeYear(displayYear - 1)} style={styles.yearButton}>
-          <ChevronLeft color={colors.secondary} size={16} strokeWidth={2.2} />
+        <Pressable
+          accessibilityLabel="Previous year"
+          onPress={() => onChangeYear(displayYear - 1)}
+          style={styles.navButton}>
+          <ChevronLeft color={colors.secondary} size={17} strokeWidth={2.2} />
         </Pressable>
 
-        <Text style={styles.yearText}>{displayYear}</Text>
+        <Text style={styles.yearLabel}>{displayYear}</Text>
 
-        <Pressable onPress={() => onChangeYear(displayYear + 1)} style={styles.yearButton}>
-          <ChevronRight color={colors.secondary} size={16} strokeWidth={2.2} />
+        <Pressable
+          accessibilityLabel="Next year"
+          onPress={() => onChangeYear(displayYear + 1)}
+          style={styles.navButton}>
+          <ChevronRight color={colors.secondary} size={17} strokeWidth={2.2} />
         </Pressable>
       </View>
 
-      <View style={styles.grid}>
-        {monthLabels.map((label, index) => {
-          const monthDate = startOfMonth(displayYear, index);
-          const isStart = isSameMonth(monthDate, range.startMonth);
-          const isEnd = isSameMonth(monthDate, range.endMonth);
-          const isBetween = isMonthBetween(monthDate, range.startMonth, range.endMonth);
+      <View style={styles.monthGrid}>
+        {months.map((month) => {
+          const date = startOfMonth(displayYear, month.value);
+          const monthTime = date.getTime();
+          const isRangeStart = startTime === monthTime;
+          const isRangeEnd = endTime === monthTime;
+          const isInRange =
+            selectedRange.start !== null &&
+            selectedRange.end !== null &&
+            monthTime > selectedRange.start &&
+            monthTime < selectedRange.end;
+          const isSelected = isRangeStart || isRangeEnd;
 
           return (
             <Pressable
-              key={`${displayYear}-${label}`}
-              onPress={() => handleSelectMonth(index)}
+              key={month.value}
+              onPress={() => handleSelectMonth(month.value)}
               style={[
-                styles.monthChip,
-                (isStart || isEnd) && styles.monthChipEdge,
-                isBetween && styles.monthChipBetween,
+                styles.monthCell,
+                isInRange && styles.monthCellInRange,
+                isSelected && styles.monthCellSelected,
               ]}>
               <Text
                 style={[
-                  styles.monthChipText,
-                  (isStart || isEnd) && styles.monthChipTextEdge,
-                  isBetween && styles.monthChipTextBetween,
+                  styles.monthText,
+                  isInRange && styles.monthTextInRange,
+                  isSelected && styles.monthTextSelected,
                 ]}>
-                {label}
+                {month.label}
               </Text>
             </Pressable>
           );
         })}
       </View>
+
+      <Text style={styles.helperText}>
+        Tap a start month, then tap an end month to filter this page.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8FAFF',
-    borderColor: '#DCE4F2',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderPanel,
     borderRadius: radius.lg,
     borderWidth: 1,
     marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
   },
   header: {
     alignItems: 'center',
@@ -156,46 +150,62 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  monthChip: {
+  navButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D4D9E7',
+    backgroundColor: colors.card,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.round,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  yearLabel: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.bodyLarge,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  monthCell: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderColor: colors.borderMuted,
     borderRadius: radius.md,
     borderWidth: 1,
-    minWidth: '22%',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 1,
+    flexBasis: '30.8%',
+    flexGrow: 1,
+    minHeight: 48,
+    justifyContent: 'center',
   },
-  monthChipBetween: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C9D3FF',
+  monthCellInRange: {
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderInfoStrong,
   },
-  monthChipEdge: {
+  monthCellSelected: {
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
   },
-  monthChipText: {
-    color: '#40485A',
-    ...textRoles.label,
+  monthText: {
+    color: colors.textHeading,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small + 1,
   },
-  monthChipTextBetween: {
+  monthTextInRange: {
     color: colors.secondary,
   },
-  monthChipTextEdge: {
-    color: '#FFFFFF',
+  monthTextSelected: {
+    color: colors.textInverse,
   },
-  yearButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D4D9E7',
-    borderRadius: radius.round,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  yearText: {
-    color: colors.secondary,
-    ...textRoles.value,
+  helperText: {
+    color: colors.textTertiary,
+    ...textRoles.body,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
 });

@@ -30,6 +30,7 @@ type AddProductModalProps = {
   onInitialStockChange: (value: string) => void;
   onOpenCamera: () => void;
   onPickImage: () => void;
+  onProductDescriptionChange: (value: string) => void;
   onRemoveImage: () => void;
   onRequestCreateCategory: () => void;
   onProductNameChange: (value: string) => void;
@@ -37,6 +38,7 @@ type AddProductModalProps = {
   onUnitPriceChange: (value: string) => void;
   onWeightVolumeChange: (value: string) => void;
   productActionLabel: string;
+  productDescription: string;
   productName: string;
   selectedCategory: string;
   submittingLabel: string;
@@ -62,6 +64,7 @@ export function AddProductModal({
   onInitialStockChange,
   onOpenCamera,
   onPickImage,
+  onProductDescriptionChange,
   onRemoveImage,
   onRequestCreateCategory,
   onProductNameChange,
@@ -69,6 +72,7 @@ export function AddProductModal({
   onUnitPriceChange,
   onWeightVolumeChange,
   productActionLabel,
+  productDescription,
   productName,
   selectedCategory,
   submittingLabel,
@@ -90,6 +94,7 @@ export function AddProductModal({
 
   return (
     <AdminModalShell
+      compact
       height={isPhone ? Math.min(height * 0.82, 720) : undefined}
       maxHeight="92%"
       onClose={onClose}
@@ -100,7 +105,7 @@ export function AddProductModal({
           label={isSaving ? submittingLabel : productActionLabel}
           loading={isSaving}
           onPress={onSave}
-          size="xl"
+          size="md"
           variant="primary"
         />
       }>
@@ -121,7 +126,7 @@ export function AddProductModal({
               />
             ) : (
               <View style={styles.imagePlaceholder}>
-                <ImagePlus color={colors.secondary} size={28} strokeWidth={2} />
+                <ImagePlus color={colors.secondary} size={23} strokeWidth={2} />
                 <Text style={styles.imagePlaceholderTitle}>Add product photo</Text>
                 <Text style={styles.imagePlaceholderText}>
                   Tap here to pick from the gallery, or use the camera button below.
@@ -153,11 +158,24 @@ export function AddProductModal({
         </View>
 
         <ProductFormInput
+          compact
+          dense
           errorMessage={fieldErrors.name}
           label="PRODUCT NAME"
           onChangeText={onProductNameChange}
           placeholder="e.g. Frozen Atlantic Salmon"
           value={productName}
+        />
+
+        <ProductFormInput
+          compact
+          dense
+          label="DESCRIPTION"
+          multiline
+          numberOfLines={3}
+          onChangeText={onProductDescriptionChange}
+          placeholder="Optional product notes"
+          value={productDescription}
         />
 
         <View style={styles.fieldGroup}>
@@ -177,7 +195,7 @@ export function AddProductModal({
               {categoryValue || 'Select a category'}
             </Text>
             <ChevronDown
-              color="#4B5060"
+              color={colors.textSoft}
               size={24}
               strokeWidth={2.2}
               style={categoryDropdownOpen ? styles.dropdownChevronOpen : undefined}
@@ -228,13 +246,15 @@ export function AddProductModal({
         </View>
 
         <ProductFormInput
+          compact
+          dense
           keyboardType="numeric"
           label="BARCODE / SKU"
           onChangeText={onBarcodeChange}
           placeholder="0000 0000 0000"
           rightSlot={
             <View style={styles.barcodeSlot}>
-              <ScanLine color={colors.secondary} size={24} strokeWidth={2.1} />
+              <ScanLine color={colors.secondary} size={20} strokeWidth={2.1} />
             </View>
           }
           value={barcode}
@@ -243,6 +263,8 @@ export function AddProductModal({
         <View style={[styles.twoColumnRow, isSingleColumn && styles.singleColumnRow]}>
           <View style={styles.halfField}>
             <ProductFormInput
+              compact
+              dense
               errorMessage={fieldErrors.costPrice}
               keyboardType="number-pad"
               label="COST PRICE (P)"
@@ -253,6 +275,8 @@ export function AddProductModal({
           </View>
           <View style={[styles.halfField, isSingleColumn && styles.fullField]}>
             <ProductFormInput
+              compact
+              dense
               errorMessage={fieldErrors.sellingPrice}
               keyboardType="number-pad"
               label="SELLING PRICE (P)"
@@ -266,6 +290,8 @@ export function AddProductModal({
         <View style={[styles.twoColumnRow, isSingleColumn && styles.singleColumnRow]}>
           <View style={styles.halfField}>
             <ProductFormInput
+              compact
+              dense
               errorMessage={fieldErrors.stock}
               keyboardType="number-pad"
               label="INITIAL STOCK"
@@ -276,6 +302,8 @@ export function AddProductModal({
           </View>
           <View style={[styles.halfField, isSingleColumn && styles.fullField]}>
             <ProductFormInput
+              compact
+              dense
               errorMessage={fieldErrors.weightVolume}
               label="WEIGHT / VOLUME"
               onChangeText={onWeightVolumeChange}
@@ -297,138 +325,138 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 32,
-    paddingTop: 8,
+    paddingBottom: spacing.md,
+    paddingTop: 0,
   },
   imageSection: {
-    marginBottom: spacing.section,
+    marginBottom: spacing.md,
   },
   fieldGroup: {
-    marginBottom: 26,
+    marginBottom: spacing.md,
   },
   fieldLabel: {
-    color: '#373C4A',
+    color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.medium,
-    letterSpacing: 3,
-    marginBottom: 14,
+    fontSize: textSizes.small,
+    letterSpacing: 2,
+    marginBottom: spacing.xs + 2,
   },
   imagePicker: {
-    backgroundColor: '#F3F5FA',
-    borderColor: '#D4DAE7',
-    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.lg,
     borderStyle: 'dashed',
     borderWidth: 1.5,
-    minHeight: 190,
+    minHeight: 104,
     overflow: 'hidden',
   },
   imagePreview: {
-    height: 220,
+    height: 118,
     width: '100%',
   },
   imagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 190,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    minHeight: 104,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   imagePlaceholderTitle: {
-    color: '#172033',
+    color: colors.textDark,
     ...textRoles.value,
-    fontSize: 18,
-    marginTop: 12,
+    fontSize: 14,
+    marginTop: spacing.xs,
   },
   imagePlaceholderText: {
-    color: '#6A7284',
+    color: colors.textTertiary,
     ...textRoles.label,
-    fontSize: 13,
-    marginTop: 8,
+    fontSize: 12,
+    marginTop: 4,
     textAlign: 'center',
   },
   imageActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 12,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   dropdownTrigger: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C8CDDD',
-    borderRadius: 18,
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 86,
-    paddingHorizontal: 20,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
   },
   dropdownTriggerOpen: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
   dropdownTriggerError: {
-    borderColor: '#C62828',
+    borderColor: colors.dangerStrong,
   },
   dropdownTriggerText: {
-    color: '#14171F',
+    color: colors.textStrong,
     ...textRoles.body,
     flex: 1,
-    fontSize: 18,
+    fontSize: 15,
     marginRight: 10,
   },
   dropdownPlaceholderText: {
-    color: '#737A8D',
+    color: colors.textSubtle,
   },
   dropdownChevronOpen: {
     transform: [{ rotate: '180deg' }],
   },
   dropdownMenu: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C8CDDD',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderTopWidth: 0,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
     borderWidth: 1,
-    maxHeight: 220,
+    maxHeight: 188,
     overflow: 'hidden',
   },
   dropdownScroll: {
-    maxHeight: 220,
+    maxHeight: 188,
   },
   dropdownOption: {
     justifyContent: 'center',
-    minHeight: 58,
-    paddingHorizontal: 20,
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
   },
   dropdownOptionActive: {
-    backgroundColor: '#EEF1FF',
+    backgroundColor: colors.surfaceInfoMuted,
   },
   dropdownOptionBorder: {
-    borderBottomColor: '#E5E8F0',
+    borderBottomColor: colors.divider,
     borderBottomWidth: 1,
   },
   dropdownOptionText: {
-    color: '#1F2533',
+    color: colors.textStrong,
     ...textRoles.body,
-    fontSize: 17,
+    fontSize: 15,
   },
   dropdownOptionTextActive: {
     color: colors.secondary,
     ...textRoles.value,
   },
   fieldErrorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 10,
   },
   createCategoryOption: {
-    borderTopColor: '#E5E8F0',
+    borderTopColor: colors.divider,
     borderTopWidth: 1,
     justifyContent: 'center',
-    minHeight: 58,
-    paddingHorizontal: 20,
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
   },
   createCategoryText: {
     color: colors.secondary,
@@ -437,15 +465,15 @@ const styles = StyleSheet.create({
   },
   barcodeSlot: {
     alignItems: 'center',
-    backgroundColor: '#F2F3F7',
+    backgroundColor: colors.surfaceNeutral,
     borderRadius: 14,
-    height: 64,
+    height: 40,
     justifyContent: 'center',
-    width: 88,
+    width: 56,
   },
   twoColumnRow: {
     flexDirection: 'row',
-    gap: 14,
+    gap: spacing.md,
   },
   singleColumnRow: {
     flexDirection: 'column',
@@ -458,7 +486,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   errorText: {
-    color: '#C62828',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: 8,

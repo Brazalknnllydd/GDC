@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { layout } from '../../constants/design-system';
+import { layout, spacing } from '../../constants/design-system';
+import { colors } from '../../constants/theme';
 import type { BottomNavItem } from '../../lib/app-routes';
 import { AdminBottomNav } from './admin-bottom-nav';
 import { AdminPageHeader } from './admin-page-header';
@@ -38,6 +39,7 @@ export function AdminPageScreen({
 }: AdminPageScreenProps) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const isCompactPhone = width < 430;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -47,6 +49,7 @@ export function AdminPageScreen({
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
+            isCompactPhone ? styles.scrollContentCompact : undefined,
             isTablet ? styles.scrollContentTablet : undefined,
             contentContainerStyle,
           ]}
@@ -65,16 +68,20 @@ export function AdminPageScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7F7FA',
+    backgroundColor: colors.backgroundMuted,
   },
   page: {
     flex: 1,
-    backgroundColor: '#F7F7FA',
+    backgroundColor: colors.backgroundMuted,
   },
   scrollContent: {
     paddingBottom: layout.screenPaddingBottom,
     paddingHorizontal: layout.screenPaddingX,
     paddingTop: layout.screenPaddingTop,
+  },
+  scrollContentCompact: {
+    paddingHorizontal: spacing.xl - 2,
+    paddingTop: spacing.xl,
   },
   scrollContentTablet: {
     alignSelf: 'center',

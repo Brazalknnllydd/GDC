@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Banknote, CreditCard, QrCode } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { formatCashierTime, formatPaymentMethod } from '../../lib/cashier-formatters';
 import { formatPeso } from '../../lib/product-utils';
 
@@ -11,6 +11,7 @@ type CashierRecentSaleItemProps = {
   receiptNumber: string;
   time: string;
   totalAmount: number;
+  onPress?: () => void;
 };
 
 function getPaymentMeta(paymentMethod: string) {
@@ -18,24 +19,24 @@ function getPaymentMeta(paymentMethod: string) {
 
   if (normalized === 'cash') {
     return {
-      backgroundColor: '#EAF8EF',
+      backgroundColor: colors.surfaceSuccessMuted,
       icon: Banknote,
-      iconColor: '#16A34A',
+      iconColor: colors.successBright,
     };
   }
 
   if (normalized === 'maya') {
     return {
-      backgroundColor: '#F5EDFF',
+      backgroundColor: colors.surfacePurple,
       icon: QrCode,
-      iconColor: '#7C3AED',
+      iconColor: colors.purple,
     };
   }
 
   return {
-    backgroundColor: '#EEF4FF',
+    backgroundColor: colors.surfaceInfoMuted,
     icon: CreditCard,
-    iconColor: '#2563EB',
+    iconColor: colors.info,
   };
 }
 
@@ -44,12 +45,13 @@ export function CashierRecentSaleItem({
   receiptNumber,
   time,
   totalAmount,
+  onPress,
 }: CashierRecentSaleItemProps) {
   const paymentMeta = getPaymentMeta(paymentMethod);
   const Icon = paymentMeta.icon;
 
   return (
-    <View style={styles.row}>
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.iconWrap, { backgroundColor: paymentMeta.backgroundColor }]}>
         <Icon color={paymentMeta.iconColor} size={22} strokeWidth={2} />
       </View>
@@ -63,14 +65,14 @@ export function CashierRecentSaleItem({
         </View>
         <Text style={styles.amountText}>{formatPeso(totalAmount)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
-    borderBottomColor: '#E3E7F1',
+    borderBottomColor: colors.divider,
     borderBottomWidth: 1,
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
@@ -91,19 +93,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   receiptText: {
-    color: '#111827',
+    color: colors.text,
     fontFamily: fonts.bold,
-    fontSize: 16,
+    fontSize: textSizes.medium,
     marginBottom: 3,
   },
   metaText: {
-    color: '#4B5563',
+    color: colors.textSoft,
     ...textRoles.label,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   amountText: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 17,
+    fontSize: textSizes.medium + 1,
   },
 });

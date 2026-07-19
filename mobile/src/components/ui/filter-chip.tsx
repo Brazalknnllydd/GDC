@@ -1,7 +1,8 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Chip } from 'react-native-paper';
 
 import { colors, textRoles, textSizes } from '../../constants/theme';
+import { radius, spacing } from '../../constants/design-system';
 
 type FilterChipProps = {
   active?: boolean;
@@ -10,6 +11,9 @@ type FilterChipProps = {
 };
 
 export function FilterChip({ active = false, label, onPress }: FilterChipProps) {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
+
   return (
     <Chip
       mode={active ? 'flat' : 'outlined'}
@@ -17,8 +21,16 @@ export function FilterChip({ active = false, label, onPress }: FilterChipProps) 
       selected={active}
       showSelectedCheck={false}
       showSelectedOverlay={false}
-      style={[styles.chip, active && styles.chipActive]}
-      textStyle={[styles.chipText, active && styles.chipTextActive]}>
+      style={[
+        styles.chip,
+        isCompactPhone ? styles.chipCompact : undefined,
+        active && styles.chipActive,
+      ]}
+      textStyle={[
+        styles.chipText,
+        isCompactPhone ? styles.chipTextCompact : undefined,
+        active && styles.chipTextActive,
+      ]}>
       {label}
     </Chip>
   );
@@ -27,23 +39,30 @@ export function FilterChip({ active = false, label, onPress }: FilterChipProps) 
 const styles = StyleSheet.create({
   chip: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CFD5E3',
-    borderRadius: 999,
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.round,
     justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 18,
+    minHeight: 38,
+    paddingHorizontal: spacing.lg,
+  },
+  chipCompact: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md + 2,
   },
   chipActive: {
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
   },
   chipText: {
-    color: '#2E3242',
+    color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.medium,
+    fontSize: textSizes.body,
+  },
+  chipTextCompact: {
+    fontSize: textSizes.small,
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
   },
 });

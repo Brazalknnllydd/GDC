@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: gdc_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: gdc
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gdc_backend
+    restart: always
+    depends_on:
+      - db
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override DATABASE_URL to use the internal docker network host 'db'
+      DATABASE_URL: "postgresql://postgres:12345@db:5432/gdc"
+    ports:
+      - "5000:5000"
+    command: >
+      sh -c "npx prisma db push --accept-data-loss && npx tsx src/server.ts"
+
+volumes:
+  postgres_data:

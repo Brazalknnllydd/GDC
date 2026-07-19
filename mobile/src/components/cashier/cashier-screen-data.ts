@@ -54,6 +54,8 @@ export type CashierDashboardResponse = {
   totals: {
     drawerVariance: number;
     totalReportedSales: number;
+    cashReceived?: number;
+    changeGiven?: number;
   };
 };
 
@@ -106,5 +108,6 @@ export const cashierSections = [
   { key: 'register' as CashierSection, label: 'Register', icon: LayoutDashboard },
   { key: 'history' as CashierSection, label: 'History', icon: ReceiptText },
   { key: 'inventory' as CashierSection, label: 'Inventory', icon: Package },
+  { key: 'customers' as CashierSection, label: 'Customers', icon: Users },
   { key: 'settings' as CashierSection, label: 'Settings', icon: Settings },
 ] as const;

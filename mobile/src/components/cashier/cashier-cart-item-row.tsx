@@ -3,7 +3,7 @@ import { Minus, Plus, X } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { resolveApiAssetUrl } from '../../lib/api';
 
 type CashierCartItemRowProps = {
@@ -50,7 +50,7 @@ export function CashierCartItemRow({
             <Text style={styles.priceText}>{priceText} / unit</Text>
           </View>
           <Pressable onPress={onRemove} style={styles.removeButton}>
-            <X color="#D22D2D" size={16} strokeWidth={2.1} />
+            <X color={colors.dangerAccent} size={16} strokeWidth={2.1} />
           </Pressable>
         </View>
 
@@ -73,7 +73,7 @@ export function CashierCartItemRow({
 
 const styles = StyleSheet.create({
   row: {
-    borderBottomColor: '#E6EAF4',
+    borderBottomColor: colors.borderSoft,
     borderBottomWidth: 1,
     flexDirection: 'row',
     paddingVertical: spacing.md,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   fallbackImage: {
     alignItems: 'center',
-    backgroundColor: '#D8DEE9',
+    backgroundColor: colors.fallbackImage,
     flex: 1,
     justifyContent: 'center',
   },
@@ -113,16 +113,16 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
   },
   name: {
-    color: '#171C28',
+    color: colors.textHeading,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: textSizes.body,
     lineHeight: 18,
     marginBottom: spacing.xs,
   },
   priceText: {
-    color: '#586173',
+    color: colors.textSecondary,
     ...textRoles.label,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   removeButton: {
     padding: 2,
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   },
   stepper: {
     alignItems: 'center',
-    borderColor: '#C9D0E3',
+    borderColor: colors.borderStrong,
     borderRadius: radius.md,
     borderWidth: 1.2,
     flexDirection: 'row',
@@ -143,21 +143,21 @@ const styles = StyleSheet.create({
   },
   stepperButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     height: 34,
     justifyContent: 'center',
     width: 34,
   },
   quantity: {
-    color: '#111827',
+    color: colors.text,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: textSizes.body,
     minWidth: 34,
     textAlign: 'center',
   },
   totalText: {
     color: colors.secondary,
     ...textRoles.value,
-    fontSize: 16,
+    fontSize: textSizes.medium,
   },
 });

@@ -2,17 +2,40 @@ import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 
 export const getCustomers = async (
-  _req: Request,
+  req: Request,
   res: Response
 ) => {
   try {
-    const customers = await prisma.customer.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : undefined;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Number(req.query.limit) || 15);
+    const skip = (page - 1) * limit;
 
-    res.json(customers);
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { phoneNumber: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    const [total, data] = await prisma.$transaction([
+      prisma.customer.count({ where: where as any }),
+      prisma.customer.findMany({
+        where: where as any,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    res.json({
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error(error);
 

@@ -1,39 +1,96 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, fonts, textRoles } from '../../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 
 type PaginationControlsProps = {
   currentPage: number;
-  endItem: number;
+  endItem?: number;
   onPageChange: (page: number) => void;
-  startItem: number;
-  totalItems: number;
+  startItem?: number;
+  totalItems?: number;
   totalPages: number;
-  visiblePageNumbers: number[];
+  visiblePageNumbers?: number[];
+  borderless?: boolean;
 };
 
 export function PaginationControls({
   currentPage,
-  endItem,
+  endItem = 0,
   onPageChange,
-  startItem,
-  totalItems,
+  startItem = 0,
+  totalItems = 0,
   totalPages,
-  visiblePageNumbers,
+  visiblePageNumbers = [],
+  borderless = false,
 }: PaginationControlsProps) {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
+
+  if (borderless) {
+    return (
+      <View style={styles.borderlessContainer}>
+        <Text style={styles.summaryTextBorderless}>
+          {`Page ${currentPage + 1} of ${totalPages || 1}`}
+        </Text>
+        <View style={styles.borderlessButtonsRow}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={currentPage === 0}
+            onPress={() => onPageChange(Math.max(currentPage - 1, 0))}
+            style={[
+              styles.borderlessTextButton,
+              currentPage === 0 && styles.borderlessTextButtonDisabled,
+            ]}>
+            <Text
+              style={[
+                styles.borderlessTextButtonLabel,
+                currentPage === 0 && styles.borderlessTextButtonLabelDisabled,
+              ]}>
+              Previous
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={currentPage >= totalPages - 1}
+            onPress={() => onPageChange(Math.min(currentPage + 1, totalPages - 1))}
+            style={[
+              styles.borderlessTextButton,
+              currentPage >= totalPages - 1 && styles.borderlessTextButtonDisabled,
+            ]}>
+            <Text
+              style={[
+                styles.borderlessTextButtonLabel,
+                currentPage >= totalPages - 1 && styles.borderlessTextButtonLabelDisabled,
+              ]}>
+              Next
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.summaryText}>{`${startItem}-${endItem} of ${totalItems}`}</Text>
-      <View style={styles.controls}>
+    <View style={[styles.card, isCompactPhone ? styles.cardCompact : undefined]}>
+      <Text style={[styles.summaryText, isCompactPhone ? styles.summaryTextCompact : undefined]}>
+        {`${startItem}-${endItem} of ${totalItems}`}
+      </Text>
+      <View style={[styles.controls, isCompactPhone ? styles.controlsCompact : undefined]}>
         <Pressable
           accessibilityRole="button"
           disabled={currentPage === 0}
           onPress={() => onPageChange(Math.max(currentPage - 1, 0))}
-          style={[styles.textButton, currentPage === 0 && styles.textButtonDisabled]}>
+          style={[
+            styles.textButton,
+            isCompactPhone ? styles.textButtonCompact : undefined,
+            currentPage === 0 && styles.textButtonDisabled,
+          ]}>
           <Text
             style={[
               styles.textButtonLabel,
+              isCompactPhone ? styles.textButtonLabelCompact : undefined,
               currentPage === 0 && styles.textButtonLabelDisabled,
             ]}>
             Previous
@@ -103,12 +160,24 @@ type PageButtonProps = {
 };
 
 function PageButton({ active = false, label, onPress }: PageButtonProps) {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
+
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={[styles.pageButton, active && styles.pageButtonActive]}>
-      <Text style={[styles.pageButtonLabel, active && styles.pageButtonLabelActive]}>
+      style={[
+        styles.pageButton,
+        isCompactPhone ? styles.pageButtonCompact : undefined,
+        active && styles.pageButtonActive,
+      ]}>
+      <Text
+        style={[
+          styles.pageButtonLabel,
+          isCompactPhone ? styles.pageButtonLabelCompact : undefined,
+          active && styles.pageButtonLabelActive,
+        ]}>
         {label}
       </Text>
     </Pressable>
@@ -117,20 +186,26 @@ function PageButton({ active = false, label, onPress }: PageButtonProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D7DCEC',
+    backgroundColor: colors.card,
+    borderColor: colors.borderInput,
     borderRadius: radius.xl,
     borderWidth: 1,
     marginTop: spacing.xl,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  cardCompact: {
+    paddingHorizontal: spacing.md,
+  },
   summaryText: {
-    color: '#6B7280',
+    color: colors.muted,
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.body,
     marginBottom: spacing.sm,
     textAlign: 'center',
+  },
+  summaryTextCompact: {
+    fontSize: textSizes.small + 1,
   },
   controls: {
     alignItems: 'center',
@@ -139,25 +214,35 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: 'space-between',
   },
+  controlsCompact: {
+    gap: spacing.xs,
+  },
   textButton: {
     alignItems: 'center',
-    backgroundColor: '#EEF1F8',
+    backgroundColor: colors.surfaceOverlayMuted,
     borderRadius: radius.md,
     justifyContent: 'center',
     minHeight: 42,
     minWidth: 92,
     paddingHorizontal: spacing.md,
   },
+  textButtonCompact: {
+    minWidth: 78,
+    paddingHorizontal: spacing.sm,
+  },
   textButtonDisabled: {
-    backgroundColor: '#F5F6FA',
+    backgroundColor: colors.surfaceDisabled,
   },
   textButtonLabel: {
     color: colors.secondary,
     ...textRoles.label,
-    fontSize: 14,
+    fontSize: textSizes.body,
+  },
+  textButtonLabelCompact: {
+    fontSize: textSizes.small + 1,
   },
   textButtonLabelDisabled: {
-    color: '#98A0B3',
+    color: colors.textSubtle,
   },
   pageNumbersRow: {
     alignItems: 'center',
@@ -168,7 +253,7 @@ const styles = StyleSheet.create({
   },
   pageButton: {
     alignItems: 'center',
-    borderColor: '#D7DCEC',
+    borderColor: colors.borderInput,
     borderRadius: radius.md,
     borderWidth: 1,
     height: 42,
@@ -176,21 +261,74 @@ const styles = StyleSheet.create({
     minWidth: 42,
     paddingHorizontal: spacing.sm,
   },
+  pageButtonCompact: {
+    height: 38,
+    minWidth: 38,
+    paddingHorizontal: spacing.xs + 2,
+  },
   pageButtonActive: {
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
   },
   pageButtonLabel: {
-    color: '#354052',
+    color: colors.textHeading,
     ...textRoles.label,
-    fontSize: 14,
+    fontSize: textSizes.body,
+  },
+  pageButtonLabelCompact: {
+    fontSize: textSizes.small + 1,
   },
   pageButtonLabelActive: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
   },
   ellipsis: {
-    color: '#7C8497',
+    color: colors.textSubtle,
     fontFamily: fonts.regular,
-    fontSize: 16,
+    fontSize: textSizes.medium,
+  },
+  cardBorderless: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    marginTop: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  borderlessContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  summaryTextBorderless: {
+    color: '#344054',
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
+  borderlessButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  borderlessTextButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D0D5DD',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  borderlessTextButtonDisabled: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F2F4F7',
+    opacity: 0.6,
+  },
+  borderlessTextButtonLabel: {
+    color: '#344054',
+    fontFamily: fonts.semiBold,
+    fontSize: 14,
+  },
+  borderlessTextButtonLabelDisabled: {
+    color: '#D0D5DD',
   },
 });

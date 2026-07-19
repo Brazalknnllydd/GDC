@@ -4,15 +4,25 @@ import {
   createSaleWithInventoryUpdate,
   isValidSaleItem,
 } from "../services/sale.service.js";
+import type { AuthenticatedRequest } from "../types/express.js";
 
 const allowedPaymentMethods = new Set(["Cash", "GCash"]);
 
 export const getSales = async (
-  _req: Request,
+  req: Request,
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
     const sales = await prisma.sale.findMany({
+      ...(isAdmin
+        ? {}
+        : {
+            where: {
+              userId: authReq.authUser.id,
+            },
+          }),
       include: {
         customer: true,
         items: {
@@ -56,6 +66,7 @@ export const getSaleById = async (
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const id = Number(req.params.id);
 
     const sale = await prisma.sale.findUnique({
@@ -99,6 +110,14 @@ export const getSaleById = async (
       });
     }
 
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
+
+    if (!isAdmin && sale.user.id !== authReq.authUser.id) {
+      return res.status(403).json({
+        message: "Cashiers can only access their own sales",
+      });
+    }
+
     res.json(sale);
   } catch (error) {
     console.error(error);
@@ -114,26 +133,40 @@ export const createSale = async (
   res: Response
 ) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
     const {
       receiptNumber,
       subtotal,
       discountAmount = 0,
+      taxAmount = 0,
       totalAmount,
       amountPaid,
       changeAmount,
       paymentMethod = "Cash",
+      paymentReference,
+      status,
+      approvedByUserId,
+      notes,
+      isPrinted,
       customerId,
-      userId,
+      userId: requestedUserId,
       shiftId,
       items,
     } = req.body as {
       receiptNumber?: string;
       subtotal?: number;
       discountAmount?: number;
+      taxAmount?: number;
       totalAmount?: number;
       amountPaid?: number;
       changeAmount?: number;
       paymentMethod?: string;
+      paymentReference?: string | null;
+      status?: string;
+      approvedByUserId?: number | null;
+      notes?: string | null;
+      isPrinted?: boolean;
       customerId?: number | null;
       userId?: number;
       shiftId?: number | null;
@@ -146,7 +179,11 @@ export const createSale = async (
       });
     }
 
-    if (typeof userId !== "number") {
+    const saleUserId = isAdmin
+      ? requestedUserId ?? authReq.authUser.id
+      : authReq.authUser.id;
+
+    if (typeof saleUserId !== "number") {
       return res.status(400).json({
         message: "User ID is required",
       });
@@ -178,18 +215,37 @@ export const createSale = async (
       });
     }
 
+    let finalShiftId = shiftId;
+    if (!isAdmin && !finalShiftId) {
+      const activeShift = await prisma.shift.findFirst({
+        where: { userId: saleUserId, status: 'OPEN' },
+      });
+      if (!activeShift) {
+        return res.status(403).json({
+          message: "You must have an open shift to process sales.",
+        });
+      }
+      finalShiftId = activeShift.id;
+    }
+
     const saleInput = {
       receiptNumber,
       subtotal,
       discountAmount,
+      taxAmount,
       totalAmount,
       amountPaid,
       changeAmount,
       paymentMethod,
-      userId,
+      userId: saleUserId,
       items,
+      ...(paymentReference !== undefined ? { paymentReference } : {}),
+      ...(status !== undefined ? { status } : {}),
+      ...(approvedByUserId !== undefined ? { approvedByUserId } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+      ...(isPrinted !== undefined ? { isPrinted } : {}),
       ...(customerId !== undefined ? { customerId } : {}),
-      ...(shiftId !== undefined ? { shiftId } : {}),
+      ...(finalShiftId !== undefined && finalShiftId !== null ? { shiftId: finalShiftId } : {}),
     };
 
     const sale = await createSaleWithInventoryUpdate(saleInput);

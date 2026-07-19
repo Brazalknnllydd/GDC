@@ -3,9 +3,10 @@ import { Pencil, Trash2 } from 'lucide-react-native';
 
 import type { Category } from './products-screen-data';
 import { spacing } from '../../constants/design-system';
-import { textRoles } from '../../constants/theme';
+import { colors, textRoles } from '../../constants/theme';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
+import { ModalActions } from '../ui/modal-actions';
 import { SurfaceCard } from '../ui/surface-card';
 
 type CategoryWithCount = Category & {
@@ -31,13 +32,14 @@ export function ManageCategoriesModal({
 }: ManageCategoriesModalProps) {
   return (
     <AdminModalShell
-      height={640}
-      maxHeight="88%"
+      maxHeight="72%"
       onClose={onClose}
       title="Manage Categories"
       visible={visible}
       footer={
-        <AppButton label="Add New Category" onPress={onCreate} variant="primary" />
+        <ModalActions>
+          <AppButton label="Add New Category" onPress={onCreate} variant="primary" />
+        </ModalActions>
       }>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {categories.length === 0 ? (
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   emptyText: {
-    color: '#677085',
+    color: colors.textTertiary,
     ...textRoles.body,
     fontSize: 16,
     paddingBottom: spacing.lg,
@@ -118,12 +120,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   categoryName: {
-    color: '#1E2433',
+    color: colors.textStrong,
     ...textRoles.value,
     fontSize: 18,
   },
   categoryCount: {
-    color: '#667085',
+    color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
   },
@@ -132,14 +134,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   description: {
-    color: '#3E4454',
+    color: colors.textSoft,
     ...textRoles.body,
     fontSize: 15,
     lineHeight: 24,
     marginTop: 14,
   },
   helperText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 12,
     lineHeight: 18,

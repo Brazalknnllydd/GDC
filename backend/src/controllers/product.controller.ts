@@ -39,6 +39,7 @@ export const createProduct = async (
   try {
     const {
       name,
+      description,
       barcode,
       costPrice,
       price,
@@ -49,6 +50,7 @@ export const createProduct = async (
     } = req.body;
 
     const trimmedName = String(name ?? "").trim();
+    const trimmedDescription = String(description ?? "").trim() || null;
     const trimmedBarcode = String(barcode ?? "").trim() || null;
     const trimmedUnit = String(unit ?? "pcs").trim() || "pcs";
     const parsedPrice = Number(price);
@@ -68,6 +70,7 @@ export const createProduct = async (
     const product = await prisma.product.create({
       data: {
         name: trimmedName,
+        description: trimmedDescription,
         barcode: trimmedBarcode,
         costPrice: parsedCostPrice,
         price: parsedPrice,
@@ -248,6 +251,10 @@ export const updateProduct = async (
 
     if (req.body.barcode !== undefined) {
       data.barcode = String(req.body.barcode).trim() || null;
+    }
+
+    if (req.body.description !== undefined) {
+      data.description = String(req.body.description).trim() || null;
     }
 
     if (req.body.price !== undefined) {

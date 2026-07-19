@@ -5,6 +5,7 @@ export type AppRoute =
   | '/admin-products'
   | '/admin-sales'
   | '/admin-reports'
+  | '/admin-customers'
   | '/admin-settings'
   | '/cashier';
 

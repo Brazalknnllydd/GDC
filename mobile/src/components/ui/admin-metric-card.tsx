@@ -41,12 +41,12 @@ type AdminMetricCardProps = {
 };
 
 const toneStyles: TonePalette = {
-  default: { detail: '#3E4454', value: '#111111' },
-  success: { detail: '#119B39', value: '#119B39' },
-  danger: { detail: '#D11D1D', value: '#D11D1D' },
-  positive: { detail: '#0E9F3E', value: '#111D77' },
-  negative: { detail: '#C62828', value: '#111D77' },
-  neutral: { detail: '#677085', value: '#111D77' },
+  default: { detail: colors.textSoft, value: colors.neutral },
+  success: { detail: colors.successBright, value: colors.successBright },
+  danger: { detail: colors.danger, value: colors.danger },
+  positive: { detail: colors.success, value: colors.secondary },
+  negative: { detail: colors.dangerStrong, value: colors.secondary },
+  neutral: { detail: colors.textTertiary, value: colors.secondary },
 };
 
 export function AdminMetricCard({
@@ -56,44 +56,74 @@ export function AdminMetricCard({
   tone = 'default',
   style,
   valueColor,
-  titleColor = '#2F3546',
+  titleColor = colors.textHeading,
   detailColor,
-  minHeight = 158,
+  minHeight = 134,
   width = '47.5%',
-  paddingHorizontal = 22,
-  paddingVertical = 22,
-  titleMarginBottom = 24,
-  valueMarginBottom = 8,
-  titleLetterSpacing = 2.2,
-  valueFontSize = 24,
-  valueLineHeight = 29,
+  paddingHorizontal = 18,
+  paddingVertical = 18,
+  titleMarginBottom = 18,
+  valueMarginBottom = 6,
+  titleLetterSpacing = 1.8,
+  valueFontSize = 21,
+  valueLineHeight = 26,
   infoDialogTitle,
   infoDialogValue,
 }: AdminMetricCardProps) {
   const { width: screenWidth } = useWindowDimensions();
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const palette = toneStyles[tone];
-  const resolvedWidth = width ?? (screenWidth < 420 ? '100%' : '47.5%');
+  const isCompactPhone = screenWidth < 430;
+  const isNarrowPhone = screenWidth < 390;
+  const resolvedWidth = width ?? '47.5%';
+  const resolvedTitleLetterSpacing = isNarrowPhone
+    ? Math.min(titleLetterSpacing, 0.8)
+    : isCompactPhone
+      ? Math.min(titleLetterSpacing, 1.3)
+      : titleLetterSpacing;
+  const resolvedTitleFontSize = isNarrowPhone ? 12 : isCompactPhone ? 13 : textSizes.body;
+  const resolvedTitleLineHeight = isNarrowPhone ? 16 : isCompactPhone ? 17 : 20;
+  const resolvedValueFontSize = isNarrowPhone
+      ? Math.min(valueFontSize, 18)
+    : isCompactPhone
+      ? Math.min(valueFontSize, 20)
+      : valueFontSize;
+  const resolvedValueLineHeight = isNarrowPhone
+    ? Math.min(valueLineHeight, 22)
+    : isCompactPhone
+      ? Math.min(valueLineHeight, 24)
+      : valueLineHeight;
+  const resolvedMinHeight = isNarrowPhone ? Math.max(minHeight, 118) : isCompactPhone ? Math.max(minHeight, 126) : minHeight;
+  const resolvedPaddingHorizontal = isNarrowPhone ? 12 : isCompactPhone ? 15 : paddingHorizontal;
+  const resolvedPaddingVertical = isNarrowPhone ? 13 : isCompactPhone ? 15 : paddingVertical;
+  const resolvedTitleMarginBottom = isNarrowPhone
+    ? Math.min(titleMarginBottom, 12)
+    : isCompactPhone
+      ? Math.min(titleMarginBottom, 14)
+      : titleMarginBottom;
+  const resolvedValueMarginBottom = isNarrowPhone ? Math.min(valueMarginBottom, 8) : valueMarginBottom;
 
   return (
     <SurfaceCard
       style={[
         styles.card,
         {
-          minHeight,
-          paddingHorizontal,
-          paddingVertical,
+          minHeight: resolvedMinHeight,
+          paddingHorizontal: resolvedPaddingHorizontal,
+          paddingVertical: resolvedPaddingVertical,
           width: resolvedWidth,
         },
         style,
       ]}>
-      <View style={[styles.headerRow, { marginBottom: titleMarginBottom }]}>
+      <View style={[styles.headerRow, { marginBottom: resolvedTitleMarginBottom }]}>
         <Text
           style={[
             styles.title,
             {
               color: titleColor,
-              letterSpacing: titleLetterSpacing,
+              fontSize: resolvedTitleFontSize,
+              letterSpacing: resolvedTitleLetterSpacing,
+              lineHeight: resolvedTitleLineHeight,
             },
           ]}>
           {title}
@@ -114,14 +144,21 @@ export function AdminMetricCard({
           styles.value,
           {
             color: valueColor || palette.value,
-            fontSize: valueFontSize,
-            lineHeight: valueLineHeight,
-            marginBottom: valueMarginBottom,
+            fontSize: resolvedValueFontSize,
+            lineHeight: resolvedValueLineHeight,
+            marginBottom: resolvedValueMarginBottom,
           },
         ]}>
         {value}
       </Text>
-      <Text style={[styles.detail, { color: detailColor || palette.detail }]}>{detail}</Text>
+      <Text
+        style={[
+          styles.detail,
+          isNarrowPhone && styles.detailNarrow,
+          { color: detailColor || palette.detail },
+        ]}>
+        {detail}
+      </Text>
 
       {infoDialogValue ? (
         <Portal>
@@ -134,7 +171,7 @@ export function AdminMetricCard({
                       <Info color={colors.secondary} size={18} strokeWidth={2.2} />
                     </View>
                     <IconButton
-                      icon={() => <X color="#666C7A" size={18} strokeWidth={2.2} />}
+                      icon={() => <X color={colors.textTertiary} size={18} strokeWidth={2.2} />}
                       onPress={() => setShowInfoDialog(false)}
                       size={18}
                       style={styles.dialogCloseButton}
@@ -165,35 +202,42 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 30,
+    minHeight: 24,
   },
   title: {
     ...textRoles.label,
     flex: 1,
-    fontSize: textSizes.medium,
-    lineHeight: 22,
-    minHeight: 22,
+    fontSize: textSizes.body,
+    lineHeight: 18,
+    minHeight: 20,
+    textTransform: 'uppercase',
   },
   infoButton: {
-    borderColor: '#CBD2E4',
-    borderRadius: 999,
+    borderColor: colors.borderInfoStrong,
+    borderRadius: radius.round,
     borderWidth: 1,
     marginLeft: 10,
   },
   infoSpacer: {
-    height: 42,
-    marginLeft: 10,
-    width: 42,
+    height: 0,
+    marginLeft: 0,
+    width: 0,
   },
   value: {
     ...textRoles.value,
   },
   detail: {
     ...textRoles.label,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  detailNarrow: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   dialogBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(17, 24, 39, 0.34)',
+    backgroundColor: colors.overlayScrim,
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
@@ -218,8 +262,8 @@ const styles = StyleSheet.create({
   },
   dialogBadge: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    borderColor: '#CBD5FF',
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderInfoStrong,
     borderRadius: radius.round,
     borderWidth: 1,
     height: 42,
@@ -227,14 +271,14 @@ const styles = StyleSheet.create({
     width: 42,
   },
   dialogEyebrow: {
-    color: '#6A7285',
+    color: colors.textTertiary,
     ...textRoles.label,
     letterSpacing: 1.1,
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
   },
   dialogTitle: {
-    color: '#23293A',
+    color: colors.textHeading,
     ...textRoles.value,
     fontSize: 20,
     marginBottom: spacing.md,
@@ -250,7 +294,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   dialogCaption: {
-    color: '#667085',
+    color: colors.textTertiary,
     ...textRoles.body,
     fontSize: 14,
     lineHeight: 22,

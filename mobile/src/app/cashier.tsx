@@ -1,45 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import axios from 'axios';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import {
-  ArrowRight,
   CheckCircle2,
   LogOut,
   QrCode,
   ScanLine,
   Search,
   ShoppingCart,
+  UserCircle2,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
   cashierPaymentMethods,
-  cashierPerformanceCards,
   cashierSections,
-  type CashierDashboardResponse,
-  type CashierSaleRecord,
 } from '../components/cashier/cashier-screen-data';
 import { CashierBottomNav, type CashierSection } from '../components/cashier/cashier-bottom-nav';
 import { CashierCartItemRow } from '../components/cashier/cashier-cart-item-row';
+import { CashierCustomersSection } from '../components/cashier/cashier-customers-section';
 import { CashierDashboardHeader } from '../components/cashier/cashier-dashboard-header';
+import { CashierHistorySection } from '../components/cashier/cashier-history-section';
+import { CashierInventorySection } from '../components/cashier/cashier-inventory-section';
 import { CashierKeypad } from '../components/cashier/cashier-keypad';
-import { CashierPaymentBreakdownCard } from '../components/cashier/cashier-payment-breakdown-card';
-import { CashierPaymentMethodChip } from '../components/cashier/cashier-payment-method-chip';
-import { CashierPerformanceCard } from '../components/cashier/cashier-performance-card';
 import { CashierProductCard } from '../components/cashier/cashier-product-card';
-import { CashierRecentSaleItem } from '../components/cashier/cashier-recent-sale-item';
-import { CashierShiftCard } from '../components/cashier/cashier-shift-card';
-import { type Category, type Product } from '../components/admin-products/products-screen-data';
+import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
+import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
+import { type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
+import { AppSegmentedControl } from '../components/ui/app-segmented-control';
 import { AppHeroAction } from '../components/ui/app-hero-action';
 import { AppTextAction } from '../components/ui/app-text-action';
 import { FilterChip } from '../components/ui/filter-chip';
@@ -48,74 +50,23 @@ import { ModalActions } from '../components/ui/modal-actions';
 import { SectionHeading } from '../components/ui/section-heading';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, shadows, spacing } from '../constants/design-system';
-import { colors, fonts, textRoles } from '../constants/theme';
-import { apiClient } from '../lib/api';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
+import {
+  getCartItemDiscount,
+  getCartItemGrossTotal,
+  getCartItemNetTotal,
+  useCashierCheckout,
+} from '../hooks/use-cashier-checkout';
+import { useCashierWorkspace } from '../hooks/use-cashier-workspace';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { apiClient } from '../lib/api';
 
 type CashierParams = {
   name?: string;
-  userId?: string;
 };
-
-type CartItem = {
-  barcode: string | null;
-  categoryName: string;
-  discountInput: string;
-  id: number;
-  imageUrl: string | null;
-  name: string;
-  price: number;
-  quantity: number;
-  stock: number;
-};
-
-type CompletedSale = {
-  amountPaid: number;
-  cashierName: string;
-  changeAmount: number;
-  createdAt: string;
-  discountAmount: number;
-  paymentMethod: string;
-  receiptNumber: string;
-  subtotal: number;
-  totalAmount: number;
-};
-
-type ActiveCheckoutInput =
-  | { type: 'amount' }
-  | {
-      productId: number;
-      type: 'discount';
-    };
-
-const emptyDashboard: CashierDashboardResponse = {
-  cashier: {
-    allowedCategories: [],
-    id: 0,
-    name: 'Cashier',
-    role: 'Cashier',
-    username: 'cashier',
-  },
-  currentShift: null,
-  paymentBreakdown: [],
-  performance: {
-    itemsSold: 0,
-    salesToday: 0,
-    served: 0,
-    transactions: 0,
-  },
-  recentSales: [],
-  totals: {
-    drawerVariance: 0,
-    totalReportedSales: 0,
-  },
-};
-
-function buildReceiptNumber() {
-  const stamp = Date.now().toString().slice(-8);
-  return `QF-${stamp}`;
-}
 
 function formatItemCount(count: number) {
   return `${count} item${count === 1 ? '' : 's'}`;
@@ -132,53 +83,6 @@ function formatReceiptDateTime(value: string) {
     year: 'numeric',
   });
 }
-
-function sanitizeCurrencyInput(value: string) {
-  const cleaned = value.replace(/[^\d.]/g, '');
-  const [whole = '', decimal = ''] = cleaned.split('.');
-
-  if (!cleaned.includes('.')) {
-    return whole;
-  }
-
-  return `${whole}.${decimal.slice(0, 2)}`;
-}
-
-function appendCurrencyInput(currentValue: string, nextKey: string) {
-  if (nextKey === '.' && currentValue.includes('.')) {
-    return currentValue;
-  }
-
-  if (nextKey === '.' && !currentValue) {
-    return '0.';
-  }
-
-  if (currentValue === '0' && nextKey !== '.') {
-    return nextKey;
-  }
-
-  return sanitizeCurrencyInput(`${currentValue}${nextKey}`);
-}
-
-function getCartItemGrossTotal(item: CartItem) {
-  return item.price * item.quantity;
-}
-
-function getCartItemDiscount(item: CartItem) {
-  const parsedDiscount = Number(sanitizeCurrencyInput(item.discountInput)) || 0;
-  return Math.max(0, Math.min(parsedDiscount, getCartItemGrossTotal(item)));
-}
-
-function getCartItemNetTotal(item: CartItem) {
-  return getCartItemGrossTotal(item) - getCartItemDiscount(item);
-}
-
-const successColor = '#059669';
-const successColorDark = '#047857';
-const successSurface = '#ECFDF5';
-const failColor = '#DC2626';
-const failSurface = '#FEF2F2';
-const failBorder = '#FECACA';
 
 function filterProducts(
   products: Product[],
@@ -204,33 +108,228 @@ function filterProducts(
 export default function CashierScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<CashierParams>();
-  const userId = Number(params.userId);
-  const { width, height } = useWindowDimensions();
-  const isTablet = width >= 820;
-  const isWideTablet = width >= 1080;
+  const { height, isTablet, isWideTablet, compactPhone } = useResponsiveLayout();
 
   const [activeSection, setActiveSection] = useState<CashierSection>('register');
-  const [dashboard, setDashboard] = useState<CashierDashboardResponse>(emptyDashboard);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [sales, setSales] = useState<CashierSaleRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] =
-    useState<(typeof cashierPaymentMethods)[number]['key']>('Cash');
-  const [amountReceivedInput, setAmountReceivedInput] = useState('');
-  const [showCartModal, setShowCartModal] = useState(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [screenError, setScreenError] = useState('');
-  const [saleError, setSaleError] = useState('');
-  const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null);
-  const [activeCheckoutInput, setActiveCheckoutInput] = useState<ActiveCheckoutInput>({
-    type: 'amount',
-  });
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scannerFeedback, setScannerFeedback] = useState('');
+  const [scannerEnabled, setScannerEnabled] = useState(true);
+  const {
+    categories,
+    dashboard,
+    products,
+    reloadWorkspace,
+    screenError,
+  } = useCashierWorkspace();
+
+  // Shift states
+  const [showOpeningCashModal, setShowOpeningCashModal] = useState(false);
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState('');
+  const [isSavingOpeningCash, setIsSavingOpeningCash] = useState(false);
+  const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
+
+  const handleUpdateOpeningCash = async () => {
+    const cleanInput = openingCashInput.replace(/,/g, '');
+    const amount = Number(cleanInput);
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid positive number');
+      return;
+    }
+
+    setIsSavingOpeningCash(true);
+    try {
+      await apiClient.put('/cashier/shift/opening-cash', {
+        openingCash: amount,
+      });
+      await reloadWorkspace();
+      setShowOpeningCashModal(false);
+      setOpeningCashInput('');
+    } catch (err) {
+      console.error('Failed to update opening cash:', err);
+      alert('Failed to update opening cash. Please try again.');
+    } finally {
+      setIsSavingOpeningCash(false);
+    }
+  };
+
+  async function handlePrintReceipt(sale: any) {
+    if (!sale) return;
+
+    let logoUri = '';
+    try {
+      const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
+      if (!logoAsset.localUri && Platform.OS !== 'web') {
+        await logoAsset.downloadAsync();
+      }
+      if (Platform.OS === 'web') {
+        logoUri = logoAsset.uri;
+      } else {
+        const localUri = logoAsset.localUri || logoAsset.uri;
+        const base64 = await FileSystem.readAsStringAsync(localUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        logoUri = `data:image/jpeg;base64,${base64}`;
+      }
+    } catch (e) {
+      console.error('Failed to load receipt logo:', e);
+    }
+
+    const itemsHtml = sale.items && Array.isArray(sale.items)
+      ? sale.items.map((item: any) => `
+        <tr>
+          <td style="padding: 6px 0; font-family: monospace;">${item.product?.name || 'Item'} x ${item.quantity}</td>
+          <td style="padding: 6px 0; font-family: monospace; text-align: right;">${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}</td>
+        </tr>
+      `).join('')
+      : '';
+
+    const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+          <style>
+            @media print {
+              @page {
+                margin: 0;
+              }
+              body {
+                margin: 1.6cm;
+              }
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              color: #111;
+              padding: 20px;
+              margin: 0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            .logo-img {
+              width: 72px;
+              height: 72px;
+              border-radius: 36px;
+              object-fit: cover;
+              margin-bottom: 8px;
+            }
+            .title {
+              font-size: 20px;
+              font-weight: bold;
+              margin: 0 0 4px;
+            }
+            .subtitle {
+              font-size: 12px;
+              margin: 0;
+            }
+            .divider {
+              border-top: 1px dashed #333;
+              margin: 15px 0;
+            }
+            .details-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+            }
+            .totals-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+              margin-top: 10px;
+            }
+            .totals-table td {
+              padding: 4px 0;
+            }
+            .footer {
+              text-align: center;
+              font-size: 12px;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${logoUri ? `<img src="${logoUri}" class="logo-img" />` : ''}
+            <h1 class="title">GDC POS RECEIPT</h1>
+            <p class="subtitle">GDC Store</p>
+            <p class="subtitle">Date: ${new Date(sale.createdAt).toLocaleString()}</p>
+            <p class="subtitle">Receipt No: ${sale.receiptNumber}</p>
+            <p class="subtitle">Cashier: ${sale.cashierName}</p>
+            <p class="subtitle">Customer: ${sale.customerName ?? sale.customer?.name ?? 'Walk-in'}</p>
+          </div>
+
+          <div class="divider"></div>
+
+          <table class="details-table">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding-bottom: 8px;">Item</th>
+                <th style="text-align: right; padding-bottom: 8px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+
+          <table class="totals-table">
+            <tr>
+              <td>Subtotal:</td>
+              <td style="text-align: right;">${formatPeso(sale.subtotal)}</td>
+            </tr>
+            <tr>
+              <td>Discount:</td>
+              <td style="text-align: right;">- ${formatPeso(sale.discountAmount)}</td>
+            </tr>
+            <tr style="font-weight: bold; font-size: 16px;">
+              <td>TOTAL:</td>
+              <td style="text-align: right;">${formatPeso(sale.totalAmount)}</td>
+            </tr>
+            <tr>
+              <td>Amount Paid:</td>
+              <td style="text-align: right;">${formatPeso(sale.amountPaid)}</td>
+            </tr>
+            <tr>
+              <td>Change:</td>
+              <td style="text-align: right;">${formatPeso(sale.changeAmount)}</td>
+            </tr>
+          </table>
+
+          <div class="divider"></div>
+
+          <div class="footer">
+            <p style="margin: 0 0 6px;">Thank you for shopping with us!</p>
+            <p style="margin: 0;">Please visit again.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.print();
+        } else {
+          alert('Popup blocker is active. Please allow popups to view receipt.');
+        }
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (error) {
+      console.error('Failed to print receipt:', error);
+      alert('Could not print receipt.');
+    }
+  }
 
   const cashierName = useMemo(() => {
     if (dashboard.cashier.name) {
@@ -255,69 +354,66 @@ export default function CashierScreen() {
     return 'Cashier';
   }, [dashboard.cashier.name, dashboard.cashier.username]);
 
+  const {
+    activeCheckoutInput,
+    activeDiscountItem,
+    addToCart,
+    amountReceived,
+    amountReceivedInput,
+    canCompleteSale,
+    cart,
+    cartDiscountTotal,
+    cartGrossSubtotal,
+    cartItemCount,
+    cartSubtotal,
+    changeAmount,
+    completedSale,
+    customerId,
+    customerName,
+    handleCompleteSale,
+    handleKeypadBackspace,
+    handleKeypadPress,
+    hasEnoughPayment,
+    isSubmittingSale,
+    paymentMethod,
+    remainingBalance,
+    saleError,
+    setActiveCheckoutInput,
+    setPaymentMethod,
+    setCustomerId,
+    setCustomerName,
+    setShowCartModal,
+    setShowCheckoutModal,
+    setShowSuccessModal,
+    showCartModal,
+    showCheckoutModal,
+    showSuccessModal,
+    updateCartItemDiscount,
+    updateCartQuantity,
+    removeFromCart,
+  } = useCashierCheckout({
+    cashierDisplayName,
+    onSaleCompleted: async () => {
+      setActiveSection('history');
+      await reloadWorkspace();
+    },
+    shiftId: dashboard.currentShift?.id ?? null,
+  });
+
+  // Customer selector state (checkout modal)
+  const [customerType, setCustomerType] = useState<'walkin' | 'registered'>('walkin');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<{ id: number; name: string; phoneNumber?: string | null }[]>([]);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+
   useEffect(() => {
     const interval = setInterval(() => setCurrentDate(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  async function loadScreenData() {
-    if (!Number.isInteger(userId) || userId <= 0) {
-      setScreenError('Missing cashier account details. Please sign in again.');
-      return;
-    }
-
-    try {
-      setScreenError('');
-
-      const [dashboardResponse, productsResponse, categoriesResponse, salesResponse] =
-        await Promise.all([
-          apiClient.get<CashierDashboardResponse>(`/cashier/dashboard/${userId}`),
-          apiClient.get<Product[]>('/products'),
-          apiClient.get<Category[]>('/categories'),
-          apiClient.get<CashierSaleRecord[]>('/sales'),
-        ]);
-
-      setDashboard(dashboardResponse.data);
-      const hasRestrictedCategories = dashboardResponse.data.cashier.allowedCategories.length > 0;
-      const allowedIds = new Set(
-        dashboardResponse.data.cashier.allowedCategories.map((category) => category.id)
-      );
-      const visibleCategories = hasRestrictedCategories
-        ? categoriesResponse.data.filter((category) => allowedIds.has(category.id))
-        : categoriesResponse.data;
-      const visibleProducts = hasRestrictedCategories
-        ? productsResponse.data.filter((product) => allowedIds.has(product.categoryId))
-        : productsResponse.data;
-
-      setProducts(visibleProducts);
-      setCategories(visibleCategories);
-      setSales(
-        salesResponse.data
-          .filter((sale) => sale.user?.id === userId)
-          .sort(
-            (left, right) =>
-              new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
-          )
-      );
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        setScreenError(
-          error.response?.data?.message ?? 'Could not load cashier workspace right now.'
-        );
-        return;
-      }
-
-      setScreenError('Could not load cashier workspace right now.');
-    }
-  }
-
-  useEffect(() => {
-    loadScreenData();
-  }, [userId]);
-
   useEffect(() => {
     setActiveSection('register');
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     if (selectedCategory === 'All') {
@@ -340,225 +436,58 @@ export default function CashierScreen() {
     () => filterProducts(products, selectedCategory, searchQuery),
     [products, selectedCategory, searchQuery]
   );
-
-  const cartItemCount = useMemo(
-    () => cart.reduce((sum, item) => sum + item.quantity, 0),
-    [cart]
-  );
-  const cartSubtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0),
-    [cart]
-  );
-  const cartGrossSubtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0),
-    [cart]
-  );
-  const cartDiscountTotal = useMemo(
-    () => cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0),
-    [cart]
-  );
-  const amountReceived = Number(amountReceivedInput) || 0;
-  const changeAmount = Math.max(amountReceived - cartSubtotal, 0);
-  const hasEnoughPayment = cartSubtotal > 0 && amountReceived >= cartSubtotal;
-  const remainingBalance = Math.max(cartSubtotal - amountReceived, 0);
-  const canCompleteSale = !isSubmittingSale && cart.length > 0 && hasEnoughPayment;
-  const recentSales = useMemo(() => sales.slice(0, 8), [sales]);
-  const activeDiscountItem = useMemo(
-    () =>
-      activeCheckoutInput.type === 'discount'
-        ? cart.find((item) => item.id === activeCheckoutInput.productId) ?? null
-        : null,
-    [activeCheckoutInput, cart]
-  );
-
-  function addToCart(product: Product) {
-    const price = normalizeNumber(product.price);
-
-    setCart((currentCart) => {
-      const existingItem = currentCart.find((item) => item.id === product.id);
-
-      if (existingItem) {
-        return currentCart.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantity: Math.min(item.quantity + 1, item.stock),
-              }
-            : item
-        );
-      }
-
-      return [
-        ...currentCart,
-        {
-          barcode: product.barcode,
-          categoryName: product.category.name,
-          discountInput: '',
-          id: product.id,
-          imageUrl: product.imageUrl,
-          name: product.name,
-          price,
-          quantity: 1,
-          stock: product.stock,
-        },
-      ];
-    });
-  }
-
-  function updateCartQuantity(productId: number, nextQuantity: number) {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                quantity: Math.max(1, Math.min(nextQuantity, item.stock)),
-              }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
-  }
-
-  function removeFromCart(productId: number) {
-    setCart((currentCart) => currentCart.filter((item) => item.id !== productId));
-  }
-
-  function updateCartItemDiscount(productId: number, nextValue: string) {
-    setCart((currentCart) =>
-      currentCart.map((item) =>
-        item.id === productId
-          ? {
-              ...item,
-              discountInput: sanitizeCurrencyInput(nextValue),
-            }
-          : item
-      )
-    );
-  }
-
-  function handleKeypadPress(value: string) {
-    setSaleError('');
-
-    if (activeCheckoutInput.type === 'discount') {
-      setCart((currentCart) =>
-        currentCart.map((item) =>
-          item.id === activeCheckoutInput.productId
-            ? {
-                ...item,
-                discountInput: appendCurrencyInput(item.discountInput, value),
-              }
-            : item
-        )
-      );
-      return;
-    }
-
-    setAmountReceivedInput((currentValue) => appendCurrencyInput(currentValue, value));
-  }
-
-  function handleKeypadBackspace() {
-    if (activeCheckoutInput.type === 'discount') {
-      setCart((currentCart) =>
-        currentCart.map((item) =>
-          item.id === activeCheckoutInput.productId
-            ? {
-                ...item,
-                discountInput: item.discountInput.slice(0, -1),
-              }
-            : item
-        )
-      );
-      return;
-    }
-
-    setAmountReceivedInput((currentValue) => currentValue.slice(0, -1));
-  }
-
-  function resetSaleFlow() {
-    setAmountReceivedInput('');
-    setPaymentMethod('Cash');
-    setSaleError('');
-    setActiveCheckoutInput({ type: 'amount' });
-    setShowCartModal(false);
-    setShowCheckoutModal(false);
-  }
-
-  async function handleCompleteSale() {
-    if (!Number.isInteger(userId) || userId <= 0) {
-      setSaleError('Missing cashier account details. Please sign in again.');
-      return;
-    }
-
-    if (cart.length === 0) {
-      setSaleError('Add at least one product before completing the sale.');
-      return;
-    }
-
-    if (amountReceived < cartSubtotal) {
-      setSaleError('Amount received must cover the total payable.');
-      return;
-    }
-
-    try {
-      setIsSubmittingSale(true);
-      setSaleError('');
-
-      const receiptNumber = buildReceiptNumber();
-      await apiClient.post('/sales', {
-        amountPaid: amountReceived,
-        changeAmount,
-        items: cart.map((item) => ({
-          price: item.price,
-          productId: item.id,
-          quantity: item.quantity,
-          subtotal: getCartItemNetTotal(item),
-        })),
-        paymentMethod,
-        receiptNumber,
-        shiftId: dashboard.currentShift?.id ?? null,
-        subtotal: cartGrossSubtotal,
-        discountAmount: cartDiscountTotal,
-        totalAmount: cartSubtotal,
-        userId,
-      });
-
-      setCompletedSale({
-        amountPaid: amountReceived,
-        cashierName: cashierDisplayName,
-        changeAmount,
-        createdAt: new Date().toISOString(),
-        discountAmount: cartDiscountTotal,
-        paymentMethod,
-        receiptNumber,
-        subtotal: cartGrossSubtotal,
-        totalAmount: cartSubtotal,
-      });
-      setCart([]);
-      resetSaleFlow();
-      setShowSuccessModal(true);
-      setActiveSection('history');
-      await loadScreenData();
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        setSaleError(error.response?.data?.message ?? 'Could not complete the sale right now.');
-      } else {
-        setSaleError('Could not complete the sale right now.');
-      }
-    } finally {
-      setIsSubmittingSale(false);
-    }
-  }
-
   const productCardWidth = isWideTablet ? '31.5%' : isTablet ? '48.2%' : '48%';
   const showInlineCart = isWideTablet;
   const registerSummaryText = dashboard.currentShift ? 'Shift Active' : 'No active shift';
+
+  async function openProductScanner() {
+    setScannerFeedback('');
+
+    if (!cameraPermission?.granted) {
+      const nextPermission = await requestCameraPermission();
+
+      if (!nextPermission.granted) {
+        setScannerFeedback('Camera permission is required to scan product barcodes.');
+        setShowScannerModal(true);
+        return;
+      }
+    }
+
+    setScannerEnabled(true);
+    setShowScannerModal(true);
+  }
+
+  function handleBarcodeScanned(result: BarcodeScanningResult) {
+    if (!scannerEnabled) {
+      return;
+    }
+
+    const scannedBarcode = result.data.trim();
+    const matchedProduct = products.find(
+      (product) => product.barcode?.trim() === scannedBarcode
+    );
+
+    setScannerEnabled(false);
+
+    if (!matchedProduct) {
+      setScannerFeedback(`No product found for barcode ${scannedBarcode}.`);
+      setSearchQuery(scannedBarcode);
+      setTimeout(() => setScannerEnabled(true), 1400);
+      return;
+    }
+
+    addToCart(matchedProduct);
+    setSelectedCategory('All');
+    setSearchQuery('');
+    setScannerFeedback(`${matchedProduct.name} added to cart.`);
+    setShowScannerModal(false);
+  }
 
   function renderRegisterSection() {
     return (
       <View style={[styles.registerLayout, showInlineCart && styles.registerLayoutWide]}>
         <View style={[styles.registerMain, showInlineCart && styles.registerMainWide]}>
-          <View style={styles.registerHeaderRow}>
+          <View style={[styles.registerHeaderRow, compactPhone && styles.registerHeaderRowCompact]}>
             <View style={styles.registerHeaderText}>
               <Text style={styles.screenTitle}>New Sale</Text>
               <View style={styles.shiftMetaRow}>
@@ -568,20 +497,21 @@ export default function CashierScreen() {
             </View>
 
             <AppHeroAction
-              icon={<ScanLine color="#FFFFFF" size={18} strokeWidth={2.2} />}
+              icon={<ScanLine color={colors.textInverse} size={18} strokeWidth={2.2} />}
               label="Scan Product"
+              onPress={openProductScanner}
               subtitle="Fast barcode lookup"
-              style={styles.scanProductButton}
+              style={[styles.scanProductButton, compactPhone && styles.scanProductButtonCompact]}
             />
           </View>
 
           <View style={styles.searchActionsRow}>
             <View style={styles.searchBox}>
-              <Search color="#697285" size={18} strokeWidth={2} />
+              <Search color={colors.textTertiary} size={18} strokeWidth={2} />
               <TextInput
                 onChangeText={setSearchQuery}
                 placeholder="Search products..."
-                placeholderTextColor="#8A91A4"
+                placeholderTextColor={colors.textSubtle}
                 style={styles.searchInput}
                 value={searchQuery}
               />
@@ -685,138 +615,70 @@ export default function CashierScreen() {
     );
   }
 
-  function renderHistorySection() {
-    return (
-      <>
-        {dashboard.currentShift ? (
-          <CashierShiftCard
-            durationMinutes={dashboard.currentShift.durationMinutes}
-            openingCash={dashboard.currentShift.openingCash}
-            startedAt={dashboard.currentShift.startedAt}
-            status={dashboard.currentShift.status}
-          />
-        ) : null}
-
-        <SectionHeading style={styles.sectionLabel}>PERFORMANCE TODAY</SectionHeading>
-        <View style={styles.performanceGrid}>
-          {cashierPerformanceCards.map((card) => (
-            <CashierPerformanceCard
-              key={card.key}
-              icon={card.icon}
-              label={card.label}
-              value={
-                card.key === 'salesToday'
-                  ? formatPeso(dashboard.performance.salesToday)
-                  : String(dashboard.performance[card.key])
-              }
-            />
-          ))}
-        </View>
-
-        <View style={styles.sectionHeaderRow}>
-          <SectionHeading style={styles.sectionHeaderNoMargin}>RECENT SALES</SectionHeading>
-          <AppTextAction
-            icon={<ArrowRight color={colors.secondary} size={16} strokeWidth={2} />}
-            label="VIEW ALL"
-          />
-        </View>
-
-        <SurfaceCard style={styles.recentSalesCard}>
-          {recentSales.length > 0 ? (
-            recentSales.map((sale) => (
-              <CashierRecentSaleItem
-                key={sale.id}
-                paymentMethod={sale.paymentMethod}
-                receiptNumber={sale.receiptNumber}
-                time={sale.createdAt}
-                totalAmount={normalizeNumber(sale.totalAmount)}
-              />
-            ))
-          ) : (
-            <Text style={styles.emptySalesText}>No sales recorded for this cashier yet.</Text>
-          )}
-        </SurfaceCard>
-
-        <CashierPaymentBreakdownCard
-          drawerVariance={dashboard.totals.drawerVariance}
-          paymentBreakdown={dashboard.paymentBreakdown}
-          totalReportedSales={dashboard.totals.totalReportedSales}
-        />
-      </>
-    );
-  }
-
-  function renderInventorySection() {
-    return (
-      <>
-        <SectionHeading style={styles.sectionLabel}>INVENTORY VIEW</SectionHeading>
-        <Text style={styles.inventoryLead}>
-          Browse current stock levels and product pricing in the same cashier workspace.
-        </Text>
-        <View style={styles.productsGrid}>
-          {products.map((product) => (
-            <CashierProductCard
-              key={product.id}
-              imageUrl={product.imageUrl}
-              name={`${product.name} (${product.stock} ${product.unit})`}
-              onAdd={() => addToCart(product)}
-              price={formatPeso(normalizeNumber(product.price))}
-              stock={product.stock}
-              style={{ width: productCardWidth }}
-            />
-          ))}
-        </View>
-      </>
-    );
-  }
-
-  function renderSettingsSection() {
-    return (
-      <>
-        <SectionHeading style={styles.sectionLabel}>CASHIER SETTINGS</SectionHeading>
-        <SurfaceCard style={styles.settingsCard}>
-          <Text style={styles.settingsTitle}>{cashierName}</Text>
-          <Text style={styles.settingsMeta}>@{dashboard.cashier.username}</Text>
-          <Text style={styles.settingsMeta}>{dashboard.cashier.role}</Text>
-          <View style={styles.settingsDivider} />
-          <Text style={styles.settingsCopy}>
-            This section is ready for cashier profile, printer, and terminal preferences next.
-          </Text>
-          <AppButton
-            fullWidth={false}
-            icon={({ color, size }) => <LogOut color={color} size={size} strokeWidth={2.1} />}
-            label="Logout"
-            onPress={() => router.replace('/')}
-            style={styles.logoutButton}
-            variant="danger"
-          />
-        </SurfaceCard>
-      </>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.page}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
+            compactPhone ? styles.scrollContentCompact : undefined,
             isTablet ? styles.scrollContentTablet : undefined,
           ]}
           showsVerticalScrollIndicator={false}>
-          <CashierDashboardHeader cashierName={cashierDisplayName} currentDate={currentDate} />
+          <CashierDashboardHeader 
+            cashierName={cashierDisplayName} 
+            currentDate={currentDate} 
+          />
 
           {activeSection === 'register' ? renderRegisterSection() : null}
-          {activeSection === 'history' ? renderHistorySection() : null}
-          {activeSection === 'inventory' ? renderInventorySection() : null}
-          {activeSection === 'settings' ? renderSettingsSection() : null}
+          {activeSection === 'history' ? (
+            <CashierHistorySection
+              dashboard={dashboard}
+              onEditOpeningCash={() => {
+                setOpeningCashInput(
+                  dashboard.currentShift?.openingCash !== undefined
+                    ? String(dashboard.currentShift.openingCash)
+                    : ''
+                );
+                setShowOpeningCashModal(true);
+              }}
+              onSelectSale={(sale) => setSelectedSaleDetails(sale)}
+            />
+          ) : null}
+          {activeSection === 'inventory' ? (
+            <CashierInventorySection
+              onAddProduct={addToCart}
+              productCardWidth={productCardWidth}
+              products={products}
+            />
+          ) : null}
+          {activeSection === 'customers' ? (
+            <CashierCustomersSection />
+          ) : null}
+          {activeSection === 'settings' ? (
+            <CashierSettingsSection
+              cashierName={cashierName}
+              onCloseShift={() => setShowCloseShiftModal(true)}
+              onLogout={() => {
+                void clearAuthSession().finally(() => {
+                  router.replace('/');
+                });
+              }}
+              role={dashboard.cashier.role}
+              username={dashboard.cashier.username}
+            />
+          ) : null}
 
           {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
         </ScrollView>
 
         {!showInlineCart && cart.length > 0 ? (
-          <View style={styles.checkoutBarWrap}>
-            <SurfaceCard style={styles.checkoutBar}>
+          <View style={[styles.checkoutBarWrap, compactPhone && styles.checkoutBarWrapCompact]}>
+            <SurfaceCard
+              style={[
+                styles.checkoutBar,
+                compactPhone && styles.checkoutBarCompact,
+              ]}>
               <View>
                 <Text style={styles.checkoutBarMeta}>{formatItemCount(cartItemCount)} Added</Text>
                 <Text style={styles.checkoutBarValue}>{formatPeso(cartSubtotal)}</Text>
@@ -843,6 +705,97 @@ export default function CashierScreen() {
         />
       </View>
 
+
+      {/* Shift Close Modal */}
+      <ShiftCloseModal
+        shiftId={dashboard.currentShift?.id}
+        visible={showCloseShiftModal}
+        onClose={() => setShowCloseShiftModal(false)}
+        onSuccess={async () => {
+          setShowCloseShiftModal(false);
+          await reloadWorkspace();
+          // Optionally redirect back to login or cashier-shift
+          router.replace('/cashier-shift');
+        }}
+      />
+      {/* Opening Cash Input Modal */}
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Cancel"
+              onPress={() => setShowOpeningCashModal(false)}
+              variant="secondary"
+            />
+            <AppButton
+              disabled={isSavingOpeningCash}
+              label={isSavingOpeningCash ? 'Saving...' : 'Save'}
+              onPress={handleUpdateOpeningCash}
+              variant="primary"
+            />
+          </ModalActions>
+        }
+        height={260}
+        onClose={() => setShowOpeningCashModal(false)}
+        title="Set Opening Cash"
+        visible={showOpeningCashModal}>
+        <View style={styles.modalInputWrap}>
+          <Text style={styles.modalInputLabel}>Opening Cash Amount (₱)</Text>
+          <TextInput
+            style={styles.modalTextInput}
+            keyboardType="numeric"
+            placeholder="0.00"
+            value={openingCashInput}
+            onChangeText={setOpeningCashInput}
+          />
+        </View>
+      </AdminModalShell>
+
+      <AdminModalShell
+        footer={
+          <AppButton
+            label="Close Scanner"
+            onPress={() => setShowScannerModal(false)}
+            variant="secondary"
+          />
+        }
+        height={Math.min(height * 0.74, 620)}
+        onClose={() => setShowScannerModal(false)}
+        title="Scan Product"
+        visible={showScannerModal}>
+        <View style={styles.scannerContent}>
+          {cameraPermission?.granted ? (
+            <View style={styles.cameraFrame}>
+              <CameraView
+                active={showScannerModal}
+                facing="back"
+                onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
+                style={styles.cameraPreview}
+              />
+              <View style={styles.scanGuide} />
+            </View>
+          ) : (
+            <SurfaceCard style={styles.scannerPermissionCard}>
+              <Text style={styles.scannerTitle}>Camera access needed</Text>
+              <Text style={styles.scannerCopy}>
+                Enable camera permission to scan product barcodes.
+              </Text>
+              <AppButton
+                label="Allow Camera"
+                onPress={openProductScanner}
+                style={styles.scannerPermissionButton}
+                variant="primary"
+              />
+            </SurfaceCard>
+          )}
+
+          <Text style={styles.scannerHint}>
+            Point the camera at a product barcode to add it to the cart.
+          </Text>
+          {scannerFeedback ? <Text style={styles.scannerFeedback}>{scannerFeedback}</Text> : null}
+        </View>
+      </AdminModalShell>
+
       <AdminModalShell
         footer={
           <AppButton
@@ -859,7 +812,7 @@ export default function CashierScreen() {
         onClose={() => setShowCartModal(false)}
         title="Cart Details"
         visible={!showInlineCart && showCartModal}>
-        <ScrollView contentContainerStyle={styles.cartModalContent}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.cartModalContent}>
           <View style={styles.checkoutInputIndicator}>
             <Text style={styles.checkoutInputIndicatorLabel}>NOW EDITING</Text>
             <Text style={styles.checkoutInputIndicatorValue}>
@@ -927,6 +880,7 @@ export default function CashierScreen() {
         title="Checkout"
         visible={showCheckoutModal}>
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.checkoutModalContent}
           showsVerticalScrollIndicator={false}>
           <View style={styles.checkoutSummaryCard}>
@@ -1002,17 +956,129 @@ export default function CashierScreen() {
             </>
           ) : null}
 
+          <Text style={styles.checkoutFieldLabel}>CUSTOMER</Text>
+          <View style={styles.customerTypeRow}>
+            <Pressable
+              onPress={() => {
+                setCustomerType('walkin');
+                setCustomerId(null);
+                setCustomerName(null);
+                setCustomerSearch('');
+                setCustomerResults([]);
+              }}
+              style={[
+                styles.customerTypeOption,
+                customerType === 'walkin' && styles.customerTypeOptionActive,
+              ]}
+            >
+              <View style={[
+                styles.customerTypeRadio,
+                customerType === 'walkin' && styles.customerTypeRadioActive,
+              ]}>
+                {customerType === 'walkin' && <View style={styles.customerTypeRadioDot} />}
+              </View>
+              <Text style={[
+                styles.customerTypeLabel,
+                customerType === 'walkin' && styles.customerTypeLabelActive,
+              ]}>Walk-in Customer</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setCustomerType('registered')}
+              style={[
+                styles.customerTypeOption,
+                customerType === 'registered' && styles.customerTypeOptionActive,
+              ]}
+            >
+              <View style={[
+                styles.customerTypeRadio,
+                customerType === 'registered' && styles.customerTypeRadioActive,
+              ]}>
+                {customerType === 'registered' && <View style={styles.customerTypeRadioDot} />}
+              </View>
+              <Text style={[
+                styles.customerTypeLabel,
+                customerType === 'registered' && styles.customerTypeLabelActive,
+              ]}>Registered Customer</Text>
+            </Pressable>
+          </View>
+
+          {customerType === 'registered' ? (
+            <View style={styles.customerSearchWrap}>
+              {customerId ? (
+                <Pressable
+                  onPress={() => { setCustomerId(null); setCustomerName(null); setCustomerSearch(''); setCustomerResults([]); }}
+                  style={styles.customerSelectedRow}
+                >
+                  <UserCircle2 color={colors.secondary} size={20} strokeWidth={2} />
+                  <Text style={styles.customerSelectedName}>{customerName}</Text>
+                  <Text style={styles.customerClearText}>Change</Text>
+                </Pressable>
+              ) : (
+                <>
+                  <View style={styles.customerSearchBox}>
+                    <Search color={colors.textTertiary} size={16} strokeWidth={2} />
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={async (text) => {
+                        setCustomerSearch(text);
+                        if (!text.trim()) { setCustomerResults([]); return; }
+                        try {
+                          setIsSearchingCustomers(true);
+                          const res = await apiClient.get<{ data: { id: number; name: string; phoneNumber?: string | null }[] }>(
+                            `/customers?search=${encodeURIComponent(text.trim())}`
+                          );
+                          setCustomerResults(res.data.data);
+                        } catch {
+                          setCustomerResults([]);
+                        } finally {
+                          setIsSearchingCustomers(false);
+                        }
+                      }}
+                      placeholder="Search by name or phone..."
+                      placeholderTextColor={colors.textSubtle}
+                      style={styles.customerSearchInput}
+                      value={customerSearch}
+                    />
+                  </View>
+                  {isSearchingCustomers ? (
+                    <Text style={styles.customerSearchHint}>Searching...</Text>
+                  ) : customerResults.length > 0 ? (
+                    <View style={styles.customerResultsList}>
+                      {customerResults.slice(0, 5).map((c) => (
+                        <Pressable
+                          key={c.id}
+                          onPress={() => { setCustomerId(c.id); setCustomerName(c.name); setCustomerResults([]); setCustomerSearch(''); }}
+                          style={styles.customerResultRow}
+                        >
+                          <UserCircle2 color={colors.textSecondary} size={16} strokeWidth={2} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.customerResultName}>{c.name}</Text>
+                            {c.phoneNumber ? <Text style={styles.customerResultMeta}>{c.phoneNumber}</Text> : null}
+                          </View>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : customerSearch.trim() ? (
+                    <Text style={styles.customerSearchHint}>No customers found.</Text>
+                  ) : null}
+                </>
+              )}
+            </View>
+          ) : null}
+
           <Text style={styles.checkoutFieldLabel}>PAYMENT METHOD</Text>
           <View style={styles.paymentMethodsRow}>
-            {cashierPaymentMethods.map((method) => (
-              <CashierPaymentMethodChip
-                active={paymentMethod === method.key}
-                icon={method.icon}
-                key={method.key}
-                label={method.label}
-                onPress={() => setPaymentMethod(method.key)}
-              />
-            ))}
+            <AppSegmentedControl
+              onChange={setPaymentMethod}
+              options={cashierPaymentMethods.map((method) => ({
+                icon: method.icon,
+                label: method.label,
+                value: method.key,
+              }))}
+              selected={paymentMethod}
+              variant="tile"
+            />
           </View>
 
           <Text style={styles.checkoutFieldLabel}>AMOUNT RECEIVED</Text>
@@ -1094,7 +1160,10 @@ export default function CashierScreen() {
             <AppButton
               icon={({ color, size }) => <QrCode color={color} size={size} strokeWidth={2.1} />}
               label="View Receipt"
-              onPress={() => setShowSuccessModal(false)}
+              onPress={() => {
+                setShowSuccessModal(false);
+                setSelectedSaleDetails(completedSale);
+              }}
               variant="successOutline"
             />
           </ModalActions>
@@ -1104,11 +1173,12 @@ export default function CashierScreen() {
         title="Payment Success"
         visible={showSuccessModal}>
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.successModalContent}
           showsVerticalScrollIndicator={false}>
           <View style={styles.successIconWrap}>
             <View style={styles.successIconInner}>
-              <CheckCircle2 color="#FFFFFF" size={44} strokeWidth={2.2} />
+              <CheckCircle2 color={colors.textInverse} size={44} strokeWidth={2.2} />
             </View>
           </View>
           <Text style={styles.successTitle}>Payment Success</Text>
@@ -1135,18 +1205,22 @@ export default function CashierScreen() {
               </View>
 
               <View style={styles.successBreakdownCard}>
+                {completedSale.discountAmount > 0 ? (
+                  <>
+                    <View style={styles.successMetaRow}>
+                      <Text style={styles.successMetaLabel}>Subtotal</Text>
+                      <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
+                    </View>
+                    <View style={styles.successMetaRow}>
+                      <Text style={styles.successMetaLabel}>Discount</Text>
+                      <Text style={styles.successMetaValue}>
+                        - {formatPeso(completedSale.discountAmount)}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
                 <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Original Price</Text>
-                  <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Discount</Text>
-                  <Text style={styles.successMetaValue}>
-                    - {formatPeso(completedSale.discountAmount)}
-                  </Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Discounted Price</Text>
+                  <Text style={styles.successMetaLabel}>Total Price</Text>
                   <Text style={styles.successMetaValue}>
                     {formatPeso(completedSale.totalAmount)}
                   </Text>
@@ -1172,6 +1246,12 @@ export default function CashierScreen() {
               </View>
 
               <View style={styles.successMetaRow}>
+                <Text style={styles.successMetaLabel}>Customer</Text>
+                <Text style={styles.successMetaValue}>
+                  {completedSale.customerName ?? 'Walk-in'}
+                </Text>
+              </View>
+              <View style={styles.successMetaRow}>
                 <Text style={styles.successMetaLabel}>Receipt No</Text>
                 <Text style={styles.successMetaValue}>{completedSale.receiptNumber}</Text>
               </View>
@@ -1193,6 +1273,105 @@ export default function CashierScreen() {
           ) : null}
         </ScrollView>
       </AdminModalShell>
+
+      {/* Sale Details / Digital Receipt Modal */}
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Print Receipt"
+              onPress={() => handlePrintReceipt(selectedSaleDetails)}
+              variant="primary"
+            />
+            <AppButton
+              label="Close"
+              onPress={() => setSelectedSaleDetails(null)}
+              variant="secondary"
+            />
+          </ModalActions>
+        }
+        height={Math.min(height * 0.85, 680)}
+        onClose={() => setSelectedSaleDetails(null)}
+        title="Receipt Details"
+        visible={selectedSaleDetails !== null}>
+        {selectedSaleDetails ? (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+            {/* Store Header */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: colors.secondary }}>GDC STORE</Text>
+              <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary }}>POS Receipt</Text>
+            </View>
+
+            <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Receipt No</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.textStrong }}>#{selectedSaleDetails.receiptNumber}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Date & Time</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatReceiptDateTime(selectedSaleDetails.createdAt || selectedSaleDetails.time)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Cashier</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{selectedSaleDetails.cashierName}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Customer</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>
+                  {selectedSaleDetails.customerName ?? selectedSaleDetails.customer?.name ?? 'Walk-in'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Payment Method</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.secondary }}>{formatPaymentMethod(selectedSaleDetails.paymentMethod)}</Text>
+              </View>
+            </SurfaceCard>
+
+            <Text style={{ fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.2, color: colors.textSecondary, marginBottom: 8 }}>ITEMS PURCHASED</Text>
+            <SurfaceCard style={{ paddingVertical: 8, paddingHorizontal: 16, marginBottom: 16 }}>
+              {selectedSaleDetails.items && selectedSaleDetails.items.map((item: any, idx: number) => (
+                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomColor: colors.divider, borderBottomWidth: idx === selectedSaleDetails.items.length - 1 ? 0 : 1 }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.textStrong }}>{item.product?.name || 'Item'}</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary }}>{item.quantity} x {formatPeso(item.price)}</Text>
+                  </View>
+                  <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.textStrong, alignSelf: 'center' }}>
+                    {formatPeso(item.price * item.quantity)}
+                  </Text>
+                </View>
+              ))}
+            </SurfaceCard>
+
+            <SurfaceCard style={{ padding: 16 }}>
+              {selectedSaleDetails.discountAmount > 0 ? (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Subtotal</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatPeso(selectedSaleDetails.subtotal)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Discount</Text>
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.danger }}>- {formatPeso(selectedSaleDetails.discountAmount)}</Text>
+                  </View>
+                  <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 8 }} />
+                </>
+              ) : null}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.textStrong }}>TOTAL AMOUNT</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.secondary }}>{formatPeso(selectedSaleDetails.totalAmount)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Amount Paid</Text>
+                <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatPeso(selectedSaleDetails.amountPaid)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.success }}>Change</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.success }}>{formatPeso(selectedSaleDetails.changeAmount)}</Text>
+              </View>
+            </SurfaceCard>
+          </ScrollView>
+        ) : null}
+      </AdminModalShell>
     </SafeAreaView>
   );
 }
@@ -1200,16 +1379,21 @@ export default function CashierScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7F7FA',
+    backgroundColor: colors.backgroundMuted,
   },
   page: {
     flex: 1,
-    backgroundColor: '#F7F7FA',
+    backgroundColor: colors.backgroundMuted,
   },
   scrollContent: {
-    paddingBottom: 178,
+    paddingBottom: layout.floatingContentPadding,
     paddingHorizontal: layout.screenPaddingX,
     paddingTop: spacing.xl,
+  },
+  scrollContentCompact: {
+    paddingBottom: layout.floatingContentPaddingCompact,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
   },
   scrollContentTablet: {
     alignSelf: 'center',
@@ -1236,6 +1420,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  registerHeaderRowCompact: {
+    flexDirection: 'column',
+  },
   registerHeaderText: {
     flex: 1,
   },
@@ -1252,25 +1439,29 @@ const styles = StyleSheet.create({
   scanProductButton: {
     minWidth: 194,
   },
+  scanProductButtonCompact: {
+    minWidth: 0,
+    width: '100%',
+  },
   shiftDot: {
-    backgroundColor: '#D22D2D',
+    backgroundColor: colors.dangerAccent,
     borderRadius: radius.round,
     height: 6,
     marginRight: spacing.sm,
     width: 6,
   },
   shiftMetaText: {
-    color: '#4B5563',
+    color: colors.textSoft,
     ...textRoles.label,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   searchActionsRow: {
     marginBottom: spacing.md,
   },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D7DCEC',
+    backgroundColor: colors.card,
+    borderColor: colors.borderInput,
     borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
@@ -1279,10 +1470,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   searchInput: {
-    color: '#232938',
+    color: colors.text,
     flex: 1,
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.body,
     marginLeft: spacing.sm,
   },
   categoryChipRow: {
@@ -1308,9 +1499,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   emptyStateText: {
-    color: '#697285',
+    color: colors.textTertiary,
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.body,
     textAlign: 'center',
   },
   inlineCartCard: {
@@ -1330,9 +1521,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   inlineCartCount: {
-    color: '#5B6477',
+    color: colors.textSecondary,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   inlineCartItems: {
     maxHeight: 420,
@@ -1341,10 +1532,69 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   emptyCartText: {
-    color: '#697285',
+    color: colors.textTertiary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+    paddingVertical: spacing.xl,
+    textAlign: 'center',
+  },
+  scannerContent: {
+    flex: 1,
+  },
+  cameraFrame: {
+    backgroundColor: '#111827',
+    borderRadius: radius.lg,
+    flex: 1,
+    minHeight: 320,
+    overflow: 'hidden',
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  scanGuide: {
+    borderColor: '#FFFFFF',
+    borderRadius: radius.md,
+    borderWidth: 2,
+    height: 120,
+    left: '12%',
+    opacity: 0.88,
+    position: 'absolute',
+    right: '12%',
+    top: '36%',
+  },
+  scannerPermissionCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 320,
+    padding: spacing.xl,
+  },
+  scannerTitle: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    marginBottom: spacing.sm,
+  },
+  scannerCopy: {
+    color: colors.textTertiary,
     fontFamily: fonts.regular,
     fontSize: 14,
-    paddingVertical: spacing.xl,
+    textAlign: 'center',
+  },
+  scannerPermissionButton: {
+    marginTop: spacing.lg,
+  },
+  scannerHint: {
+    color: colors.textSoft,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  scannerFeedback: {
+    color: colors.tertiary,
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   cartSummary: {
@@ -1356,22 +1606,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   summaryLabel: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
   },
   summaryValue: {
-    color: '#2D3342',
+    color: colors.textHeading,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
   },
   summaryDiscountValue: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.semiBold,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
   },
   summaryDivider: {
-    backgroundColor: '#E6EAF4',
+    backgroundColor: colors.borderSoft,
     height: 1,
     marginVertical: spacing.md,
   },
@@ -1391,6 +1641,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: layout.screenPaddingX,
   },
+  checkoutBarWrapCompact: {
+    left: spacing.md,
+    right: spacing.md,
+  },
   checkoutBar: {
     alignItems: 'center',
     backgroundColor: colors.secondary,
@@ -1401,15 +1655,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     ...shadows.floating,
   },
+  checkoutBarCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
   checkoutBarMeta: {
-    color: '#D8DEFF',
+    color: colors.textOnSecondaryMuted,
     ...textRoles.label,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   checkoutBarValue: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontFamily: fonts.bold,
-    fontSize: 18,
+    fontSize: textSizes.title,
     marginTop: spacing.xs,
   },
   checkoutButton: {
@@ -1419,8 +1677,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   checkoutSummaryCard: {
-    backgroundColor: '#F8F9FD',
-    borderColor: '#DDE2F0',
+    backgroundColor: colors.cardAlt,
+    borderColor: colors.borderMuted,
     borderRadius: radius.lg,
     borderWidth: 1,
     marginBottom: spacing.lg,
@@ -1428,26 +1686,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   checkoutSummaryLabel: {
-    color: '#5F6678',
+    color: colors.textSecondary,
     ...textRoles.label,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.4,
     marginBottom: spacing.sm,
   },
   checkoutSummaryValue: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 24,
+    fontSize: textSizes.xlarge,
   },
   checkoutSummaryMeta: {
-    color: '#80879A',
+    color: colors.textSubtle,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     marginTop: spacing.xs,
   },
   checkoutInputIndicator: {
-    backgroundColor: '#EEF3FF',
-    borderColor: '#CAD7FB',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfo,
     borderRadius: radius.md,
     borderWidth: 1,
     marginBottom: spacing.md,
@@ -1455,27 +1713,27 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   checkoutInputIndicatorLabel: {
-    color: '#60708D',
+    color: colors.textSecondary,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.1,
     marginBottom: spacing.xs,
   },
   checkoutInputIndicatorValue: {
     color: colors.secondary,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: textSizes.body,
   },
   discountPanel: {
-    backgroundColor: '#F8FAFF',
-    borderColor: '#DDE4F3',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderPanel,
     borderRadius: radius.lg,
     borderWidth: 1,
     marginBottom: spacing.md,
     padding: spacing.md,
   },
   discountRow: {
-    borderBottomColor: '#E1E7F2',
+    borderBottomColor: colors.divider,
     borderBottomWidth: 1,
     paddingVertical: spacing.sm,
   },
@@ -1490,20 +1748,20 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   discountItemName: {
-    color: '#1A2030',
+    color: colors.textDark,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: textSizes.body,
   },
   discountItemMeta: {
-    color: '#697285',
+    color: colors.textTertiary,
     fontFamily: fonts.regular,
-    fontSize: 12,
+    fontSize: textSizes.small,
     marginTop: spacing.xs,
   },
   discountNetTotal: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
   },
   discountInputRow: {
     alignItems: 'center',
@@ -1512,28 +1770,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   discountInputPrefix: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.bold,
-    fontSize: 16,
+    fontSize: textSizes.medium,
     marginRight: spacing.sm,
   },
   discountAppliedText: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   checkoutFieldLabel: {
-    color: '#434A5B',
+    color: colors.textHeading,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.3,
     marginBottom: spacing.sm,
     marginTop: spacing.md,
   },
   paymentMethodsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     marginBottom: spacing.md,
   },
   moneyField: {
@@ -1547,39 +1802,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   moneyFieldActive: {
-    backgroundColor: '#F3F6FF',
-    borderColor: '#2A3CC7',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.infoStrong,
     borderWidth: 1.5,
   },
   moneyPrefix: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 20,
+    fontSize: textSizes.titleLarge,
     marginRight: spacing.sm,
   },
   moneyValue: {
-    color: '#1A2030',
+    color: colors.textDark,
     flex: 1,
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: textSizes.medium,
   },
   discountMoneyField: {
     minHeight: 44,
     width: 190,
   },
   discountPlaceholderText: {
-    color: '#96A0B5',
+    color: colors.textSubtle,
   },
   activeInputBadge: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: colors.surfaceOverlay,
     borderRadius: radius.round,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
   },
   activeInputBadgeText: {
-    color: '#3142BD',
+    color: colors.infoStrong,
     fontFamily: fonts.semiBold,
-    fontSize: 10,
+    fontSize: textSizes.xsmall,
     letterSpacing: 0.7,
   },
   amountIndicatorRow: {
@@ -1588,8 +1843,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   amountIndicatorCard: {
-    backgroundColor: '#F6F8FC',
-    borderColor: '#DEE4EF',
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderMuted,
     borderRadius: radius.md,
     borderWidth: 1,
     flex: 1,
@@ -1598,34 +1853,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   amountIndicatorCardSuccess: {
-    backgroundColor: successSurface,
-    borderColor: '#A7F3D0',
+    backgroundColor: colors.surfaceSuccess,
+    borderColor: colors.borderSuccess,
   },
   amountIndicatorCardFail: {
-    backgroundColor: failSurface,
-    borderColor: failBorder,
+    backgroundColor: colors.surfaceDanger,
+    borderColor: colors.borderDanger,
   },
   amountIndicatorLabel: {
-    color: '#6B7280',
+    color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     marginBottom: spacing.xs,
   },
   amountIndicatorValue: {
-    color: '#1A2030',
+    color: colors.textDark,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: textSizes.body,
   },
   amountIndicatorValueSuccess: {
-    color: successColorDark,
+    color: colors.successStrong,
   },
   amountIndicatorValueFail: {
-    color: failColor,
+    color: colors.danger,
   },
   changeField: {
     alignItems: 'center',
-    backgroundColor: '#F4F4F6',
-    borderColor: '#DFE3ED',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1636,40 +1891,161 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   changeFieldSuccess: {
-    backgroundColor: successSurface,
-    borderColor: '#A7F3D0',
+    backgroundColor: colors.surfaceSuccess,
+    borderColor: colors.borderSuccess,
   },
   changeFieldFail: {
-    backgroundColor: failSurface,
-    borderColor: failBorder,
+    backgroundColor: colors.surfaceDanger,
+    borderColor: colors.borderDanger,
   },
   changeLabel: {
-    color: '#5E6476',
+    color: colors.textSecondary,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
   },
   changeValue: {
     fontFamily: fonts.bold,
-    fontSize: 18,
+    fontSize: textSizes.title,
   },
   changeValueSuccess: {
-    color: successColor,
+    color: colors.success,
   },
   changeValueFail: {
-    color: failColor,
+    color: colors.danger,
   },
   saleErrorText: {
-    backgroundColor: failSurface,
-    borderColor: failBorder,
+    backgroundColor: colors.surfaceDanger,
+    borderColor: colors.borderDanger,
     borderRadius: radius.md,
     borderWidth: 1,
-    color: failColor,
+    color: colors.danger,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: textSizes.small,
     marginTop: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     textAlign: 'center',
+  },
+  customerTypeRow: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  customerTypeOption: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  customerTypeOptionActive: {
+    backgroundColor: colors.surfaceBrandMuted,
+    borderColor: colors.secondary,
+  },
+  customerTypeRadio: {
+    alignItems: 'center',
+    borderColor: colors.borderMuted,
+    borderRadius: 9,
+    borderWidth: 2,
+    height: 18,
+    justifyContent: 'center',
+    width: 18,
+  },
+  customerTypeRadioActive: {
+    borderColor: colors.secondary,
+  },
+  customerTypeRadioDot: {
+    backgroundColor: colors.secondary,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  customerTypeLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  customerTypeLabelActive: {
+    color: colors.secondary,
+  },
+  customerSearchWrap: {
+    marginBottom: spacing.md,
+  },
+  customerSearchBox: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  customerSearchInput: {
+    color: colors.textStrong,
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+  },
+  customerSearchHint: {
+    color: colors.textSubtle,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  customerResultsList: {
+    backgroundColor: colors.card,
+    borderColor: colors.borderMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
+  customerResultRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.divider,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  customerResultName: {
+    color: colors.textStrong,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  customerResultMeta: {
+    color: colors.textSubtle,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+  },
+  customerSelectedRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceBrandMuted,
+    borderColor: colors.secondary,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  customerSelectedName: {
+    color: colors.secondary,
+    flex: 1,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  customerClearText: {
+    color: colors.textSubtle,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
   },
   successModalContent: {
     paddingBottom: spacing.sm,
@@ -1680,46 +2056,46 @@ const styles = StyleSheet.create({
   },
   successIconInner: {
     alignItems: 'center',
-    backgroundColor: successColor,
+    backgroundColor: colors.success,
     borderRadius: radius.round,
     height: 92,
     justifyContent: 'center',
     width: 92,
   },
   successTitle: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.bold,
-    fontSize: 24,
+    fontSize: textSizes.xlarge,
     marginTop: spacing.lg,
     textAlign: 'center',
   },
   successText: {
-    color: '#5B6477',
+    color: colors.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.body,
     marginBottom: spacing.xl,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   successCard: {
-    borderColor: '#A7F3D0',
+    borderColor: colors.borderSuccess,
     borderWidth: 1,
     marginBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
   successTotalLabel: {
-    color: '#5C6577',
+    color: colors.textSecondary,
     ...textRoles.label,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     letterSpacing: 1.4,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   successTotalValue: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.bold,
-    fontSize: 30,
+    fontSize: textSizes.hero,
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
@@ -1729,26 +2105,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   successMiniCard: {
-    backgroundColor: successSurface,
+    backgroundColor: colors.surfaceSuccess,
     borderRadius: radius.md,
     flex: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   successMiniLabel: {
-    color: '#5C6577',
+    color: colors.textSecondary,
     ...textRoles.label,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
     marginBottom: spacing.sm,
   },
   successMiniValue: {
-    color: successColorDark,
+    color: colors.successStrong,
     fontFamily: fonts.semiBold,
-    fontSize: 15,
+    fontSize: textSizes.bodyLarge,
   },
   successBreakdownCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#D7E3DA',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderSuccess,
     borderRadius: radius.md,
     borderWidth: 1,
     marginBottom: spacing.lg,
@@ -1761,78 +2137,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   successMetaLabel: {
-    color: '#5B6477',
+    color: colors.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
   },
   successMetaValue: {
-    color: '#1D2433',
+    color: colors.textHeading,
     fontFamily: fonts.semiBold,
-    fontSize: 13,
-  },
-  sectionLabel: {
-    marginBottom: spacing.lg,
-    marginTop: spacing.section,
-  },
-  performanceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  sectionHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    marginTop: spacing.section,
-  },
-  sectionHeaderNoMargin: {
-    marginBottom: 0,
-  },
-  recentSalesCard: {
-    marginBottom: spacing.section,
-    overflow: 'hidden',
-    paddingVertical: spacing.sm,
-  },
-  emptySalesText: {
-    color: '#697285',
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    textAlign: 'center',
-  },
-  inventoryLead: {
-    color: '#5B6477',
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  settingsCard: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-  },
-  settingsTitle: {
-    color: colors.secondary,
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    marginBottom: spacing.xs,
-  },
-  settingsMeta: {
-    color: '#5B6477',
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    marginBottom: spacing.xs,
-  },
-  settingsDivider: {
-    backgroundColor: '#E4E8F2',
-    height: 1,
-    marginVertical: spacing.lg,
+    fontSize: textSizes.small + 1,
   },
   settingsCopy: {
-    color: '#5B6477',
+    color: colors.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.body,
     lineHeight: 22,
   },
   logoutButton: {
@@ -1840,10 +2157,192 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   errorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: textSizes.small + 1,
     marginTop: spacing.lg,
     textAlign: 'center',
+  },
+  botFab: {
+    position: 'absolute',
+    bottom: 95,
+    right: 20,
+    backgroundColor: colors.secondary,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(19, 25, 39, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '75%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    borderBottomColor: colors.borderSoft,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  botTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  botIconBadge: {
+    backgroundColor: colors.surfaceBrandMuted,
+    borderRadius: 12,
+    padding: 8,
+  },
+  modalTitle: {
+    color: colors.textStrong,
+    ...textRoles.value,
+    fontSize: 16,
+  },
+  modalSubtitle: {
+    color: colors.success,
+    ...textRoles.label,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  closeButton: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: 20,
+    padding: 6,
+  },
+  messagesList: {
+    padding: 16,
+    gap: 12,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginVertical: 4,
+  },
+  messageRowUser: {
+    justifyContent: 'flex-end',
+  },
+  messageRowBot: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    borderRadius: 18,
+    maxWidth: '82%',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    flexShrink: 1,
+  },
+  messageBubbleUser: {
+    backgroundColor: colors.secondary,
+    borderBottomRightRadius: 4,
+  },
+  messageBubbleBot: {
+    backgroundColor: colors.surfaceInfo,
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    ...textRoles.body,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  messageTextUser: {
+    color: colors.white,
+  },
+  messageTextBot: {
+    color: colors.textDark,
+  },
+  messageTime: {
+    ...textRoles.label,
+    fontSize: 9,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  messageTimeUser: {
+    color: colors.textOnSecondaryMuted,
+  },
+  messageTimeBot: {
+    color: colors.textSubtle,
+  },
+  loadingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  loadingText: {
+    color: colors.textSubtle,
+    ...textRoles.label,
+    fontSize: 12,
+  },
+  inputArea: {
+    alignItems: 'center',
+    borderTopColor: colors.borderSoft,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  chatInput: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: 24,
+    color: colors.textStrong,
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  sendButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 44,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.surfaceOverlayMuted,
+  },
+  modalInputWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  modalInputLabel: {
+    color: colors.textSecondary,
+    ...textRoles.label,
+    marginBottom: spacing.sm,
+  },
+  modalTextInput: {
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: radius.md,
+    color: colors.textStrong,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    minHeight: 46,
+    paddingHorizontal: 16,
   },
 });

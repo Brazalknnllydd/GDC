@@ -1,0 +1,13 @@
+Follow the instructions in `AGENTS.md`.
+
+Additional Cursor project rules:
+
+- Follow SOLID principles.
+- Follow DRY principles.
+- Be professional and concise.
+- Minimize token usage.
+- Prefer small, maintainable changes.
+- Avoid unnecessary abstraction.
+- Explain code changes briefly after editing.
+- Respect existing project structure and patterns.
+- For `mobile/`, keep changes compatible with Expo SDK 56.

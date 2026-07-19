@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
 
 type SalesTransactionRowProps = {
@@ -37,15 +38,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm + 2,
   },
   receipt: {
-    color: '#1B1F2D',
+    color: colors.textStrong,
     ...textRoles.value,
     marginBottom: 4,
   },
   subtitle: {
-    color: '#72788A',
+    color: colors.textSubtle,
     ...textRoles.label,
   },
   rightColumn: {
@@ -57,13 +58,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   statusPill: {
-    backgroundColor: '#DFF6E5',
-    borderRadius: 999,
+    backgroundColor: colors.surfaceSuccessMuted,
+    borderRadius: radius.round,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   statusText: {
-    color: '#15803D',
+    color: colors.successBright,
     ...textRoles.label,
   },
 });

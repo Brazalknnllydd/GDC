@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import { FlashList } from '@shopify/flash-list';
 import {
   Platform,
   Pressable,
@@ -7,9 +8,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Plus, Search } from 'lucide-react-native';
+import { PackagePlus, Search, Shapes, Tags } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { AddCategoryModal } from '../components/admin-products/add-category-modal';
@@ -36,14 +38,15 @@ import {
 } from '../lib/product-utils';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
-import { FilterChip } from '../components/ui/filter-chip';
+import { AppSelect } from '../components/ui/app-select';
 import { InventoryStatCard } from '../components/ui/inventory-stat-card';
 import { PaginationControls } from '../components/ui/pagination-controls';
+import { SurfaceCard } from '../components/ui/surface-card';
 import { ProductListItem } from '../components/ui/product-list-item';
 import { SectionHeading } from '../components/ui/section-heading';
 import { AppButton } from '../components/ui/app-button';
-import { AppFab } from '../components/ui/app-fab';
 import { apiClient } from '../lib/api';
+import type { CategoryFormValues } from '../lib/form-schemas';
 
 const lowStockThreshold = 10;
 const productsPerPage = 10;
@@ -62,6 +65,8 @@ type SelectedProductImage = {
 };
 
 export default function AdminProductsScreen() {
+  const { width } = useWindowDimensions();
+  const isCompactPhone = width < 430;
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
@@ -69,6 +74,7 @@ export default function AdminProductsScreen() {
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
 
   const [productName, setProductName] = useState('');
+  const [productDescription, setProductDescription] = useState('');
   const [categoryValue, setCategoryValue] = useState('');
   const [barcode, setBarcode] = useState('');
   const [costPrice, setCostPrice] = useState('');
@@ -92,8 +98,6 @@ export default function AdminProductsScreen() {
   const [productFieldErrors, setProductFieldErrors] = useState<ProductFieldErrors>({});
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [categoryDescription, setCategoryDescription] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState('');
@@ -150,6 +154,7 @@ export default function AdminProductsScreen() {
   function resetProductForm() {
     setEditingProductId(null);
     setProductName('');
+    setProductDescription('');
     setCategoryValue(categories[0]?.name || '');
     setBarcode('');
     setCostPrice('');
@@ -175,6 +180,7 @@ export default function AdminProductsScreen() {
   function openEditProductModal(product: Product) {
     setEditingProductId(product.id);
     setProductName(product.name);
+    setProductDescription(product.description || '');
     setCategoryValue(product.category.name);
     setBarcode(product.barcode || '');
     setCostPrice(String(normalizeNumber(product.costPrice)));
@@ -268,14 +274,14 @@ export default function AdminProductsScreen() {
     });
   }, [categories.length, products]);
 
-  async function handleSaveCategory() {
-    const trimmedName = newCategoryName.trim();
-    const trimmedDescription = categoryDescription.trim();
+  const editingCategory = useMemo(
+    () => categories.find((category) => category.id === editingCategoryId) ?? null,
+    [categories, editingCategoryId]
+  );
 
-    if (!trimmedName) {
-      setCategoryError('Category name is required.');
-      return;
-    }
+  async function handleSaveCategory(values: CategoryFormValues) {
+    const trimmedName = values.categoryName.trim();
+    const trimmedDescription = values.categoryDescription.trim();
 
     try {
       setIsSavingCategory(true);
@@ -335,23 +341,17 @@ export default function AdminProductsScreen() {
   function closeCategoryModal() {
     setShowAddCategory(false);
     setEditingCategoryId(null);
-    setNewCategoryName('');
-    setCategoryDescription('');
     setCategoryError('');
   }
 
   function openCreateCategoryModal() {
     setEditingCategoryId(null);
-    setNewCategoryName('');
-    setCategoryDescription('');
     setCategoryError('');
     setShowAddCategory(true);
   }
 
   function openEditCategoryModal(category: Category) {
     setEditingCategoryId(category.id);
-    setNewCategoryName(category.name);
-    setCategoryDescription(category.description || '');
     setCategoryError('');
     setShowAddCategory(true);
   }
@@ -475,6 +475,7 @@ export default function AdminProductsScreen() {
     const formData = new FormData();
 
     formData.append('name', productName.trim());
+    formData.append('description', productDescription.trim());
     formData.append('barcode', barcode.trim());
     formData.append('costPrice', costPrice);
     formData.append('price', unitPrice);
@@ -653,27 +654,33 @@ export default function AdminProductsScreen() {
     <AdminPageScreen
       title="Products"
       introDescription="Manage inventory and pricing across all stores."
-      bottomNavItems={tabs}
-      floatingContent={
-        <AppFab
-          icon={<Plus color="#FFFFFF" size={34} strokeWidth={2.2} />}
-          onPress={openCreateProductModal}
-          style={styles.fab}
-        />
-      }>
-      <View style={styles.categoryActionsRow}>
+      bottomNavItems={tabs}>
+      <View style={[styles.categoryActionsRow, isCompactPhone && styles.categoryActionsColumn]}>
         <AppButton
-          fullWidth={false}
-          label="Add Category"
-          onPress={openCreateCategoryModal}
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <PackagePlus color={color} size={size} strokeWidth={2.1} />}
+          label="Add Product"
+          onPress={openCreateProductModal}
           size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
           variant="primary"
         />
         <AppButton
-          fullWidth={false}
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <Tags color={color} size={size} strokeWidth={2.1} />}
+          label="Add Category"
+          onPress={openCreateCategoryModal}
+          size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
+          variant="primary"
+        />
+        <AppButton
+          fullWidth={isCompactPhone}
+          icon={({ color, size }) => <Shapes color={color} size={size} strokeWidth={2.1} />}
           label="Manage Categories"
           onPress={() => setShowManageCategories(true)}
           size="sm"
+          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
           variant="secondary"
         />
       </View>
@@ -694,33 +701,32 @@ export default function AdminProductsScreen() {
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Search color="#6F7487" size={22} strokeWidth={2} />
+          <Search color={colors.textTertiary} size={22} strokeWidth={2} />
           <TextInput
             onChangeText={setSearchQuery}
             placeholder="Search products..."
-            placeholderTextColor="#747B8D"
+            placeholderTextColor={colors.textSubtle}
             style={styles.searchInput}
             value={searchQuery}
           />
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-        {categoryChips.map((category) => (
-          <FilterChip
-            key={category}
-            active={selectedCategory === category}
-            label={category}
-            onPress={() => setSelectedCategory(category)}
-          />
-        ))}
-      </ScrollView>
-
-      <Text style={styles.filterSummaryText}>
-        {selectedCategory === 'All'
-          ? `Showing ${filteredProducts.length} of ${products.length} products`
-          : `Showing ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'} in ${selectedCategory}`}
-      </Text>
+      <View style={styles.filterRow}>
+        <AppSelect
+          options={categoryChips}
+          value={selectedCategory}
+          onValueChange={setSelectedCategory}
+          placeholder="Select category"
+          style={styles.categorySelect}
+        />
+        
+        <Text style={styles.filterSummaryText}>
+          {selectedCategory === 'All'
+            ? `Showing ${filteredProducts.length} of ${products.length} products`
+            : `Showing ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'} in ${selectedCategory}`}
+        </Text>
+      </View>
 
       <SectionHeading style={styles.sectionHeading}>PRODUCTS</SectionHeading>
       {feedback ? (
@@ -741,60 +747,79 @@ export default function AdminProductsScreen() {
         </View>
       ) : null}
       {screenError ? <Text style={styles.screenErrorText}>{screenError}</Text> : null}
-      <View style={styles.productsList}>
+      <SurfaceCard style={[styles.tableCard, isCompactPhone && styles.tableCardCompact]}>
         {isLoadingProducts ? (
           <Text style={styles.emptyStateText}>Loading inventory...</Text>
         ) : filteredProducts.length > 0 ? (
-          paginatedProducts.map((product) => (
-            <ProductListItem
-              key={product.id}
-              category={product.category.name}
-              imageUrl={product.imageUrl}
-              low={product.stock <= lowStockThreshold}
-              name={product.name}
-              onDelete={() => requestDeleteProduct(product)}
-              onEdit={() => openEditProductModal(product)}
-              price={formatPeso(normalizeNumber(product.price))}
-              sku={product.barcode || `ID-${product.id}`}
-              unitsText={`${product.stock} ${product.unit} in stock`}
-            />
-          ))
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={{ minWidth: '100%' }}
+          >
+            <View style={[styles.table, { minWidth: '100%' }]}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 3.2, minWidth: 160 }]}>PRODUCT NAME</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 150 }]}>DESCRIPTION</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>CATEGORY</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 120 }]}>BARCODE</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>WEIGHT</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>PRICE</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>STOCK</Text>
+                <Text style={[styles.tableHeaderCell, { width: 160, textAlign: 'right' }]}>ACTIONS</Text>
+              </View>
+
+              <View style={styles.tableRows}>
+                {paginatedProducts.map((product) => (
+                  <ProductListItem
+                    key={product.id}
+                    category={product.category.name}
+                    description={product.description}
+                    imageUrl={product.imageUrl}
+                    low={product.stock <= lowStockThreshold}
+                    name={product.name}
+                    onDelete={() => requestDeleteProduct(product)}
+                    onEdit={() => openEditProductModal(product)}
+                    price={formatPeso(normalizeNumber(product.price))}
+                    sku={product.barcode || `ID-${product.id}`}
+                    weightText={product.weight ? `${product.weight} ${product.unit}` : '-'}
+                    stockText={String(product.stock)}
+                  />
+                ))}
+              </View>
+
+              {/* Table Footer with Pagination */}
+              <View style={styles.tableFooter}>
+                <PaginationControls
+                  borderless
+                  currentPage={productPage}
+                  endItem={productPageEnd}
+                  onPageChange={setProductPage}
+                  startItem={productPageStart}
+                  totalItems={filteredProducts.length}
+                  totalPages={totalProductPages}
+                  visiblePageNumbers={visiblePageNumbers}
+                />
+              </View>
+            </View>
+          </ScrollView>
         ) : (
-          <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
+          <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
+          </View>
         )}
-      </View>
-      {!isLoadingProducts && filteredProducts.length > 0 ? (
-        <PaginationControls
-          currentPage={productPage}
-          endItem={productPageEnd}
-          onPageChange={setProductPage}
-          startItem={productPageStart}
-          totalItems={filteredProducts.length}
-          totalPages={totalProductPages}
-          visiblePageNumbers={visiblePageNumbers}
-        />
-      ) : null}
+      </SurfaceCard>
 
       <AddCategoryModal
-        categoryDescription={categoryDescription}
-        categoryError={categoryError}
-        categoryName={newCategoryName}
         isSavingCategory={isSavingCategory}
+        initialValues={{
+          categoryDescription: editingCategory?.description || '',
+          categoryName: editingCategory?.name || '',
+        }}
         mode={editingCategoryId ? 'edit' : 'create'}
-        onChangeCategoryDescription={(value) => {
-          setCategoryDescription(value);
-          if (categoryError) {
-            setCategoryError('');
-          }
-        }}
-        onChangeCategoryName={(value) => {
-          setNewCategoryName(value);
-          if (categoryError) {
-            setCategoryError('');
-          }
-        }}
         onClose={closeCategoryModal}
         onSave={handleSaveCategory}
+        serverError={categoryError}
         visible={showAddCategory}
       />
 
@@ -836,10 +861,12 @@ export default function AdminProductsScreen() {
         }}
         onRequestCreateCategory={openCategoryModalFromProduct}
         onProductNameChange={setProductName}
+        onProductDescriptionChange={setProductDescription}
         onSave={handleSaveProduct}
         onUnitPriceChange={(value) => setUnitPrice(digitsOnly(value))}
         onWeightVolumeChange={setWeightVolume}
         productActionLabel={editingProductId ? 'Update Product' : 'Add Product'}
+        productDescription={productDescription}
         productName={productName}
         selectedCategory={categoryValue}
         submittingLabel={editingProductId ? 'Updating...' : 'Saving...'}
@@ -874,6 +901,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl + 4,
   },
+  categoryActionsColumn: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  mobileActionButton: {
+    width: '100%',
+  },
+  desktopActionButton: {
+    minWidth: 184,
+  },
   searchRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -882,31 +919,36 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.xl,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    minHeight: 76,
-    paddingHorizontal: spacing.xl,
+    minHeight: 60,
+    paddingHorizontal: spacing.lg,
   },
   searchInput: {
-    color: '#2E3341',
+    color: colors.textHeading,
     flex: 1,
     fontFamily: fonts.regular,
-    fontSize: 20,
-    marginLeft: 10,
+    fontSize: 17,
+    marginLeft: spacing.sm + 2,
   },
-  chipsRow: {
-    gap: spacing.md,
-    paddingVertical: spacing.xl + 4,
+  filterRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.lg,
+    marginTop: spacing.md,
+  },
+  categorySelect: {
+    minWidth: 180,
   },
   filterSummaryText: {
-    color: '#687082',
+    color: colors.textTertiary,
     ...textRoles.label,
     fontSize: 13,
-    marginBottom: 14,
   },
   sectionHeading: {
     marginBottom: 18,
@@ -918,13 +960,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   feedbackSuccess: {
-    backgroundColor: '#E9F8EF',
-    borderColor: '#A6D9B6',
+    backgroundColor: colors.surfaceSuccessMuted,
+    borderColor: colors.borderSuccess,
     borderWidth: 1,
   },
   feedbackError: {
-    backgroundColor: '#FDECEC',
-    borderColor: '#E7B5B5',
+    backgroundColor: colors.surfaceDangerMuted,
+    borderColor: colors.borderDangerSoft,
     borderWidth: 1,
   },
   feedbackText: {
@@ -932,28 +974,66 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   feedbackTextSuccess: {
-    color: '#0D7A33',
+    color: colors.successBright,
   },
   feedbackTextError: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
   },
   screenErrorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginBottom: 12,
   },
-  productsList: {
-    gap: 14,
+  tableCard: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: 'hidden',
+  },
+  tableCardCompact: {
+    marginHorizontal: -spacing.md,
+    borderRadius: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+  },
+  listSpacer: {
+    height: 14,
   },
   emptyStateText: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
-    fontSize: 17,
+    fontSize: 15,
+    lineHeight: 22,
   },
-  fab: {
-    bottom: 104,
-    position: 'absolute',
-    right: 22,
+  table: {
+    backgroundColor: colors.card,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  tableHeader: {
+    backgroundColor: colors.surfaceSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderPanel,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  tableHeaderCell: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
+  },
+  tableRows: {
+    backgroundColor: '#FFFFFF',
+  },
+  tableFooter: {
+    backgroundColor: colors.surfaceSoft,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderPanel,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
 });

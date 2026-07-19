@@ -1,10 +1,11 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/cashiers", async (_req, res) => {
+router.get("/cashiers", requireAuth, requireRole(["Admin", "Owner"]), async (_req, res) => {
   try {
     const cashiers = await prisma.user.findMany({
       where: {
@@ -49,7 +50,7 @@ router.get("/cashiers", async (_req, res) => {
   }
 });
 
-router.post("/cashiers", async (req, res) => {
+router.post("/cashiers", requireAuth, requireRole(["Admin", "Owner"]), async (req, res) => {
   try {
     const {
       allowedCategoryIds,

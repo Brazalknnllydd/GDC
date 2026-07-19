@@ -1,40 +1,40 @@
-import { colors, fonts } from '../../constants/theme';
+import { colorChannels, colors, fonts, textSizes, withOpacity } from '../../constants/theme';
 
 export const adminChartConfig = {
-  backgroundGradientFrom: '#FFFFFF',
+  backgroundGradientFrom: colors.card,
   backgroundGradientFromOpacity: 0,
-  backgroundGradientTo: '#FFFFFF',
+  backgroundGradientTo: colors.card,
   backgroundGradientToOpacity: 0,
   barPercentage: 0.62,
-  color: (opacity = 1) => `rgba(26, 35, 126, ${opacity})`,
+  color: (opacity = 1) => withOpacity(colorChannels.secondary, opacity),
   decimalPlaces: 0,
   fillShadowGradientFrom: colors.secondary,
   fillShadowGradientFromOpacity: 0.2,
   fillShadowGradientTo: colors.secondary,
   fillShadowGradientToOpacity: 0.02,
-  labelColor: (opacity = 1) => `rgba(95, 103, 122, ${opacity})`,
+  labelColor: (opacity = 1) => withOpacity(colorChannels.textSecondary, opacity),
   propsForBackgroundLines: {
-    stroke: '#DCE1EE',
+    stroke: colors.borderPanel,
     strokeDasharray: '4 6',
     strokeWidth: 1,
   },
   propsForDots: {
     fill: colors.secondary,
     r: '4',
-    stroke: '#FFFFFF',
+    stroke: colors.card,
     strokeWidth: '2',
   },
   propsForHorizontalLabels: {
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
   },
   propsForLabels: {
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
   },
   propsForVerticalLabels: {
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: textSizes.smallCaps,
   },
   strokeWidth: 2,
   useShadowColorFromDataset: false,

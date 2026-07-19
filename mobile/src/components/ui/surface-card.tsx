@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Card } from 'react-native-paper';
 
 import { radius, shadows } from '../../constants/design-system';
+import { colors } from '../../constants/theme';
 
 type SurfaceCardProps = {
   children: ReactNode;
@@ -20,10 +21,11 @@ export function SurfaceCard({ children, onPress, style }: SurfaceCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CED3E3',
+    backgroundColor: colors.card,
+    borderColor: colors.borderStrong,
     borderRadius: radius.xl,
     borderWidth: 1,
+    overflow: 'hidden',
     ...shadows.card,
   },
 });

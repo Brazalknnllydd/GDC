@@ -16,10 +16,19 @@ import { AdminLineChart } from '../components/ui/admin-line-chart';
 import { AdminMetricCard } from '../components/ui/admin-metric-card';
 import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
+import {
+  ReportExportOptions,
+  type ReportExportFormat,
+} from '../components/ui/report-export-options';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, spacing } from '../constants/design-system';
 import { colors, textRoles, textSizes } from '../constants/theme';
+import { useReportsAnalytics } from '../hooks/use-reports-analytics';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import type { SaleRecord } from '../lib/sales-types';
+import { downloadWebPdfReport } from '../lib/web-pdf-export';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type Product = {
@@ -29,41 +38,6 @@ type Product = {
   };
 };
 
-type SaleItem = {
-  quantity: number;
-  subtotal: number | string;
-  product?: {
-    name: string;
-  };
-};
-
-type SaleRecord = {
-  totalAmount: number | string;
-  discountAmount?: number | string;
-  paymentMethod: string;
-  createdAt: string;
-  items: SaleItem[];
-};
-
-function normalizeNumber(value: number | string | undefined) {
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    return Number(value) || 0;
-  }
-
-  return 0;
-}
-
-function formatPeso(value: number) {
-  return `P${value.toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-PH', {
     day: '2-digit',
@@ -72,14 +46,6 @@ function formatDateTime(value: string) {
     month: 'short',
     year: 'numeric',
   });
-}
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 }
 
 function formatMonthLabel(value: Date | null) {
@@ -115,59 +81,26 @@ function formatMonthRangeLabel(range: MonthRangeValue) {
   return formatMonthLabel(range.startMonth || range.endMonth);
 }
 
-function isWithinMonthRange(dateValue: string, range: MonthRangeValue) {
-  if (!range.startMonth || !range.endMonth) {
-    return true;
+function formatMonthRangeForFilename(range: MonthRangeValue) {
+  if (!range.startMonth && !range.endMonth) {
+    return 'all-months';
   }
 
-  const date = new Date(dateValue);
-  return date >= startOfMonth(range.startMonth) && date <= endOfMonth(range.endMonth);
+  const months = [range.startMonth || range.endMonth, range.endMonth || range.startMonth]
+    .filter((value): value is Date => Boolean(value))
+    .map((value) =>
+      value.toLocaleDateString('en-PH', {
+        month: 'short',
+        year: 'numeric',
+      })
+    )
+    .map((value) => value.replace(/\s+/g, '-').toLowerCase());
+
+  return [...new Set(months)].join('-to-');
 }
 
-function buildMonthlyLineSeries(sales: SaleRecord[], range: MonthRangeValue) {
-  if (!range.startMonth || !range.endMonth) {
-    return { discountValues: [], labels: [], revenueValues: [] };
-  }
-
-  const labels: string[] = [];
-  const revenueValues: number[] = [];
-  const discountValues: number[] = [];
-  const cursor = startOfMonth(range.startMonth);
-  const endCursor = startOfMonth(range.endMonth);
-
-  while (cursor.getTime() <= endCursor.getTime()) {
-    const year = cursor.getFullYear();
-    const month = cursor.getMonth();
-    labels.push(
-      cursor.toLocaleDateString('en-PH', {
-        month: 'short',
-        year:
-          range.startMonth.getFullYear() === range.endMonth.getFullYear() ? undefined : '2-digit',
-      })
-    );
-
-    revenueValues.push(
-      sales.reduce((sum, sale) => {
-        const saleDate = new Date(sale.createdAt);
-        return saleDate.getFullYear() === year && saleDate.getMonth() === month
-          ? sum + normalizeNumber(sale.totalAmount)
-          : sum;
-      }, 0)
-    );
-
-    discountValues.push(
-      sales.reduce((sum, sale) => {
-        const saleDate = new Date(sale.createdAt);
-        return saleDate.getFullYear() === year && saleDate.getMonth() === month
-          ? sum + normalizeNumber(sale.discountAmount)
-          : sum;
-      }, 0)
-    );
-
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  return { discountValues, labels, revenueValues };
+function escapeCsvValue(value: string | number) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
 function escapeHtml(value: string | number) {
@@ -179,11 +112,23 @@ function escapeHtml(value: string | number) {
     .replace(/'/g, '&#39;');
 }
 
+const pdfColors = {
+  border: colors.borderPanel,
+  box: colors.surfaceSubtle,
+  label: colors.muted,
+  text: colors.textStrong,
+  title: colors.secondary,
+  thBackground: colors.surfaceBrandSoft,
+};
+
 export default function AdminReportsScreen() {
+  const { compactPhone } = useResponsiveLayout();
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [screenError, setScreenError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportVisible, setIsExportVisible] = useState(false);
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ReportExportFormat>('excel');
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [reportMonthRange, setReportMonthRange] = useState<MonthRangeValue>(() => {
@@ -220,134 +165,14 @@ export default function AdminReportsScreen() {
     loadReportsData();
   }, []);
 
-  const filteredSales = useMemo(
-    () => sales.filter((sale) => isWithinMonthRange(sale.createdAt, reportMonthRange)),
-    [reportMonthRange, sales]
-  );
-
-  const totals = useMemo(() => {
-    const revenue = filteredSales.reduce(
-      (sum, sale) => sum + normalizeNumber(sale.totalAmount),
-      0
-    );
-    const discounts = filteredSales.reduce(
-      (sum, sale) => sum + normalizeNumber(sale.discountAmount),
-      0
-    );
-    const itemsSold = filteredSales.reduce(
-      (sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
-      0
-    );
-    const averageBasket = filteredSales.length === 0 ? 0 : itemsSold / filteredSales.length;
-    const activeCategories = new Set(products.map((product) => product.category.name)).size;
-
-    return {
-      activeCategories,
-      averageBasket,
-      discounts,
-      itemsSold,
-      revenue,
-      transactions: filteredSales.length,
-    };
-  }, [filteredSales, products]);
-
-  const reportMetrics = useMemo(
-    () => [
-      {
-        title: 'DISCOUNTS GIVEN',
-        value: formatPeso(totals.discounts),
-        detail: 'Total discounts applied',
-        tone: 'default' as const,
-      },
-      {
-        title: 'ITEMS SOLD',
-        value: String(totals.itemsSold),
-        detail: `${totals.transactions} completed transactions`,
-        tone: 'default' as const,
-      },
-      {
-        title: 'AVG BASKET',
-        value: totals.averageBasket.toFixed(1),
-        detail: 'Items per transaction',
-        tone: 'default' as const,
-      },
-      {
-        title: 'ACTIVE CATEGORIES',
-        value: String(totals.activeCategories),
-        detail: 'Categories tracked in inventory',
-        tone: 'default' as const,
-      },
-    ],
-    [totals]
-  );
-
-  const chartSeries = useMemo(
-    () => buildMonthlyLineSeries(filteredSales, reportMonthRange),
-    [filteredSales, reportMonthRange]
-  );
-
-  const categoryPerformance = useMemo(() => {
-    const counts = new Map<string, number>();
-    products.forEach((product) => {
-      counts.set(product.category.name, (counts.get(product.category.name) || 0) + 1);
+  const { categoryPerformance, chartSeries, insightCards, paymentDistribution, reportMetrics, totals } =
+    useReportsAnalytics({
+      formatPeso,
+      normalizeNumber,
+      products,
+      reportMonthRange,
+      sales,
     });
-    const total = Math.max(products.length, 1);
-
-    return [...counts.entries()]
-      .map(([label, count]) => ({
-        label,
-        percentage: Math.round((count / total) * 100),
-      }))
-      .sort((left, right) => right.percentage - left.percentage);
-  }, [products]);
-
-  const paymentDistribution = useMemo(() => {
-    const totalRevenue = Math.max(
-      filteredSales.reduce((sum, sale) => sum + normalizeNumber(sale.totalAmount), 0),
-      1
-    );
-
-    return [
-      { key: 'Cash', label: 'Cash', tone: 'success' as const },
-      { key: 'GCash', label: 'GCash', tone: 'primary' as const },
-    ].map((config) => {
-      const amount = filteredSales
-        .filter((sale) => sale.paymentMethod === config.key)
-        .reduce((sum, sale) => sum + normalizeNumber(sale.totalAmount), 0);
-      const percentage = filteredSales.length === 0 ? 0 : Math.round((amount / totalRevenue) * 100);
-
-      return {
-        amount: formatPeso(amount),
-        icon: CreditCard,
-        label: config.label,
-        percentageText: `(${percentage}%)`,
-        tone: config.tone,
-      };
-    });
-  }, [filteredSales]);
-
-  const insightCards = useMemo(() => {
-    const bestCategory = categoryPerformance[0]?.label || 'No categories yet';
-    const topPayment = paymentDistribution
-      .slice()
-      .sort((left, right) => {
-        const leftValue = Number(left.amount.replace(/[^\d.]/g, '')) || 0;
-        const rightValue = Number(right.amount.replace(/[^\d.]/g, '')) || 0;
-        return rightValue - leftValue;
-      })[0]?.label || 'No payment data';
-    const peakSalesDay = filteredSales.length
-      ? new Date(
-          filteredSales
-            .slice()
-            .sort(
-              (left, right) =>
-                normalizeNumber(right.totalAmount) - normalizeNumber(left.totalAmount)
-            )[0].createdAt
-        ).toLocaleDateString('en-US', { weekday: 'long' })
-      : 'No sales yet';
-
-    return { bestCategory, peakSalesDay, topPayment };
-  }, [categoryPerformance, filteredSales, paymentDistribution]);
 
   async function getLogoDataUri() {
     const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
@@ -368,22 +193,20 @@ export default function AdminReportsScreen() {
     return `data:image/jpeg;base64,${base64}`;
   }
 
-  function openPrintableWebReport(html: string) {
-    if (typeof window === 'undefined') {
-      throw new Error('Print preview is not available in this environment.');
+  function downloadWebFile(content: string, fileName: string, mimeType: string) {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      throw new Error('Web download is not available in this environment.');
     }
 
-    const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=960,height=720');
-
-    if (!reportWindow) {
-      throw new Error('Please allow pop-ups to export the PDF report.');
-    }
-
-    reportWindow.document.open();
-    reportWindow.document.write(html);
-    reportWindow.document.close();
-    reportWindow.focus();
-    setTimeout(() => reportWindow.print(), 400);
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
   }
 
   async function shareFile(uri: string) {
@@ -401,6 +224,75 @@ export default function AdminReportsScreen() {
     });
   }
 
+  async function exportExcelReport() {
+    const rangeLabel = formatMonthRangeLabel(reportMonthRange);
+    const lines = [
+      [escapeCsvValue('GDC Inventory Pro Reports Summary')],
+      [escapeCsvValue(`Range: ${rangeLabel}`)],
+      [escapeCsvValue(`Generated: ${formatDateTime(new Date().toISOString())}`)],
+      [],
+      [escapeCsvValue('Summary')],
+      [escapeCsvValue('Discounts Given'), escapeCsvValue(formatPeso(totals.discounts))],
+      [escapeCsvValue('Items Sold'), escapeCsvValue(totals.itemsSold)],
+      [escapeCsvValue('Average Basket'), escapeCsvValue(totals.averageBasket.toFixed(1))],
+      [escapeCsvValue('Active Categories'), escapeCsvValue(totals.activeCategories)],
+      [],
+      [escapeCsvValue('Payment Method'), escapeCsvValue('Total'), escapeCsvValue('Share')],
+      ...paymentDistribution.map((payment) =>
+        [payment.label, payment.amount, payment.percentageText].map(escapeCsvValue)
+      ),
+      [],
+      [escapeCsvValue('Category'), escapeCsvValue('Catalog Coverage')],
+      ...categoryPerformance.map((category) =>
+        [category.label, `${category.percentage}%`].map(escapeCsvValue)
+      ),
+    ];
+    const csvContent = lines.map((line) => line.join(',')).join('\n');
+    const fileName = `gdc-reports-summary-${formatMonthRangeForFilename(reportMonthRange)}.csv`;
+
+    if (Platform.OS === 'web') {
+      downloadWebFile(csvContent, fileName, 'text/csv;charset=utf-8;');
+      return;
+    }
+
+    const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+    await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    const available = await Sharing.isAvailableAsync();
+    if (!available) {
+      Alert.alert('Sharing unavailable', 'File sharing is not available on this device.');
+      return;
+    }
+
+    await Sharing.shareAsync(fileUri, {
+      UTI: 'public.comma-separated-values-text',
+      dialogTitle: 'Share Excel Report',
+      mimeType: 'text/csv',
+    });
+  }
+
+  async function handleExportReport() {
+    if (selectedExportFormat === 'pdf') {
+      await handleExportPdf();
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setScreenError('');
+      await exportExcelReport();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export the report right now.';
+      setScreenError(message);
+      Alert.alert('Export failed', message);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   async function handleExportPdf() {
     try {
       setIsExporting(true);
@@ -409,6 +301,7 @@ export default function AdminReportsScreen() {
       const logoDataUri = await getLogoDataUri();
       const rangeLabel = formatMonthRangeLabel(reportMonthRange);
       const generatedAt = formatDateTime(new Date().toISOString());
+      const fileName = `gdc-reports-summary-${formatMonthRangeForFilename(reportMonthRange)}.pdf`;
       const categoryRows =
         categoryPerformance.length > 0
           ? categoryPerformance
@@ -445,12 +338,12 @@ export default function AdminReportsScreen() {
             <style>
               body {
                 font-family: Arial, sans-serif;
-                color: #1b1f2d;
+                color: ${pdfColors.text};
                 padding: 24px;
               }
               .header {
                 align-items: center;
-                border-bottom: 2px solid #d9def0;
+                border-bottom: 2px solid ${pdfColors.border};
                 display: flex;
                 gap: 16px;
                 padding-bottom: 18px;
@@ -462,13 +355,13 @@ export default function AdminReportsScreen() {
                 width: 64px;
               }
               .title {
-                color: #1a237e;
+                color: ${pdfColors.title};
                 font-size: 24px;
                 font-weight: 700;
                 margin: 0;
               }
               .subtitle {
-                color: #5d6476;
+                color: ${colors.textSecondary};
                 font-size: 12px;
                 letter-spacing: 2px;
                 margin: 4px 0 0;
@@ -487,8 +380,8 @@ export default function AdminReportsScreen() {
                 margin: 22px 0;
               }
               .summary-card {
-                background: #f7f8fc;
-                border: 1px solid #dce1ee;
+                background: ${pdfColors.box};
+                border: 1px solid ${pdfColors.border};
                 border-radius: 14px;
                 box-sizing: border-box;
                 min-width: 220px;
@@ -496,20 +389,20 @@ export default function AdminReportsScreen() {
                 width: calc(50% - 6px);
               }
               .summary-label {
-                color: #6b7280;
+                color: ${pdfColors.label};
                 font-size: 11px;
                 letter-spacing: 1px;
                 margin: 0 0 8px;
                 text-transform: uppercase;
               }
               .summary-value {
-                color: #1a237e;
+                color: ${pdfColors.title};
                 font-size: 22px;
                 font-weight: 700;
                 margin: 0;
               }
               h2 {
-                color: #1a237e;
+                color: ${pdfColors.title};
                 font-size: 18px;
                 margin: 28px 0 12px;
               }
@@ -518,14 +411,14 @@ export default function AdminReportsScreen() {
                 width: 100%;
               }
               th, td {
-                border: 1px solid #dce1ee;
+                border: 1px solid ${pdfColors.border};
                 font-size: 11px;
                 padding: 8px 10px;
                 text-align: left;
               }
               th {
-                background: #eef2ff;
-                color: #1a237e;
+                background: ${pdfColors.thBackground};
+                color: ${pdfColors.title};
               }
               .insight-grid {
                 display: flex;
@@ -533,21 +426,21 @@ export default function AdminReportsScreen() {
                 margin-top: 18px;
               }
               .insight-box {
-                background: #f6f7fb;
-                border: 1px solid #dce1ee;
+                background: ${pdfColors.box};
+                border: 1px solid ${pdfColors.border};
                 border-radius: 14px;
                 flex: 1;
                 padding: 14px 16px;
               }
               .insight-label {
-                color: #6b7280;
+                color: ${pdfColors.label};
                 font-size: 11px;
                 letter-spacing: 1px;
                 margin: 0 0 6px;
                 text-transform: uppercase;
               }
               .insight-value {
-                color: #1b1f2d;
+                color: ${pdfColors.text};
                 font-size: 18px;
                 font-weight: 700;
                 margin: 0;
@@ -633,7 +526,42 @@ export default function AdminReportsScreen() {
       `;
 
       if (Platform.OS === 'web') {
-        openPrintableWebReport(html);
+        await downloadWebPdfReport({
+          fileName,
+          title: 'Admin Reports',
+          subtitle: 'GDC Inventory Pro',
+          metadata: [
+            { label: 'Month Range', value: rangeLabel },
+            { label: 'Generated', value: generatedAt },
+          ],
+          summary: [
+            { label: 'Discounts Given', value: formatPeso(totals.discounts) },
+            { label: 'Items Sold', value: String(totals.itemsSold) },
+            { label: 'Average Basket', value: totals.averageBasket.toFixed(1) },
+            { label: 'Active Categories', value: String(totals.activeCategories) },
+          ],
+          tables: [
+            {
+              headers: ['Payment Method', 'Total', 'Share'],
+              rows: paymentDistribution.map((payment) => [
+                payment.label,
+                payment.amount,
+                payment.percentageText,
+              ]),
+              title: 'Payment Distribution',
+            },
+            {
+              emptyText: 'No category coverage data available.',
+              headers: ['Category', 'Coverage'],
+              rows: categoryPerformance.map((category) => [
+                category.label,
+                `${category.percentage}%`,
+              ]),
+              title: 'Catalog Category Coverage',
+            },
+          ],
+          footer: 'Prepared by GDC Inventory Pro',
+        });
         return;
       }
 
@@ -653,19 +581,9 @@ export default function AdminReportsScreen() {
     <AdminPageScreen
       title="Reports"
       introDescription="Review store insights, payment mix, category coverage, and export-ready summaries."
-      bottomNavItems={reportTabs}
-      introChildren={
-        <View style={styles.filterToolbar}>
-          <Pressable
-            disabled={isExporting}
-            onPress={handleExportPdf}
-            style={[styles.toolbarIconButton, isExporting && styles.toolbarIconButtonDisabled]}>
-            <Download color={colors.secondary} size={18} strokeWidth={2} />
-          </Pressable>
-        </View>
-      }>
-      <SurfaceCard style={styles.rangeCard}>
-        <View style={styles.rangeCardHeader}>
+      bottomNavItems={reportTabs}>
+      <SurfaceCard style={[styles.rangeCard, compactPhone && styles.rangeCardCompact]}>
+        <View style={[styles.rangeCardHeader, compactPhone && styles.rangeCardHeaderCompact]}>
           <View style={styles.rangeTextBlock}>
             <Text style={styles.rangeLabel}>Reports Month Range</Text>
             <Text style={styles.rangeValue}>{formatMonthRangeLabel(reportMonthRange)}</Text>
@@ -674,14 +592,27 @@ export default function AdminReportsScreen() {
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => setShowRangePicker((current) => !current)}
-            style={styles.calendarButton}>
-            <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
-            <Text style={styles.calendarButtonText}>
-              {showRangePicker ? 'Hide Calendar' : 'Choose Range'}
-            </Text>
-          </Pressable>
+          <View style={[styles.rangeActionsBlock, compactPhone && styles.rangeActionsBlockCompact]}>
+            <Pressable
+              disabled={isExporting}
+              onPress={() => setIsExportVisible((current) => !current)}
+              style={[
+                styles.toolbarIconButton,
+                compactPhone && styles.toolbarIconButtonCompact,
+                isExporting && styles.toolbarIconButtonDisabled,
+              ]}>
+              <Download color={colors.secondary} size={18} strokeWidth={2} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setShowRangePicker((current) => !current)}
+              style={[styles.calendarButton, compactPhone && styles.calendarButtonCompact]}>
+              <CalendarDays color={colors.secondary} size={16} strokeWidth={2} />
+              <Text style={styles.calendarButtonText}>
+                {showRangePicker ? 'Hide Calendar' : 'Choose Range'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {showRangePicker ? (
@@ -693,7 +624,7 @@ export default function AdminReportsScreen() {
               range={reportMonthRange}
             />
 
-            <View style={styles.rangeActions}>
+            <View style={[styles.rangeActions, compactPhone && styles.rangeActionsCompact]}>
               <Pressable
                 onPress={() => {
                   const now = new Date();
@@ -725,23 +656,34 @@ export default function AdminReportsScreen() {
         ) : null}
       </SurfaceCard>
 
-      <AdminMetricGrid>
-        {reportMetrics.map((metric) => (
-          <AdminMetricCard
-            key={metric.title}
-            detail={metric.detail}
-            title={metric.title}
-            tone={metric.tone}
-            value={metric.value}
-          />
-        ))}
-      </AdminMetricGrid>
+      {isExportVisible ? (
+        <ReportExportOptions
+          format={selectedExportFormat}
+          isExporting={isExporting}
+          onExport={handleExportReport}
+          onFormatChange={setSelectedExportFormat}
+        />
+      ) : null}
+
+      <View style={isExportVisible ? styles.metricsAfterExport : undefined}>
+        <AdminMetricGrid>
+          {reportMetrics.map((metric) => (
+            <AdminMetricCard
+              key={metric.title}
+              detail={metric.detail}
+              title={metric.title}
+              tone={metric.tone}
+              value={metric.value}
+            />
+          ))}
+        </AdminMetricGrid>
+      </View>
 
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Monthly Report Trend</Text>
       </View>
 
-      <SurfaceCard style={styles.analyticsCard}>
+      <SurfaceCard style={[styles.analyticsCard, compactPhone && styles.analyticsCardCompact]}>
         <View style={styles.analyticsLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.legendRevenue]} />
@@ -803,7 +745,7 @@ export default function AdminReportsScreen() {
       <Text style={styles.sectionTitle}>Payment Distribution</Text>
       <SurfaceCard style={styles.paymentCard}>
         {paymentDistribution.map((payment) => (
-          <PaymentDistributionRow key={payment.label} {...payment} />
+          <PaymentDistributionRow key={payment.label} {...payment} icon={CreditCard} />
         ))}
       </SurfaceCard>
 
@@ -813,31 +755,33 @@ export default function AdminReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  filterToolbar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: -4,
-  },
   toolbarIconButton: {
     alignItems: 'center',
-    backgroundColor: '#F4F6FF',
-    borderColor: '#C7D3FF',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfoStrong,
     borderRadius: radius.round,
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
+  toolbarIconButtonCompact: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   toolbarIconButtonDisabled: {
     opacity: 0.52,
   },
   rangeCard: {
-    backgroundColor: '#FBFBFE',
-    borderColor: '#D9DFF0',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderPanel,
     marginBottom: layout.cardGap + spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+  },
+  rangeCardCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   rangeCardHeader: {
     alignItems: 'flex-start',
@@ -846,25 +790,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  rangeCardHeaderCompact: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  rangeActionsBlock: {
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  rangeActionsBlockCompact: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   rangeTextBlock: {
     flex: 1,
     minWidth: 0,
   },
   rangeLabel: {
-    color: '#6A7285',
+    color: colors.textTertiary,
     ...textRoles.label,
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   rangeValue: {
-    color: '#1B1F2D',
+    color: colors.textStrong,
     ...textRoles.value,
     fontSize: 18,
     lineHeight: 28,
     marginBottom: 4,
   },
   rangeHelp: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 14,
     lineHeight: 21,
@@ -872,8 +828,8 @@ const styles = StyleSheet.create({
   calendarButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#EEF2FF',
-    borderColor: '#CBD5FF',
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderInfoStrong,
     borderRadius: radius.round,
     borderWidth: 1,
     flexDirection: 'row',
@@ -881,6 +837,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
+  },
+  calendarButtonCompact: {
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
+    width: '100%',
   },
   calendarButtonText: {
     color: colors.secondary,
@@ -892,17 +854,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
+  rangeActionsCompact: {
+    flexWrap: 'wrap',
+  },
   rangeActionButton: {
-    backgroundColor: '#F3F4F8',
-    borderColor: '#D4D9E7',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
     borderRadius: radius.round,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   rangeActionText: {
-    color: '#40485A',
+    color: colors.textHeading,
     ...textRoles.label,
+  },
+  metricsAfterExport: {
+    marginTop: layout.cardGap,
   },
   sectionHeaderRow: {
     alignItems: 'center',
@@ -912,14 +880,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.block,
   },
   sectionTitle: {
-    color: '#171C28',
+    color: colors.textStrong,
     ...textRoles.value,
     fontSize: textSizes.large,
   },
   analyticsCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
+  },
+  analyticsCardCompact: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
   },
   analyticsLegend: {
     flexDirection: 'row',
@@ -943,11 +915,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tertiary,
   },
   legendText: {
-    color: '#5A6071',
+    color: colors.textSecondary,
     ...textRoles.label,
   },
   sectionEyebrow: {
-    color: '#7A8092',
+    color: colors.textSubtle,
     ...textRoles.label,
     letterSpacing: 1.3,
     marginBottom: spacing.md,
@@ -958,27 +930,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.section,
   },
   heroInsightCard: {
-    backgroundColor: '#1A237E',
-    borderColor: '#1A237E',
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
     borderRadius: radius.xl,
     marginBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
   heroInsightLabel: {
-    color: '#D7DBFF',
+    color: colors.textOnSecondaryMuted,
     ...textRoles.label,
     letterSpacing: 1.1,
     marginBottom: 6,
   },
   heroInsightValue: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     ...textRoles.heading,
     fontSize: 30,
     marginBottom: 6,
   },
   heroInsightCopy: {
-    color: '#D8DEFF',
+    color: colors.textOnSecondaryMuted,
     ...textRoles.body,
     fontSize: 14,
   },
@@ -993,25 +965,25 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   insightTilePrimary: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#C12227',
+    backgroundColor: colors.tertiary,
+    borderColor: colors.dangerAccent,
   },
   insightTileSoft: {
-    backgroundColor: '#F3F4F8',
-    borderColor: '#D7DDEC',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
   },
   insightTileLabel: {
-    color: '#FFE4E4',
+    color: colors.borderDanger,
     ...textRoles.label,
     marginBottom: 8,
   },
   insightTileLabelSoft: {
-    color: '#747B8D',
+    color: colors.textSubtle,
     ...textRoles.label,
     marginBottom: 8,
   },
   insightTileValueLight: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     ...textRoles.value,
     fontSize: textSizes.large - 1,
     lineHeight: 30,
@@ -1033,12 +1005,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   emptyStateText: {
-    color: '#5D6476',
+    color: colors.textSecondary,
     ...textRoles.body,
     fontSize: 15,
+    lineHeight: 22,
   },
   screenErrorText: {
-    color: '#B3261E',
+    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: 13,
     marginTop: spacing.md,
