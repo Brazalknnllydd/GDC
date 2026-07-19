@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import Toast from "react-native-toast-message";
 import {
   useFonts,
   Poppins_400Regular,
@@ -68,18 +69,20 @@ export default function RootLayout() {
     );
   }
 
-  return (
-    <PaperProvider theme={paperTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="admin" />
-        <Stack.Screen name="admin-products" />
-        <Stack.Screen name="admin-customers" />
-        <Stack.Screen name="admin-sales" />
-        <Stack.Screen name="admin-reports" />
-        <Stack.Screen name="admin-settings" />
-        <Stack.Screen name="cashier" />
-      </Stack>
-    </PaperProvider>
-  );
+return (
+  <PaperProvider theme={paperTheme}>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="admin" />
+      <Stack.Screen name="admin-products" />
+      <Stack.Screen name="admin-customers" />
+      <Stack.Screen name="admin-sales" />
+      <Stack.Screen name="admin-reports" />
+      <Stack.Screen name="admin-settings" />
+      <Stack.Screen name="cashier" />
+    </Stack>
+
+    <Toast />
+  </PaperProvider>
+);
 }

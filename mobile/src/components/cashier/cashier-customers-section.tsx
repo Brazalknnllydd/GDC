@@ -21,6 +21,7 @@ import { spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { apiClient } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-errors';
+import { toast } from '../../lib/toast';
 
 type Customer = {
   id: number;
@@ -117,16 +118,38 @@ export function CashierCustomersSection() {
         address: form.address.trim() || null,
         notes: form.notes.trim() || null,
       };
-      if (editingCustomer) {
-        await apiClient.put(`/customers/${editingCustomer.id}`, payload);
-      } else {
-        await apiClient.post('/customers', payload);
-      }
-      setShowFormModal(false);
-      void loadCustomers();
+if (editingCustomer) {
+  await apiClient.put(`/customers/${editingCustomer.id}`, payload);
+
+  toast.success(
+    "Customer Updated",
+    `${form.name} was updated successfully.`
+  );
+
+} else {
+  await apiClient.post('/customers', payload);
+
+  toast.success(
+    "Customer Added",
+    `${form.name} was added successfully.`
+  );
+}
+
+setShowFormModal(false);
+void loadCustomers();
     } catch (err) {
-      setFormError(getApiErrorMessage(err, 'Could not save customer.'));
-    } finally {
+  const message = getApiErrorMessage(
+    err,
+    'Could not save customer.'
+  );
+
+  toast.error(
+    "Save Failed",
+    message
+  );
+
+  setFormError(message);
+} finally {
       setIsSaving(false);
     }
   }

@@ -4,6 +4,7 @@ import type { Product } from '../components/admin-products/products-screen-data'
 import { apiClient } from '../lib/api';
 import { getApiErrorMessage } from '../lib/api-errors';
 import { normalizeNumber } from '../lib/product-utils';
+import { toast } from '../lib/toast';
 
 export type CartItem = {
   barcode: string | null;
@@ -171,6 +172,11 @@ export function useCashierCheckout({
         },
       ];
     });
+
+    toast.success(
+      "Added to Cart",
+      `${product.name} added successfully.`
+    );
   }
 
   function updateCartQuantity(productId: number, nextQuantity: number) {
@@ -188,9 +194,22 @@ export function useCashierCheckout({
     );
   }
 
-  function removeFromCart(productId: number) {
-    setCart((currentCart) => currentCart.filter((item) => item.id !== productId));
+function removeFromCart(productId: number) {
+  const removedItem = cart.find(
+    (item) => item.id === productId
+  );
+
+  setCart((currentCart) =>
+    currentCart.filter((item) => item.id !== productId)
+  );
+
+  if (removedItem) {
+    toast.info(
+      "Removed from Cart",
+      `${removedItem.name} was removed.`
+    );
   }
+}
 
   function updateCartItemDiscount(productId: number, nextValue: string) {
     setCart((currentCart) =>
@@ -308,16 +327,30 @@ export function useCashierCheckout({
         })),
       });
       setCart([]);
-      resetSaleFlow();
-      setShowSuccessModal(true);
+setShowSuccessModal(true);
 
-      if (onSaleCompleted) {
+toast.success(
+  "Payment Successful",
+  `Receipt ${receiptNumber} completed.`
+);
+
+if (onSaleCompleted) {
         await onSaleCompleted();
       }
 
       return true;
     } catch (error) {
-      setSaleError(getApiErrorMessage(error, 'Could not complete the sale right now.'));
+      const message = getApiErrorMessage(
+        error,
+        'Could not complete the sale right now.'
+      );
+
+      toast.error(
+        "Payment Failed",
+        message
+      );
+
+      setSaleError(message);
       return false;
     } finally {
       setIsSubmittingSale(false);
