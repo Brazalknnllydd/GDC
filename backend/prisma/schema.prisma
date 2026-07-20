@@ -9,9 +9,9 @@ datasource db {
 model Role {
   id        Int      @id @default(autoincrement())
   name      String   @unique
-  users     User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  users     User[]
 }
 
 model User {
@@ -20,32 +20,32 @@ model User {
   username                String                  @unique
   password                String
   roleId                  Int
-  role                    Role                    @relation(fields: [roleId], references: [id])
-  shifts                  Shift[]
-  sales                   Sale[]                  @relation("CashierSales")
-  approvedSales           Sale[]                  @relation("ApprovedSales")
-  cashierCategoryAccesses CashierCategoryAccess[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
+  cashierCategoryAccesses CashierCategoryAccess[]
+  approvedSales           Sale[]                  @relation("ApprovedSales")
+  sales                   Sale[]                  @relation("CashierSales")
+  shifts                  Shift[]
+  role                    Role                    @relation(fields: [roleId], references: [id])
 }
 
 model Category {
   id                      Int                     @id @default(autoincrement())
   name                    String                  @unique
   description             String?
-  products                Product[]
-  cashierCategoryAccesses CashierCategoryAccess[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
+  cashierCategoryAccesses CashierCategoryAccess[]
+  products                Product[]
 }
 
 model CashierCategoryAccess {
   id         Int      @id @default(autoincrement())
   userId     Int
   categoryId Int
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, categoryId])
 }
@@ -62,11 +62,11 @@ model Product {
   weight        Float?
   unit          String         @default("pcs")
   categoryId    Int
-  category      Category       @relation(fields: [categoryId], references: [id])
-  saleItems     SaleItem[]
-  inventoryLogs InventoryLog[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  inventoryLogs InventoryLog[]
+  category      Category       @relation(fields: [categoryId], references: [id])
+  saleItems     SaleItem[]
 }
 
 model Customer {
@@ -75,9 +75,9 @@ model Customer {
   phoneNumber String?
   address     String?
   notes       String?
-  sales       Sale[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  sales       Sale[]
 }
 
 model Shift {
@@ -90,37 +90,37 @@ model Shift {
   startedAt           DateTime  @default(now())
   endedAt             DateTime?
   userId              Int
-  user                User      @relation(fields: [userId], references: [id])
   sales               Sale[]
+  user                User      @relation(fields: [userId], references: [id])
 }
 
 model Sale {
-  id               Int       @id @default(autoincrement())
-  receiptNumber    String    @unique
+  id               Int        @id @default(autoincrement())
+  receiptNumber    String     @unique
   userId           Int
-  user             User      @relation("CashierSales", fields: [userId], references: [id])
   customerId       Int?
-  customer         Customer? @relation(fields: [customerId], references: [id])
   shiftId          Int?
-  shift            Shift?    @relation(fields: [shiftId], references: [id])
-  subtotal         Decimal   @db.Decimal(10, 2)
+  subtotal         Decimal    @db.Decimal(10, 2)
   discountType     String?
-  discountValue    Decimal?  @db.Decimal(10, 2)
-  discountAmount   Decimal   @default(0) @db.Decimal(10, 2)
-  taxAmount        Decimal   @default(0) @db.Decimal(10, 2)
-  totalAmount      Decimal   @db.Decimal(10, 2)
-  amountPaid       Decimal   @db.Decimal(10, 2)
-  changeAmount     Decimal   @db.Decimal(10, 2)
-  paymentMethod    String    @default("Cash")
+  discountValue    Decimal?   @db.Decimal(10, 2)
+  discountAmount   Decimal    @default(0) @db.Decimal(10, 2)
+  taxAmount        Decimal    @default(0) @db.Decimal(10, 2)
+  totalAmount      Decimal    @db.Decimal(10, 2)
+  amountPaid       Decimal    @db.Decimal(10, 2)
+  changeAmount     Decimal    @db.Decimal(10, 2)
+  paymentMethod    String     @default("Cash")
   paymentReference String?
-  status           String    @default("completed")
+  status           String     @default("completed")
   approvedByUserId Int?
-  approvedBy       User?     @relation("ApprovedSales", fields: [approvedByUserId], references: [id])
   notes            String?
-  isPrinted        Boolean   @default(false)
+  isPrinted        Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  approvedBy       User?      @relation("ApprovedSales", fields: [approvedByUserId], references: [id])
+  customer         Customer?  @relation(fields: [customerId], references: [id])
+  shift            Shift?     @relation(fields: [shiftId], references: [id])
+  user             User       @relation("CashierSales", fields: [userId], references: [id])
   items            SaleItem[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
 }
 
 model SaleItem {
@@ -129,9 +129,9 @@ model SaleItem {
   price     Decimal @db.Decimal(10, 2)
   subtotal  Decimal @db.Decimal(10, 2)
   saleId    Int
-  sale      Sale    @relation(fields: [saleId], references: [id])
   productId Int
   product   Product @relation(fields: [productId], references: [id])
+  sale      Sale    @relation(fields: [saleId], references: [id])
 }
 
 model InventoryLog {
@@ -140,6 +140,6 @@ model InventoryLog {
   quantity  Float
   note      String?
   productId Int
-  product   Product  @relation(fields: [productId], references: [id])
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 }
