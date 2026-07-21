@@ -41,43 +41,44 @@ export async function getCashierDashboard(userId: number) {
     throw new Error("User not found");
   }
 
-  const latestShift = await prisma.shift.findFirst({
-    where: {
-      userId,
-    },
-    orderBy: {
-      startedAt: "desc",
-    },
-  });
+const currentShift = await prisma.shift.findFirst({
+  where: {
+    userId,
+    status: "OPEN",
+    endedAt: null,
+  },
+  orderBy: {
+    startedAt: "desc",
+  },
+});
 
-  const todaySales = latestShift?.status === 'OPEN' ? await prisma.sale.findMany({
-    where: {
-      userId,
-      shiftId: latestShift.id,
+const todaySales = await prisma.sale.findMany({
+  where: {
+    userId,
+  },
+  include: {
+    customer: {
+      select: { name: true },
     },
-    include: {
-      customer: {
-        select: { name: true },
-      },
-      items: {
-        include: {
-          product: {
-            select: {
-              name: true,
-            },
+    items: {
+      include: {
+        product: {
+          select: {
+            name: true,
           },
         },
       },
-      user: {
-        select: {
-          name: true,
-        },
+    },
+    user: {
+      select: {
+        name: true,
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-  }) : [];
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+});
 
   const recentSales = todaySales.map((sale) => ({
     id: sale.id,
@@ -151,20 +152,20 @@ export async function getCashierDashboard(userId: number) {
       role: user.role.name,
       username: user.username,
     },
-    currentShift: latestShift
+    currentShift: currentShift
       ? {
-          id: latestShift.id,
+          id: currentShift.id,
           durationMinutes: Math.max(
             0,
             Math.floor(
-              ((latestShift.endedAt ?? new Date()).getTime() - latestShift.startedAt.getTime()) /
+              ((currentShift.endedAt ?? new Date()).getTime() - currentShift.startedAt.getTime()) /
                 60000
             )
           ),
-          expectedCashOnHand: toNumber(latestShift.openingCash) + cashSalesTotal,
-          openingCash: toNumber(latestShift.openingCash),
-          startedAt: latestShift.startedAt.toISOString(),
-          status: latestShift.endedAt ? "Closed Shift" : "Active Shift",
+          expectedCashOnHand: toNumber(currentShift.openingCash) + cashSalesTotal,
+          openingCash: toNumber(currentShift.openingCash),
+          startedAt: currentShift.startedAt.toISOString(),
+          status: currentShift.endedAt ? "Closed Shift" : "Active Shift",
         }
       : null,
     paymentBreakdown,
@@ -176,8 +177,8 @@ export async function getCashierDashboard(userId: number) {
     },
     recentSales,
     totals: {
-      drawerVariance: latestShift && latestShift.closingCash !== null
-        ? toNumber(latestShift.closingCash) - (toNumber(latestShift.openingCash) + cashSalesTotal)
+      drawerVariance: currentShift && currentShift.closingCash !== null
+        ? toNumber(currentShift.closingCash) - (toNumber(currentShift.openingCash) + cashSalesTotal)
         : 0,
       totalReportedSales: salesToday,
       cashReceived,

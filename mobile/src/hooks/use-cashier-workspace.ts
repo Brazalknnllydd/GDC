@@ -66,9 +66,15 @@ export function useCashierWorkspace() {
     }
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
+  loadWorkspace();
+
+  const interval = setInterval(() => {
     loadWorkspace();
-  }, [loadWorkspace]);
+  }, 10000);
+
+  return () => clearInterval(interval);
+}, [loadWorkspace]);
 
   return {
     categories,

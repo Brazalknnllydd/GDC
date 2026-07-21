@@ -766,12 +766,23 @@ export default function CashierScreen() {
         <View style={styles.scannerContent}>
           {cameraPermission?.granted ? (
             <View style={styles.cameraFrame}>
-              <CameraView
-                active={showScannerModal}
-                facing="back"
-                onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
-                style={styles.cameraPreview}
-              />
+<CameraView
+  active={showScannerModal}
+  facing="front"
+  onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
+  barcodeScannerSettings={{
+    barcodeTypes: [
+      "ean13",
+      "ean8",
+      "upc_a",
+      "upc_e",
+      "code128",
+      "code39",
+      "qr",
+    ],
+  }}
+  style={styles.cameraPreview}
+/>
               <View style={styles.scanGuide} />
             </View>
           ) : (
