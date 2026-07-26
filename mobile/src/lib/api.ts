@@ -66,6 +66,27 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    let message = 'An unexpected error occurred.';
+    if (error.response) {
+      if (typeof error.response.data?.message === 'string') {
+        message = error.response.data.message;
+      } else if (typeof error.response.data?.error === 'string') {
+        message = error.response.data.error;
+      } else {
+        message = `Server Error (${error.response.status})`;
+      }
+    } else if (error.request) {
+      message = 'Network error. Please check your connection.';
+    } else {
+      message = error.message;
+    }
+    return Promise.reject(new Error(message));
+  }
+);
+
 export function resolveApiAssetUrl(value?: string | null) {
   if (!value) {
     return null;

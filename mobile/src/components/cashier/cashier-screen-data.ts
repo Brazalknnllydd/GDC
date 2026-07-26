@@ -49,7 +49,13 @@ export type CashierDashboardResponse = {
     paymentMethod: string;
     receiptNumber: string;
     time: string;
+    createdAt: string;
     totalAmount: number;
+    customerName: string | null;
+    changeAmount: number;
+    cashierName: string;
+    subtotal: number;
+    amountPaid: number;
   }>;
   totals: {
     drawerVariance: number;

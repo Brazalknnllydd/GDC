@@ -51,13 +51,9 @@ import { SectionHeading } from '../components/ui/section-heading';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
-import {
-  getCartItemDiscount,
-  getCartItemGrossTotal,
-  getCartItemNetTotal,
-  useCashierCheckout,
-} from '../hooks/use-cashier-checkout';
-import { useCashierWorkspace } from '../hooks/use-cashier-workspace';
+import { useCashierStore } from '../store/cashier-store';
+import { CartModal, CheckoutModal, SuccessModal } from '../components/cashier/cashier-modals';
+import { handlePrintReceipt } from '../lib/receipt-template';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
@@ -118,13 +114,11 @@ export default function CashierScreen() {
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [scannerFeedback, setScannerFeedback] = useState('');
   const [scannerEnabled, setScannerEnabled] = useState(true);
-  const {
-    categories,
-    dashboard,
-    products,
-    reloadWorkspace,
-    screenError,
-  } = useCashierWorkspace();
+  const { categories, dashboard, products, loadWorkspace: reloadWorkspace, screenError } = useCashierStore();
+
+  useEffect(() => {
+    reloadWorkspace();
+  }, [reloadWorkspace]);
 
   // Shift states
   const [showOpeningCashModal, setShowOpeningCashModal] = useState(false);
@@ -354,57 +348,19 @@ export default function CashierScreen() {
     return 'Cashier';
   }, [dashboard.cashier.name, dashboard.cashier.username]);
 
-  const {
-    activeCheckoutInput,
-    activeDiscountItem,
-    addToCart,
-    amountReceived,
-    amountReceivedInput,
-    canCompleteSale,
-    cart,
-    cartDiscountTotal,
-    cartGrossSubtotal,
-    cartItemCount,
-    cartSubtotal,
-    changeAmount,
-    completedSale,
-    customerId,
-    customerName,
-    handleCompleteSale,
-    handleKeypadBackspace,
-    handleKeypadPress,
-    hasEnoughPayment,
-    isSubmittingSale,
-    paymentMethod,
-    remainingBalance,
-    saleError,
-    setActiveCheckoutInput,
-    setPaymentMethod,
-    setCustomerId,
-    setCustomerName,
-    setShowCartModal,
-    setShowCheckoutModal,
-    setShowSuccessModal,
-    showCartModal,
-    showCheckoutModal,
-    showSuccessModal,
-    updateCartItemDiscount,
-    updateCartQuantity,
-    removeFromCart,
-  } = useCashierCheckout({
-    cashierDisplayName,
-    onSaleCompleted: async () => {
-      setActiveSection('history');
-      await reloadWorkspace();
-    },
-    shiftId: dashboard.currentShift?.id ?? null,
-  });
-
-  // Customer selector state (checkout modal)
-  const [customerType, setCustomerType] = useState<'walkin' | 'registered'>('walkin');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customerResults, setCustomerResults] = useState<{ id: number; name: string; phoneNumber?: string | null }[]>([]);
-  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+  const { cart, addToCart, setShowCartModal, setShowCheckoutModal, handleCompleteSale, completedSale, setShowSuccessModal, updateCartQuantity, removeFromCart } = useCashierStore();
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartGrossSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const cartDiscountTotal = cart.reduce((sum, item) => {
+    const discountStr = item.discountInput ? item.discountInput.replace(/[^\d.]/g, '') : '0';
+    return sum + (Number(discountStr) || 0);
+  }, 0);
+  const cartSubtotal = cart.reduce((sum, item) => {
+    const gross = item.price * item.quantity;
+    const discountStr = item.discountInput ? item.discountInput.replace(/[^\d.]/g, '') : '0';
+    const discount = Number(discountStr) || 0;
+    return sum + (gross - Math.min(gross, discount));
+  }, 0);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -796,483 +752,9 @@ export default function CashierScreen() {
         </View>
       </AdminModalShell>
 
-      <AdminModalShell
-        footer={
-          <AppButton
-            disabled={cart.length === 0}
-            label="Proceed to Checkout"
-            onPress={() => {
-              setShowCartModal(false);
-              setShowCheckoutModal(true);
-            }}
-            variant="primary"
-          />
-        }
-        height={Math.min(height * 0.84, 720)}
-        onClose={() => setShowCartModal(false)}
-        title="Cart Details"
-        visible={!showInlineCart && showCartModal}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.cartModalContent}>
-          <View style={styles.checkoutInputIndicator}>
-            <Text style={styles.checkoutInputIndicatorLabel}>NOW EDITING</Text>
-            <Text style={styles.checkoutInputIndicatorValue}>
-              {activeCheckoutInput.type === 'amount'
-                ? 'Amount Received'
-                : `Discount - ${activeDiscountItem?.name ?? 'Selected Item'}`}
-            </Text>
-          </View>
-
-          {cart.length > 0 ? (
-            cart.map((item) => (
-              <CashierCartItemRow
-                key={item.id}
-                imageUrl={item.imageUrl}
-                name={item.name}
-                onDecrease={() => updateCartQuantity(item.id, item.quantity - 1)}
-                onIncrease={() => updateCartQuantity(item.id, item.quantity + 1)}
-                onRemove={() => removeFromCart(item.id)}
-                priceText={formatPeso(item.price)}
-                quantity={item.quantity}
-                totalText={formatPeso(item.price * item.quantity)}
-              />
-            ))
-          ) : (
-            <Text style={styles.emptyCartText}>Your cart is empty.</Text>
-          )}
-        </ScrollView>
-
-        <View style={styles.cartSummary}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>{formatPeso(cartGrossSubtotal)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Discount</Text>
-            <Text style={styles.summaryDiscountValue}>- {formatPeso(cartDiscountTotal)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Items</Text>
-            <Text style={styles.summaryValue}>{cartItemCount}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
-          </View>
-        </View>
-      </AdminModalShell>
-
-      <AdminModalShell
-        footer={
-          <AppButton
-            disabled={!canCompleteSale}
-            icon={({ color, size }) => (
-              <CheckCircle2 color={color} size={size} strokeWidth={2.2} />
-            )}
-            label={isSubmittingSale ? 'Completing...' : 'Complete Sale'}
-            loading={isSubmittingSale}
-            onPress={handleCompleteSale}
-            variant="success"
-          />
-        }
-        height={Math.min(height * 0.86, 760)}
-        onClose={() => setShowCheckoutModal(false)}
-        title="Checkout"
-        visible={showCheckoutModal}>
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.checkoutModalContent}
-          showsVerticalScrollIndicator={false}>
-          <View style={styles.checkoutSummaryCard}>
-            <Text style={styles.checkoutSummaryLabel}>TOTAL PAYABLE</Text>
-            <Text style={styles.checkoutSummaryValue}>{formatPeso(cartSubtotal)}</Text>
-            <Text style={styles.checkoutSummaryMeta}>
-              {formatItemCount(cartItemCount)}{cartDiscountTotal > 0 ? ` • ${formatPeso(cartDiscountTotal)} discount` : ''}
-            </Text>
-          </View>
-
-          {cart.length > 0 ? (
-            <>
-              <Text style={styles.checkoutFieldLabel}>PRODUCT DISCOUNTS</Text>
-              <View style={styles.discountPanel}>
-                {cart.map((item) => {
-                  const grossTotal = getCartItemGrossTotal(item);
-                  const discountAmount = getCartItemDiscount(item);
-                  const netTotal = getCartItemNetTotal(item);
-
-                  return (
-                    <View key={item.id} style={styles.discountRow}>
-                      <View style={styles.discountRowHeader}>
-                        <View style={styles.discountItemTextWrap}>
-                          <Text numberOfLines={1} style={styles.discountItemName}>
-                            {item.name}
-                          </Text>
-                          <Text style={styles.discountItemMeta}>
-                            {item.quantity} x {formatPeso(item.price)} • Max {formatPeso(grossTotal)}
-                          </Text>
-                        </View>
-                        <Text style={styles.discountNetTotal}>{formatPeso(netTotal)}</Text>
-                      </View>
-
-                      <View style={styles.discountInputRow}>
-                        <Pressable
-                          onPress={() =>
-                            setActiveCheckoutInput({
-                              productId: item.id,
-                              type: 'discount',
-                            })
-                          }
-                          style={[
-                            styles.moneyField,
-                            styles.discountMoneyField,
-                            activeCheckoutInput.type === 'discount' &&
-                            activeCheckoutInput.productId === item.id
-                              ? styles.moneyFieldActive
-                              : undefined,
-                          ]}>
-                          <Text style={styles.discountInputPrefix}>P</Text>
-                          <Text
-                            style={[
-                              styles.moneyValue,
-                              !item.discountInput && styles.discountPlaceholderText,
-                            ]}>
-                            {item.discountInput || '0'}
-                          </Text>
-                          {activeCheckoutInput.type === 'discount' &&
-                          activeCheckoutInput.productId === item.id ? (
-                            <View style={styles.activeInputBadge}>
-                              <Text style={styles.activeInputBadgeText}>ACTIVE</Text>
-                            </View>
-                          ) : null}
-                        </Pressable>
-                        <Text style={styles.discountAppliedText}>
-                          Discount: {formatPeso(discountAmount)}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-
-          <Text style={styles.checkoutFieldLabel}>CUSTOMER</Text>
-          <View style={styles.customerTypeRow}>
-            <Pressable
-              onPress={() => {
-                setCustomerType('walkin');
-                setCustomerId(null);
-                setCustomerName(null);
-                setCustomerSearch('');
-                setCustomerResults([]);
-              }}
-              style={[
-                styles.customerTypeOption,
-                customerType === 'walkin' && styles.customerTypeOptionActive,
-              ]}
-            >
-              <View style={[
-                styles.customerTypeRadio,
-                customerType === 'walkin' && styles.customerTypeRadioActive,
-              ]}>
-                {customerType === 'walkin' && <View style={styles.customerTypeRadioDot} />}
-              </View>
-              <Text style={[
-                styles.customerTypeLabel,
-                customerType === 'walkin' && styles.customerTypeLabelActive,
-              ]}>Walk-in Customer</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setCustomerType('registered')}
-              style={[
-                styles.customerTypeOption,
-                customerType === 'registered' && styles.customerTypeOptionActive,
-              ]}
-            >
-              <View style={[
-                styles.customerTypeRadio,
-                customerType === 'registered' && styles.customerTypeRadioActive,
-              ]}>
-                {customerType === 'registered' && <View style={styles.customerTypeRadioDot} />}
-              </View>
-              <Text style={[
-                styles.customerTypeLabel,
-                customerType === 'registered' && styles.customerTypeLabelActive,
-              ]}>Registered Customer</Text>
-            </Pressable>
-          </View>
-
-          {customerType === 'registered' ? (
-            <View style={styles.customerSearchWrap}>
-              {customerId ? (
-                <Pressable
-                  onPress={() => { setCustomerId(null); setCustomerName(null); setCustomerSearch(''); setCustomerResults([]); }}
-                  style={styles.customerSelectedRow}
-                >
-                  <UserCircle2 color={colors.secondary} size={20} strokeWidth={2} />
-                  <Text style={styles.customerSelectedName}>{customerName}</Text>
-                  <Text style={styles.customerClearText}>Change</Text>
-                </Pressable>
-              ) : (
-                <>
-                  <View style={styles.customerSearchBox}>
-                    <Search color={colors.textTertiary} size={16} strokeWidth={2} />
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={async (text) => {
-                        setCustomerSearch(text);
-                        if (!text.trim()) { setCustomerResults([]); return; }
-                        try {
-                          setIsSearchingCustomers(true);
-                          const res = await apiClient.get<{ data: { id: number; name: string; phoneNumber?: string | null }[] }>(
-                            `/customers?search=${encodeURIComponent(text.trim())}`
-                          );
-                          setCustomerResults(res.data.data);
-                        } catch {
-                          setCustomerResults([]);
-                        } finally {
-                          setIsSearchingCustomers(false);
-                        }
-                      }}
-                      placeholder="Search by name or phone..."
-                      placeholderTextColor={colors.textSubtle}
-                      style={styles.customerSearchInput}
-                      value={customerSearch}
-                    />
-                  </View>
-                  {isSearchingCustomers ? (
-                    <Text style={styles.customerSearchHint}>Searching...</Text>
-                  ) : customerResults.length > 0 ? (
-                    <View style={styles.customerResultsList}>
-                      {customerResults.slice(0, 5).map((c) => (
-                        <Pressable
-                          key={c.id}
-                          onPress={() => { setCustomerId(c.id); setCustomerName(c.name); setCustomerResults([]); setCustomerSearch(''); }}
-                          style={styles.customerResultRow}
-                        >
-                          <UserCircle2 color={colors.textSecondary} size={16} strokeWidth={2} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.customerResultName}>{c.name}</Text>
-                            {c.phoneNumber ? <Text style={styles.customerResultMeta}>{c.phoneNumber}</Text> : null}
-                          </View>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : customerSearch.trim() ? (
-                    <Text style={styles.customerSearchHint}>No customers found.</Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-          ) : null}
-
-          <Text style={styles.checkoutFieldLabel}>PAYMENT METHOD</Text>
-          <View style={styles.paymentMethodsRow}>
-            <AppSegmentedControl
-              onChange={setPaymentMethod}
-              options={cashierPaymentMethods.map((method) => ({
-                icon: method.icon,
-                label: method.label,
-                value: method.key,
-              }))}
-              selected={paymentMethod}
-              variant="tile"
-            />
-          </View>
-
-          <Text style={styles.checkoutFieldLabel}>AMOUNT RECEIVED</Text>
-          <Pressable
-            onPress={() => setActiveCheckoutInput({ type: 'amount' })}
-            style={[
-              styles.moneyField,
-              activeCheckoutInput.type === 'amount' ? styles.moneyFieldActive : undefined,
-            ]}>
-            <Text style={styles.moneyPrefix}>P</Text>
-            <Text style={styles.moneyValue}>{amountReceivedInput || '0'}</Text>
-            {activeCheckoutInput.type === 'amount' ? (
-              <View style={styles.activeInputBadge}>
-                <Text style={styles.activeInputBadgeText}>ACTIVE</Text>
-              </View>
-            ) : null}
-          </Pressable>
-
-          <View style={styles.amountIndicatorRow}>
-            <View style={styles.amountIndicatorCard}>
-              <Text style={styles.amountIndicatorLabel}>Payable</Text>
-              <Text style={styles.amountIndicatorValue}>{formatPeso(cartSubtotal)}</Text>
-            </View>
-            <View style={styles.amountIndicatorCard}>
-              <Text style={styles.amountIndicatorLabel}>Received</Text>
-              <Text style={styles.amountIndicatorValue}>{formatPeso(amountReceived)}</Text>
-            </View>
-            <View
-              style={[
-                styles.amountIndicatorCard,
-                hasEnoughPayment ? styles.amountIndicatorCardSuccess : styles.amountIndicatorCardFail,
-              ]}>
-              <Text style={styles.amountIndicatorLabel}>
-                {hasEnoughPayment ? 'Change Due' : 'Remaining'}
-              </Text>
-              <Text
-                style={[
-                  styles.amountIndicatorValue,
-                  hasEnoughPayment
-                    ? styles.amountIndicatorValueSuccess
-                    : styles.amountIndicatorValueFail,
-                ]}>
-                {formatPeso(hasEnoughPayment ? changeAmount : remainingBalance)}
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.changeField,
-              hasEnoughPayment ? styles.changeFieldSuccess : styles.changeFieldFail,
-            ]}>
-            <Text style={styles.changeLabel}>CHANGE</Text>
-            <Text
-              style={[
-                styles.changeValue,
-                hasEnoughPayment ? styles.changeValueSuccess : styles.changeValueFail,
-              ]}>
-              {formatPeso(changeAmount)}
-            </Text>
-          </View>
-
-          <CashierKeypad onBackspace={handleKeypadBackspace} onKeyPress={handleKeypadPress} />
-          {saleError ? <Text style={styles.saleErrorText}>{saleError}</Text> : null}
-        </ScrollView>
-      </AdminModalShell>
-
-      <AdminModalShell
-        footer={
-          <ModalActions stacked>
-            <AppButton
-              label="New Sale"
-              onPress={() => {
-                setShowSuccessModal(false);
-                setActiveSection('register');
-              }}
-              variant="success"
-            />
-            <AppButton
-              icon={({ color, size }) => <QrCode color={color} size={size} strokeWidth={2.1} />}
-              label="View Receipt"
-              onPress={() => {
-                setShowSuccessModal(false);
-                setSelectedSaleDetails(completedSale);
-              }}
-              variant="successOutline"
-            />
-          </ModalActions>
-        }
-        height={Math.min(height * 0.74, 620)}
-        onClose={() => setShowSuccessModal(false)}
-        title="Payment Success"
-        visible={showSuccessModal}>
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.successModalContent}
-          showsVerticalScrollIndicator={false}>
-          <View style={styles.successIconWrap}>
-            <View style={styles.successIconInner}>
-              <CheckCircle2 color={colors.textInverse} size={44} strokeWidth={2.2} />
-            </View>
-          </View>
-          <Text style={styles.successTitle}>Payment Success</Text>
-          <Text style={styles.successText}>The transaction has been processed.</Text>
-
-          {completedSale ? (
-            <SurfaceCard style={styles.successCard}>
-              <Text style={styles.successTotalLabel}>TOTAL PAID</Text>
-              <Text style={styles.successTotalValue}>{formatPeso(completedSale.totalAmount)}</Text>
-
-              <View style={styles.successMiniRow}>
-                <View style={styles.successMiniCard}>
-                  <Text style={styles.successMiniLabel}>CHANGE</Text>
-                  <Text style={styles.successMiniValue}>
-                    {formatPeso(completedSale.changeAmount)}
-                  </Text>
-                </View>
-                <View style={styles.successMiniCard}>
-                  <Text style={styles.successMiniLabel}>RECEIVED</Text>
-                  <Text style={styles.successMiniValue}>
-                    {formatPeso(completedSale.amountPaid)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.successBreakdownCard}>
-                {completedSale.discountAmount > 0 ? (
-                  <>
-                    <View style={styles.successMetaRow}>
-                      <Text style={styles.successMetaLabel}>Subtotal</Text>
-                      <Text style={styles.successMetaValue}>{formatPeso(completedSale.subtotal)}</Text>
-                    </View>
-                    <View style={styles.successMetaRow}>
-                      <Text style={styles.successMetaLabel}>Discount</Text>
-                      <Text style={styles.successMetaValue}>
-                        - {formatPeso(completedSale.discountAmount)}
-                      </Text>
-                    </View>
-                  </>
-                ) : null}
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Total Price</Text>
-                  <Text style={styles.successMetaValue}>
-                    {formatPeso(completedSale.totalAmount)}
-                  </Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Payment Method</Text>
-                  <Text style={styles.successMetaValue}>
-                    {formatPaymentMethod(completedSale.paymentMethod)}
-                  </Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Amount Received</Text>
-                  <Text style={styles.successMetaValue}>
-                    {formatPeso(completedSale.amountPaid)}
-                  </Text>
-                </View>
-                <View style={styles.successMetaRow}>
-                  <Text style={styles.successMetaLabel}>Change</Text>
-                  <Text style={styles.successMetaValue}>
-                    {formatPeso(completedSale.changeAmount)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Customer</Text>
-                <Text style={styles.successMetaValue}>
-                  {completedSale.customerName ?? 'Walk-in'}
-                </Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Receipt No</Text>
-                <Text style={styles.successMetaValue}>{completedSale.receiptNumber}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Cashier</Text>
-                <Text style={styles.successMetaValue}>{completedSale.cashierName}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Amount Paid</Text>
-                <Text style={styles.successMetaValue}>{formatPeso(completedSale.amountPaid)}</Text>
-              </View>
-              <View style={styles.successMetaRow}>
-                <Text style={styles.successMetaLabel}>Date & Time</Text>
-                <Text style={styles.successMetaValue}>
-                  {formatReceiptDateTime(completedSale.createdAt)}
-                </Text>
-              </View>
-            </SurfaceCard>
-          ) : null}
-        </ScrollView>
-      </AdminModalShell>
+      <CartModal />
+      <CheckoutModal onComplete={() => handleCompleteSale(cashierDisplayName, dashboard.currentShift?.id ?? null, async () => { setActiveSection('history'); await reloadWorkspace(); })} />
+      <SuccessModal onNewSale={() => { setShowSuccessModal(false); setActiveSection('register'); }} onViewReceipt={() => { setShowSuccessModal(false); setSelectedSaleDetails(completedSale); }} />
 
       {/* Sale Details / Digital Receipt Modal */}
       <AdminModalShell
@@ -1344,7 +826,7 @@ export default function CashierScreen() {
 
             <SurfaceCard style={{ padding: 16 }}>
               {selectedSaleDetails.discountAmount > 0 ? (
-                <>
+                <View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Subtotal</Text>
                     <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{formatPeso(selectedSaleDetails.subtotal)}</Text>
@@ -1354,7 +836,7 @@ export default function CashierScreen() {
                     <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.danger }}>- {formatPeso(selectedSaleDetails.discountAmount)}</Text>
                   </View>
                   <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 8 }} />
-                </>
+                </View>
               ) : null}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                 <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.textStrong }}>TOTAL AMOUNT</Text>

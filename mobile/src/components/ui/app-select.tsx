@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     maxHeight: 320,
     width: '100%',
     maxWidth: 400,
-    ...shadows.lg,
+    ...shadows.floating,
     overflow: 'hidden',
   },
   dropdownCompact: {

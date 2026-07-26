@@ -154,7 +154,7 @@ export default function AdminShiftsScreen() {
                         onPress={() => openActionModal(shift, 'FORCE_CLOSE')}
                         icon={({ color, size }) => <Lock color={colors.danger} size={14} />}
                         style={styles.actionBtn}
-                        textStyle={{ color: colors.danger, fontSize: 12 }}
+                        
                       />
                     ) : (
                       <AppButton 
@@ -163,7 +163,7 @@ export default function AdminShiftsScreen() {
                         onPress={() => openActionModal(shift, 'REOPEN')}
                         icon={({ color, size }) => <Unlock color={color} size={14} />}
                         style={styles.actionBtn}
-                        textStyle={{ fontSize: 12 }}
+                        
                       />
                     )}
                   </View>
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.semiBold,
-    fontSize: textSizes.h2,
+    fontSize: textSizes.titleLarge,
     color: colors.textStrong,
     marginBottom: spacing.xs,
   },

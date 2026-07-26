@@ -43,7 +43,7 @@ export function CashierSettingsSection({
             icon={({ color, size }) => <Store color={color} size={size} strokeWidth={2.1} />}
             label="End Shift"
             onPress={onCloseShift}
-            style={styles.endShiftButton}
+            style={styles.logoutButton}
             variant="secondary"
           />
         )}

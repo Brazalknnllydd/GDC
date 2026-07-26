@@ -35,6 +35,9 @@ if (typeof console !== 'undefined') {
   };
 }
 
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../lib/query-client';
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -69,17 +72,19 @@ export default function RootLayout() {
   }
 
   return (
-    <PaperProvider theme={paperTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="admin" />
-        <Stack.Screen name="admin-products" />
-        <Stack.Screen name="admin-customers" />
-        <Stack.Screen name="admin-sales" />
-        <Stack.Screen name="admin-reports" />
-        <Stack.Screen name="admin-settings" />
-        <Stack.Screen name="cashier" />
-      </Stack>
-    </PaperProvider>
+    <QueryClientProvider client={queryClient}>
+      <PaperProvider theme={paperTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="admin" />
+          <Stack.Screen name="admin-products" />
+          <Stack.Screen name="admin-customers" />
+          <Stack.Screen name="admin-sales" />
+          <Stack.Screen name="admin-reports" />
+          <Stack.Screen name="admin-settings" />
+          <Stack.Screen name="cashier" />
+        </Stack>
+      </PaperProvider>
+    </QueryClientProvider>
   );
 }

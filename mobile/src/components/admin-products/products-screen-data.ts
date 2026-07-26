@@ -27,6 +27,7 @@ export type Category = {
 export type Product = {
   id: number;
   name: string;
+  description?: string | null;
   imageUrl: string | null;
   barcode: string | null;
   price: number | string;

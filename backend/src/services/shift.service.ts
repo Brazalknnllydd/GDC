@@ -108,7 +108,7 @@ export const ShiftService = {
         status: 'FORCE_CLOSED',
         expectedClosingCash,
         endedAt: new Date(),
-        notes,
+        notes: notes ?? null,
       },
     });
   },
@@ -127,7 +127,7 @@ export const ShiftService = {
       data: {
         status: 'OPEN',
         endedAt: null,
-        notes,
+        notes: notes ?? null,
       },
     });
   },

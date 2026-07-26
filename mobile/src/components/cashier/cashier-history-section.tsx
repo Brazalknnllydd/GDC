@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 import type { CashierDashboardResponse } from './cashier-screen-data';
@@ -65,42 +65,58 @@ export function CashierHistorySection({
 
       <SurfaceCard style={styles.recentSalesCard}>
         {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
-          <Text style={[styles.headerCell, { flex: 1 }]}>TIME</Text>
-          <Text style={[styles.headerCell, { flex: 1 }]}>METHOD</Text>
-          <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>TOTAL</Text>
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ minWidth: 900 }}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
+              <Text style={[styles.headerCell, { flex: 1.5 }]}>DATE/TIME</Text>
+              <Text style={[styles.headerCell, { flex: 1.5 }]}>CASHIER</Text>
+              <Text style={[styles.headerCell, { flex: 1.5 }]}>CUSTOMER</Text>
+              <Text style={[styles.headerCell, { flex: 1 }]}>METHOD</Text>
+              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>CHANGE</Text>
+              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>TOTAL</Text>
+            </View>
 
-        {/* Table Rows */}
-        {paginatedSales.length > 0 ? (
-          paginatedSales.map((sale, index) => (
-            <TouchableOpacity
-              key={sale.id}
-              style={[
-                styles.tableRow,
-                index === paginatedSales.length - 1 && styles.tableRowLast,
-              ]}
-              onPress={() => onSelectSale?.(sale)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.rowCell, styles.receiptText, { flex: 1.5 }]}>
-                #{sale.receiptNumber}
-              </Text>
-              <Text style={[styles.rowCell, styles.timeText, { flex: 1 }]}>
-                {formatCashierTime(new Date(sale.time))}
-              </Text>
-              <Text style={[styles.rowCell, styles.methodText, { flex: 1 }]}>
-                {formatPaymentMethod(sale.paymentMethod)}
-              </Text>
-              <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right' }]}>
-                {formatPeso(sale.totalAmount)}
-              </Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.emptySalesText}>No sales recorded for this cashier today.</Text>
-        )}
+            {/* Table Rows */}
+            {paginatedSales.length > 0 ? (
+              paginatedSales.map((sale, index) => (
+                <TouchableOpacity
+                  key={sale.id}
+                  style={[
+                    styles.tableRow,
+                    index === paginatedSales.length - 1 && styles.tableRowLast,
+                  ]}
+                  onPress={() => onSelectSale?.(sale)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.rowCell, styles.receiptText, { flex: 1.5 }]}>
+                    #{sale.receiptNumber}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]}>
+                    {new Date(sale.time).toLocaleDateString()} {formatCashierTime(new Date(sale.time))}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]} numberOfLines={1}>
+                    {sale.cashierName}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]} numberOfLines={1}>
+                    {sale.customerName || 'Walk-in'}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.methodText, { flex: 1 }]}>
+                    {formatPaymentMethod(sale.paymentMethod)}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.timeText, { flex: 1, textAlign: 'right' }]}>
+                    {formatPeso(sale.changeAmount || 0)}
+                  </Text>
+                  <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right' }]}>
+                    {formatPeso(sale.totalAmount)}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.emptySalesText}>No sales recorded for this cashier today.</Text>
+            )}
+          </View>
+        </ScrollView>
 
         {/* Pagination Footer */}
         <View style={{ paddingVertical: 16, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: colors.borderPanel, backgroundColor: colors.surfaceSoft }}>

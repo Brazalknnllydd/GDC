@@ -29,7 +29,11 @@ export function CashierInventorySection({
           <CashierProductCard
             key={product.id}
             imageUrl={product.imageUrl}
-            name={`${product.name} (${product.stock} ${product.unit})`}
+            name={
+              <Text>
+                {product.name} ({product.stock === 0 ? <Text style={{ color: colors.danger }}>no stocks</Text> : `${product.stock} ${product.unit}`})
+              </Text>
+            }
             onAdd={() => onAddProduct(product)}
             price={formatPeso(normalizeNumber(product.price))}
             stock={product.stock}

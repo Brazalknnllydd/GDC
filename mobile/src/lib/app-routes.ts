@@ -7,7 +7,9 @@ export type AppRoute =
   | '/admin-reports'
   | '/admin-customers'
   | '/admin-settings'
-  | '/cashier';
+  | '/admin-shifts'
+  | '/cashier'
+  | '/';
 
 export type NavIconProps = {
   color?: string;

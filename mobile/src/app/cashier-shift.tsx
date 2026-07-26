@@ -56,7 +56,7 @@ export default function CashierShiftScreen() {
 
   const handleLogout = async () => {
     await clearAuthSession();
-    router.replace('/login');
+    router.replace('/');
   };
 
   if (isChecking) {
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.semiBold,
-    fontSize: textSizes.h2,
+    fontSize: textSizes.titleLarge,
     color: colors.textStrong,
     marginBottom: spacing.sm,
   },

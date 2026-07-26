@@ -116,7 +116,7 @@ RULES:
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
-    const geminiResponse = await (globalThis as any).fetch(geminiUrl, {
+    const geminiResponse = await fetch(geminiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -139,7 +139,9 @@ RULES:
       return res.status(502).json({ message: "Failed to communicate with Gemini API" });
     }
 
-    const data = await geminiResponse.json() as any;
+    const data = await geminiResponse.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
     const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a reply right now.";
 
     res.json({ response: botReply.trim() });

@@ -1,232 +1,136 @@
-import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
-import { FlashList } from '@shopify/flash-list';
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { PackagePlus, Search, Shapes, Tags } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { useMemo, useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, useWindowDimensions, StyleSheet } from 'react-native';
+import { Search, PackagePlus, Shapes, Tags } from 'lucide-react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../lib/api';
 
+import { ProductEditForm } from '../components/admin-products/product-edit-form';
+import { ProductTable } from '../components/admin-products/product-table';
+import { DeleteProductModal } from '../components/admin-products/delete-product-modal';
 import { AddCategoryModal } from '../components/admin-products/add-category-modal';
 import { DeleteCategoryModal } from '../components/admin-products/delete-category-modal';
-import { DeleteProductModal } from '../components/admin-products/delete-product-modal';
-import { AddProductModal } from '../components/admin-products/add-product-modal';
 import { ManageCategoriesModal } from '../components/admin-products/manage-categories-modal';
-import {
-  baseOverviewCards,
-  tabs,
-  type Category,
-  type Product,
-} from '../components/admin-products/products-screen-data';
-import { radius, shadows, spacing } from '../constants/design-system';
-import { colors, fonts, textRoles, textSizes } from '../constants/theme';
-import { usePagination } from '../hooks/use-pagination';
-import {
-  digitsOnly,
-  formatCompactPeso,
-  formatPeso,
-  inferUnit,
-  normalizeNumber,
-  parseWeight,
-} from '../lib/product-utils';
-import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
+
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
-import { AppSelect } from '../components/ui/app-select';
-import { InventoryStatCard } from '../components/ui/inventory-stat-card';
-import { PaginationControls } from '../components/ui/pagination-controls';
 import { SurfaceCard } from '../components/ui/surface-card';
-import { ProductListItem } from '../components/ui/product-list-item';
+import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
+import { InventoryStatCard } from '../components/ui/inventory-stat-card';
 import { SectionHeading } from '../components/ui/section-heading';
 import { AppButton } from '../components/ui/app-button';
-import { apiClient } from '../lib/api';
+
+import { usePagination } from '../hooks/use-pagination';
+import { normalizeNumber } from '../lib/product-utils';
+import { radius, shadows, spacing } from '../constants/design-system';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
+import type { Category, Product } from '../components/admin-products/products-screen-data';
 import type { CategoryFormValues } from '../lib/form-schemas';
 
 const lowStockThreshold = 10;
 const productsPerPage = 10;
-type FeedbackState = {
-  tone: 'success' | 'error';
-  message: string;
-} | null;
-type ProductFieldErrors = Partial<
-  Record<'name' | 'category' | 'costPrice' | 'sellingPrice' | 'stock' | 'weightVolume', string>
->;
-type SelectedProductImage = {
-  file?: File;
-  fileName?: string | null;
-  mimeType?: string | null;
-  uri: string;
-};
+type FeedbackState = { tone: 'success' | 'error'; message: string } | null;
 
 export default function AdminProductsScreen() {
+  const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 430;
-  const [showAddProduct, setShowAddProduct] = useState(false);
-  const [showAddCategory, setShowAddCategory] = useState(false);
-  const [showManageCategories, setShowManageCategories] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<number | null>(null);
-  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
 
-  const [productName, setProductName] = useState('');
-  const [productDescription, setProductDescription] = useState('');
-  const [categoryValue, setCategoryValue] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [costPrice, setCostPrice] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
-  const [initialStock, setInitialStock] = useState('');
-  const [weightVolume, setWeightVolume] = useState('');
-  const [productImageUri, setProductImageUri] = useState<string | null>(null);
-  const [productImageAsset, setProductImageAsset] = useState<SelectedProductImage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [productPendingDelete, setProductPendingDelete] = useState<Product | null>(null);
-
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const [isSavingProduct, setIsSavingProduct] = useState(false);
-  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
-  const [productError, setProductError] = useState('');
-  const [screenError, setScreenError] = useState('');
-  const [productFieldErrors, setProductFieldErrors] = useState<ProductFieldErrors>({});
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
-  const [isSavingCategory, setIsSavingCategory] = useState(false);
-  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
-  const [categoryError, setCategoryError] = useState('');
+  // Modals state
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productPendingDelete, setProductPendingDelete] = useState<Product | null>(null);
+
+  const [showManageCategories, setShowManageCategories] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<Category | null>(null);
 
-  async function loadCategories() {
-    const response = await apiClient.get<Category[]>('/categories');
-    setCategories(response.data);
-    setCategoryValue((currentValue) => currentValue || response.data[0]?.name || '');
-  }
+  // Queries
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await apiClient.get<Category[]>('/categories');
+      return res.data;
+    },
+  });
 
-  async function loadProducts() {
-    const response = await apiClient.get<Product[]>('/products');
-    setProducts(response.data);
-  }
+  const { data: products = [], isLoading: isLoadingProductsList } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const res = await apiClient.get<Product[]>('/products');
+      return res.data;
+    },
+  });
 
-  async function loadScreenData() {
-    try {
-      setScreenError('');
-      setIsLoadingProducts(true);
-      await Promise.all([loadCategories(), loadProducts()]);
-    } catch {
-      setScreenError('Could not load inventory right now.');
-    } finally {
-      setIsLoadingProducts(false);
+  const isLoadingProducts = isLoadingCategories || isLoadingProductsList;
+
+  // Mutations for categories
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setCategoryPendingDelete(null);
+      setFeedback({ tone: 'success', message: 'Category deleted successfully.' });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setProductPendingDelete(null);
+      setFeedback({ tone: 'success', message: 'Product deleted successfully.' });
+    },
+  });
+
+  
+  const saveCategoryMutation = useMutation({
+    mutationFn: async (values: CategoryFormValues) => {
+      if (editingCategoryId) {
+        return apiClient.put(`/categories/${editingCategoryId}`, { name: values.categoryName, description: values.categoryDescription });
+      }
+      return apiClient.post('/categories', { name: values.categoryName, description: values.categoryDescription });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setShowAddCategory(false);
+      setFeedback({ tone: 'success', message: `Category ${editingCategoryId ? 'updated' : 'added'} successfully.` });
     }
-  }
+  });
 
   useEffect(() => {
-    loadScreenData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCategory === 'All') {
-      return;
-    }
-
-    const categoryStillExists = categories.some((category) => category.name === selectedCategory);
-
-    if (!categoryStillExists) {
+    if (selectedCategory !== 'All' && !categories.some(c => c.name === selectedCategory)) {
       setSelectedCategory('All');
     }
   }, [categories, selectedCategory]);
 
   useEffect(() => {
-    if (!feedback) {
-      return;
+    if (feedback) {
+      const timeout = setTimeout(() => setFeedback(null), 2600);
+      return () => clearTimeout(timeout);
     }
-
-    const timeout = setTimeout(() => setFeedback(null), 2600);
-    return () => clearTimeout(timeout);
   }, [feedback]);
 
-  function resetProductForm() {
-    setEditingProductId(null);
-    setProductName('');
-    setProductDescription('');
-    setCategoryValue(categories[0]?.name || '');
-    setBarcode('');
-    setCostPrice('');
-    setUnitPrice('');
-    setInitialStock('');
-    setWeightVolume('');
-    setProductImageUri(null);
-    setProductImageAsset(null);
-    setProductError('');
-    setProductFieldErrors({});
-  }
-
-  function closeProductModal() {
-    setShowAddProduct(false);
-    resetProductForm();
-  }
-
-  function openCreateProductModal() {
-    resetProductForm();
-    setShowAddProduct(true);
-  }
-
-  function openEditProductModal(product: Product) {
-    setEditingProductId(product.id);
-    setProductName(product.name);
-    setProductDescription(product.description || '');
-    setCategoryValue(product.category.name);
-    setBarcode(product.barcode || '');
-    setCostPrice(String(normalizeNumber(product.costPrice)));
-    setUnitPrice(String(normalizeNumber(product.price)));
-    setInitialStock(String(product.stock));
-    setProductImageUri(product.imageUrl || null);
-    setProductImageAsset(null);
-    setWeightVolume(
-      product.weight !== null && product.weight !== undefined
-        ? `${product.weight}${product.unit !== 'pcs' ? product.unit : ''}`
-        : ''
-    );
-    setProductError('');
-    setShowAddProduct(true);
-  }
-
-  const categoryChips = useMemo(
-    () => ['All', ...categories.map((category) => category.name)],
-    [categories]
-  );
+  const categoryChips = useMemo(() => ['All', ...categories.map(c => c.name)], [categories]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
-
     return products.filter((product) => {
-      const matchesCategory =
-        selectedCategory === 'All' || product.category.name === selectedCategory;
-
-      const matchesQuery =
-        !normalizedQuery ||
+      const matchesCategory = selectedCategory === 'All' || product.category.name === selectedCategory;
+      const matchesQuery = !normalizedQuery || 
         product.name.toLowerCase().includes(normalizedQuery) ||
         product.category.name.toLowerCase().includes(normalizedQuery) ||
         (product.barcode || '').toLowerCase().includes(normalizedQuery);
-
       return matchesCategory && matchesQuery;
     });
   }, [products, searchQuery, selectedCategory]);
-
-  const categoriesWithCounts = useMemo(
-    () =>
-      categories.map((category) => ({
-        ...category,
-        productCount: products.filter((product) => product.categoryId === category.id).length,
-      })),
-    [categories, products]
-  );
 
   const {
     endItem: productPageEnd,
@@ -243,797 +147,159 @@ export default function AdminProductsScreen() {
   });
 
   const overviewCards = useMemo(() => {
-    const inventoryValue = products.reduce(
-      (sum, product) => sum + normalizeNumber(product.price) * product.stock,
-      0
-    );
-    const lowStockCount = products.filter((product) => product.stock <= lowStockThreshold).length;
+    const inventoryValue = products.reduce((sum, p) => sum + normalizeNumber(p.price) * p.stock, 0);
+    const lowStockCount = products.filter(p => p.stock <= lowStockThreshold).length;
 
-    return baseOverviewCards.map((card) => {
-      if (card.title === 'TOTAL\nPRODUCTS') {
-        return { ...card, value: String(products.length) };
-      }
-
-      if (card.title === 'LOW STOCK') {
-        return { ...card, value: String(lowStockCount) };
-      }
-
-      if (card.title === 'CATEGORIES') {
-        return { ...card, value: String(categories.length) };
-      }
-
-      if (card.title === 'INVENTORY VALUE') {
-        return {
-          ...card,
-          fullValue: formatPeso(inventoryValue),
-          value: formatCompactPeso(inventoryValue),
-        };
-      }
-
-      return card;
-    });
-  }, [categories.length, products]);
-
-  const editingCategory = useMemo(
-    () => categories.find((category) => category.id === editingCategoryId) ?? null,
-    [categories, editingCategoryId]
-  );
-
-  async function handleSaveCategory(values: CategoryFormValues) {
-    const trimmedName = values.categoryName.trim();
-    const trimmedDescription = values.categoryDescription.trim();
-
-    try {
-      setIsSavingCategory(true);
-      setCategoryError('');
-      const payload = {
-        description: trimmedDescription || null,
-        name: trimmedName,
-      };
-
-      if (editingCategoryId) {
-        const response = await apiClient.put<Category>(`/categories/${editingCategoryId}`, payload);
-        setCategories((currentCategories) =>
-          currentCategories
-            .map((category) => (category.id === editingCategoryId ? response.data : category))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        );
-        setCategoryValue((currentValue) =>
-          currentValue === categories.find((category) => category.id === editingCategoryId)?.name
-            ? response.data.name
-            : currentValue
-        );
-        setSelectedCategory((currentValue) =>
-          currentValue === categories.find((category) => category.id === editingCategoryId)?.name
-            ? response.data.name
-            : currentValue
-        );
-        setFeedback({
-          tone: 'success',
-          message: `Category "${response.data.name}" updated successfully.`,
-        });
-      } else {
-        const response = await apiClient.post<Category>('/categories', payload);
-        setCategories((currentCategories) =>
-          [...currentCategories, response.data].sort((a, b) => a.name.localeCompare(b.name))
-        );
-        setCategoryValue(response.data.name);
-        setSelectedCategory(response.data.name);
-        setFeedback({
-          tone: 'success',
-          message: `Category "${response.data.name}" added successfully.`,
-        });
-      }
-
-      closeCategoryModal();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setCategoryError(error.response?.data?.message ?? 'Could not save category right now.');
-        return;
-      }
-
-      setCategoryError('Could not save category right now.');
-    } finally {
-      setIsSavingCategory(false);
-    }
-  }
-
-  function closeCategoryModal() {
-    setShowAddCategory(false);
-    setEditingCategoryId(null);
-    setCategoryError('');
-  }
-
-  function openCreateCategoryModal() {
-    setEditingCategoryId(null);
-    setCategoryError('');
-    setShowAddCategory(true);
-  }
-
-  function openEditCategoryModal(category: Category) {
-    setEditingCategoryId(category.id);
-    setCategoryError('');
-    setShowAddCategory(true);
-  }
-
-  function openCategoryModalFromProduct() {
-    openCreateCategoryModal();
-  }
-
-  function requestDeleteCategory(category: Category) {
-    setCategoryPendingDelete(category);
-  }
-
-  function closeDeleteCategoryModal() {
-    if (isDeletingCategory) {
-      return;
-    }
-
-    setCategoryPendingDelete(null);
-  }
-
-  async function handleConfirmDeleteCategory() {
-    if (!categoryPendingDelete) {
-      return;
-    }
-
-    try {
-      setIsDeletingCategory(true);
-      await apiClient.delete(`/categories/${categoryPendingDelete.id}`);
-      setCategories((currentCategories) =>
-        currentCategories.filter((category) => category.id !== categoryPendingDelete.id)
-      );
-      setFeedback({
-        tone: 'success',
-        message: `Category "${categoryPendingDelete.name}" deleted successfully.`,
-      });
-      setCategoryPendingDelete(null);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setScreenError(error.response?.data?.message ?? 'Could not delete category right now.');
-      } else {
-        setScreenError('Could not delete category right now.');
-      }
-    } finally {
-      setIsDeletingCategory(false);
-    }
-  }
-
-  async function handlePickProductImage() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      setProductError('Media library access is needed to choose a product image.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const selectedAsset = result.assets[0];
-      if (!selectedAsset?.uri) {
-        setProductError('Could not use the selected image.');
-        return;
-      }
-
-      setProductImageUri(selectedAsset.uri);
-      setProductImageAsset({
-        file: (selectedAsset as ImagePicker.ImagePickerAsset & { file?: File }).file,
-        fileName: selectedAsset.fileName,
-        mimeType: selectedAsset.mimeType,
-        uri: selectedAsset.uri,
-      });
-      setProductError('');
-    }
-  }
-
-  async function handleOpenProductCamera() {
-    if (Platform.OS === 'web') {
-      setProductError('Camera capture is available on the mobile app. Tap the photo area to pick an image on web.');
-      return;
-    }
-
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (!permission.granted) {
-      setProductError('Camera access is needed to take a product image.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      cameraType: ImagePicker.CameraType.back,
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const selectedAsset = result.assets[0];
-      if (!selectedAsset?.uri) {
-        setProductError('Could not use the captured image.');
-        return;
-      }
-
-      setProductImageUri(selectedAsset.uri);
-      setProductImageAsset({
-        file: (selectedAsset as ImagePicker.ImagePickerAsset & { file?: File }).file,
-        fileName: selectedAsset.fileName,
-        mimeType: selectedAsset.mimeType,
-        uri: selectedAsset.uri,
-      });
-      setProductError('');
-    }
-  }
-
-  function buildProductFormData(categoryId: number) {
-    const formData = new FormData();
-
-    formData.append('name', productName.trim());
-    formData.append('description', productDescription.trim());
-    formData.append('barcode', barcode.trim());
-    formData.append('costPrice', costPrice);
-    formData.append('price', unitPrice);
-    formData.append('stock', initialStock);
-    formData.append('weight', String(parseWeight(weightVolume) ?? ''));
-    formData.append('unit', inferUnit(weightVolume));
-    formData.append('categoryId', String(categoryId));
-
-    if (!productImageUri) {
-      if (editingProductId) {
-        formData.append('removeImage', 'true');
-      }
-
-      return formData;
-    }
-
-    if (!productImageAsset) {
-      return formData;
-    }
-
-    if (productImageAsset.file) {
-      formData.append('image', productImageAsset.file);
-      return formData;
-    }
-
-    const extensionMatch =
-      productImageAsset.fileName?.match(/\.(\w+)$/) ??
-      productImageAsset.uri.match(/\.(\w+)(?:\?.*)?$/);
-    const extension = extensionMatch?.[1]?.toLowerCase() || 'jpg';
-    const mimeType = productImageAsset.mimeType || (extension === 'png' ? 'image/png' : 'image/jpeg');
-    const fileName = productImageAsset.fileName || `product-image.${extension}`;
-
-    formData.append('image', {
-      uri: productImageAsset.uri,
-      name: fileName,
-      type: mimeType,
-    } as any);
-
-    return formData;
-  }
-
-  async function handleSaveProduct() {
-    const trimmedName = productName.trim();
-    const matchedCategory = categories.find((category) => category.name === categoryValue);
-    const nextFieldErrors: ProductFieldErrors = {};
-
-    if (!trimmedName) {
-      nextFieldErrors.name = 'Product name is required.';
-    }
-
-    if (!matchedCategory) {
-      nextFieldErrors.category = 'Please select a category.';
-    }
-
-    if (!costPrice) {
-      nextFieldErrors.costPrice = 'Cost price is required.';
-    } else if (Number(costPrice) <= 0) {
-      nextFieldErrors.costPrice = 'Cost price must be greater than zero.';
-    }
-
-    if (!unitPrice) {
-      nextFieldErrors.sellingPrice = 'Selling price is required.';
-    } else if (Number(unitPrice) <= 0) {
-      nextFieldErrors.sellingPrice = 'Selling price must be greater than zero.';
-    }
-
-    if (!initialStock) {
-      nextFieldErrors.stock = 'Initial stock is required.';
-    }
-
-    if (!weightVolume.trim()) {
-      nextFieldErrors.weightVolume = 'Weight / volume is required.';
-    } else if (parseWeight(weightVolume) === null) {
-      nextFieldErrors.weightVolume = 'Enter a valid weight / volume value.';
-    }
-
-    setProductFieldErrors(nextFieldErrors);
-
-    if (Object.keys(nextFieldErrors).length > 0) {
-      setProductError('Please fix the highlighted fields.');
-      return;
-    }
-
-    if (!matchedCategory) {
-      setProductError('Please select a category.');
-      return;
-    }
-
-    try {
-      setIsSavingProduct(true);
-      setProductError('');
-      setProductFieldErrors({});
-      const payload = buildProductFormData(matchedCategory.id);
-
-      if (editingProductId) {
-        const response = await apiClient.put<Product>(`/products/${editingProductId}`, payload, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        setProducts((currentProducts) =>
-          currentProducts.map((product) =>
-            product.id === editingProductId ? response.data : product
-          )
-        );
-        setFeedback({
-          tone: 'success',
-          message: `Product "${response.data.name}" updated successfully.`,
-        });
-      } else {
-        const response = await apiClient.post<Product>('/products', payload, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        setProducts((currentProducts) => [response.data, ...currentProducts]);
-        setFeedback({
-          tone: 'success',
-          message: `Product "${response.data.name}" added successfully.`,
-        });
-      }
-
-      closeProductModal();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setProductError(error.response?.data?.message ?? 'Could not save product right now.');
-        return;
-      }
-
-      setProductError('Could not save product right now.');
-    } finally {
-      setIsSavingProduct(false);
-    }
-  }
-
-  function requestDeleteProduct(product: Product) {
-    setProductPendingDelete(product);
-  }
-
-  function closeDeleteProductModal() {
-    if (isDeletingProduct) {
-      return;
-    }
-
-    setProductPendingDelete(null);
-  }
-
-  async function handleConfirmDeleteProduct() {
-    if (!productPendingDelete) {
-      return;
-    }
-
-    try {
-      setIsDeletingProduct(true);
-      await apiClient.delete(`/products/${productPendingDelete.id}`);
-      setProducts((currentProducts) =>
-        currentProducts.filter((currentProduct) => currentProduct.id !== productPendingDelete.id)
-      );
-      setFeedback({
-        tone: 'success',
-        message: `Product "${productPendingDelete.name}" deleted successfully.`,
-      });
-      setProductPendingDelete(null);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setScreenError(error.response?.data?.message ?? 'Could not delete product right now.');
-      } else {
-        setScreenError('Could not delete product right now.');
-      }
-    } finally {
-      setIsDeletingProduct(false);
-    }
-  }
+    return [
+      { id: '1', title: 'Total Products', value: products.length.toString(), accent: 'default' },
+      { id: '2', title: 'Categories', value: categories.length.toString(), accent: 'default' },
+      { id: '3', title: 'Low Stock Items', value: lowStockCount.toString(), accent: lowStockCount > 0 ? 'danger' : 'default' },
+    ] as const;
+  }, [products, categories]);
 
   return (
     <AdminPageScreen
-      title="Products"
-      introDescription="Manage inventory and pricing across all stores."
-      bottomNavItems={tabs}>
-      <View style={[styles.categoryActionsRow, isCompactPhone && styles.categoryActionsColumn]}>
-        <AppButton
-          fullWidth={isCompactPhone}
-          icon={({ color, size }) => <PackagePlus color={color} size={size} strokeWidth={2.1} />}
-          label="Add Product"
-          onPress={openCreateProductModal}
-          size="sm"
-          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
-          variant="primary"
-        />
-        <AppButton
-          fullWidth={isCompactPhone}
-          icon={({ color, size }) => <Tags color={color} size={size} strokeWidth={2.1} />}
-          label="Add Category"
-          onPress={openCreateCategoryModal}
-          size="sm"
-          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
-          variant="primary"
-        />
-        <AppButton
-          fullWidth={isCompactPhone}
-          icon={({ color, size }) => <Shapes color={color} size={size} strokeWidth={2.1} />}
-          label="Manage Categories"
-          onPress={() => setShowManageCategories(true)}
-          size="sm"
-          style={isCompactPhone ? styles.mobileActionButton : styles.desktopActionButton}
-          variant="secondary"
-        />
-      </View>
-
+      title="Products & Inventory"
+      introDescription="Manage your product catalog, categories, and track inventory levels across your store."
+    >
       <AdminMetricGrid>
         {overviewCards.map((card) => (
-          <InventoryStatCard
-            key={card.title}
-            accent={card.accent}
-            detail={card.detail}
-            infoDialogTitle={card.title.replace('\n', ' ')}
-            infoDialogValue={'fullValue' in card ? card.fullValue : undefined}
-            title={card.title}
-            value={card.value}
-          />
+          <InventoryStatCard key={card.id} title={card.title} value={card.value} detail="Overview" accent={card.accent as 'default' | 'danger' | 'success'} />
         ))}
       </AdminMetricGrid>
 
-      <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Search color={colors.textTertiary} size={22} strokeWidth={2} />
-          <TextInput
-            onChangeText={setSearchQuery}
-            placeholder="Search products..."
-            placeholderTextColor={colors.textSubtle}
-            style={styles.searchInput}
-            value={searchQuery}
-          />
-        </View>
-      </View>
-
-      <View style={styles.filterRow}>
-        <AppSelect
-          options={categoryChips}
-          value={selectedCategory}
-          onValueChange={setSelectedCategory}
-          placeholder="Select category"
-          style={styles.categorySelect}
-        />
-        
-        <Text style={styles.filterSummaryText}>
-          {selectedCategory === 'All'
-            ? `Showing ${filteredProducts.length} of ${products.length} products`
-            : `Showing ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'} in ${selectedCategory}`}
-        </Text>
-      </View>
-
-      <SectionHeading style={styles.sectionHeading}>PRODUCTS</SectionHeading>
-      {feedback ? (
-        <View
-          style={[
-            styles.feedbackBanner,
-            feedback.tone === 'success' ? styles.feedbackSuccess : styles.feedbackError,
-          ]}>
-          <Text
-            style={[
-              styles.feedbackText,
-              feedback.tone === 'success'
-                ? styles.feedbackTextSuccess
-                : styles.feedbackTextError,
-            ]}>
-            {feedback.message}
-          </Text>
-        </View>
-      ) : null}
-      {screenError ? <Text style={styles.screenErrorText}>{screenError}</Text> : null}
-      <SurfaceCard style={[styles.tableCard, isCompactPhone && styles.tableCardCompact]}>
-        {isLoadingProducts ? (
-          <Text style={styles.emptyStateText}>Loading inventory...</Text>
-        ) : filteredProducts.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={true}
-            contentContainerStyle={{ minWidth: '100%' }}
-          >
-            <View style={[styles.table, { minWidth: '100%' }]}>
-              {/* Table Header */}
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { flex: 3.2, minWidth: 160 }]}>PRODUCT NAME</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 150 }]}>DESCRIPTION</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>CATEGORY</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 120 }]}>BARCODE</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>WEIGHT</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>PRICE</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 80 }]}>STOCK</Text>
-                <Text style={[styles.tableHeaderCell, { width: 100, textAlign: 'right' }]}>ACTIONS</Text>
-              </View>
-
-              <View style={styles.tableRows}>
-                {paginatedProducts.map((product) => (
-                  <ProductListItem
-                    key={product.id}
-                    category={product.category.name}
-                    description={product.description}
-                    imageUrl={product.imageUrl}
-                    low={product.stock <= lowStockThreshold}
-                    name={product.name}
-                    onDelete={() => requestDeleteProduct(product)}
-                    onEdit={() => openEditProductModal(product)}
-                    price={formatPeso(normalizeNumber(product.price))}
-                    sku={product.barcode || `ID-${product.id}`}
-                    weightText={product.weight ? `${product.weight} ${product.unit}` : '-'}
-                    stockText={String(product.stock)}
-                  />
-                ))}
-              </View>
-
-              {/* Table Footer with Pagination */}
-              <View style={styles.tableFooter}>
-                <PaginationControls
-                  borderless
-                  currentPage={productPage}
-                  endItem={productPageEnd}
-                  onPageChange={setProductPage}
-                  startItem={productPageStart}
-                  totalItems={filteredProducts.length}
-                  totalPages={totalProductPages}
-                  visiblePageNumbers={visiblePageNumbers}
-                />
-              </View>
-            </View>
-          </ScrollView>
-        ) : (
-          <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={styles.emptyStateText}>No products found for this filter yet.</Text>
+      <SurfaceCard style={styles.contentCard}>
+        <View style={styles.sectionHeaderWrap}>
+          <SectionHeading>Inventory Catalog</SectionHeading>
+          <View style={styles.actionGroup}>
+            <AppButton variant="secondary" icon={Shapes} onPress={() => setShowManageCategories(true)} label="Categories" />
+            <AppButton variant="primary" icon={PackagePlus} onPress={() => { setEditingProduct(null); setShowAddProduct(true); }} label="Add Product" />
           </View>
-        )}
+        </View>
+
+        <View style={styles.filtersSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesContainer}>
+            {categoryChips.map((chip) => (
+              <Pressable
+                key={chip}
+                onPress={() => setSelectedCategory(chip)}
+                style={[styles.categoryChip, selectedCategory === chip && styles.categoryChipActive]}
+              >
+                <Text style={[styles.categoryChipText, selectedCategory === chip && styles.categoryChipTextActive]}>
+                  {chip}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        <ProductTable
+          isLoading={isLoadingProducts}
+          paginatedProducts={paginatedProducts}
+          productPage={productPage}
+          setProductPage={setProductPage}
+          totalPages={totalProductPages}
+          visiblePageNumbers={visiblePageNumbers}
+          onEdit={(product) => { setEditingProduct(product); setShowAddProduct(true); }}
+          onDelete={(product) => setProductPendingDelete(product)}
+        />
       </SurfaceCard>
 
-      <AddCategoryModal
-        isSavingCategory={isSavingCategory}
-        initialValues={{
-          categoryDescription: editingCategory?.description || '',
-          categoryName: editingCategory?.name || '',
-        }}
-        mode={editingCategoryId ? 'edit' : 'create'}
-        onClose={closeCategoryModal}
-        onSave={handleSaveCategory}
-        serverError={categoryError}
-        visible={showAddCategory}
-      />
-
-      <ManageCategoriesModal
-        categories={categoriesWithCounts}
-        onClose={() => setShowManageCategories(false)}
-        onCreate={() => {
-          setShowManageCategories(false);
-          openCreateCategoryModal();
-        }}
-        onDelete={(category) => requestDeleteCategory(category)}
-        onEdit={(category) => {
-          setShowManageCategories(false);
-          openEditCategoryModal(category);
-        }}
-        visible={showManageCategories}
-      />
-
-      <AddProductModal
-        barcode={barcode}
-        categories={categories}
-        categoryValue={categoryValue}
-        costPrice={costPrice}
-        errorMessage={productError}
-        fieldErrors={productFieldErrors}
-        imagePreviewUri={productImageUri}
-        initialStock={initialStock}
-        isSaving={isSavingProduct}
-        onBarcodeChange={setBarcode}
-        onCategorySelect={setCategoryValue}
-        onClose={closeProductModal}
-        onCostPriceChange={(value) => setCostPrice(digitsOnly(value))}
-        onInitialStockChange={(value) => setInitialStock(digitsOnly(value))}
-        onOpenCamera={handleOpenProductCamera}
-        onPickImage={handlePickProductImage}
-        onRemoveImage={() => {
-          setProductImageUri(null);
-          setProductImageAsset(null);
-        }}
-        onRequestCreateCategory={openCategoryModalFromProduct}
-        onProductNameChange={setProductName}
-        onProductDescriptionChange={setProductDescription}
-        onSave={handleSaveProduct}
-        onUnitPriceChange={(value) => setUnitPrice(digitsOnly(value))}
-        onWeightVolumeChange={setWeightVolume}
-        productActionLabel={editingProductId ? 'Update Product' : 'Add Product'}
-        productDescription={productDescription}
-        productName={productName}
-        selectedCategory={categoryValue}
-        submittingLabel={editingProductId ? 'Updating...' : 'Saving...'}
-        unitPrice={unitPrice}
+      <ProductEditForm
         visible={showAddProduct}
-        weightVolume={weightVolume}
+        onClose={() => setShowAddProduct(false)}
+        productToEdit={editingProduct}
+        categories={categories}
+        onSuccess={(msg) => setFeedback({ tone: 'success', message: msg })}
       />
 
       <DeleteProductModal
-        isDeleting={isDeletingProduct}
-        onClose={closeDeleteProductModal}
-        onConfirm={handleConfirmDeleteProduct}
-        productName={productPendingDelete?.name || ''}
         visible={!!productPendingDelete}
+        onClose={() => setProductPendingDelete(null)}
+        onConfirm={() => {
+          if (productPendingDelete) deleteProductMutation.mutate(productPendingDelete.id);
+        }}
+        productName={productPendingDelete?.name || ''}
+        isDeleting={deleteProductMutation.isPending}
+        
+      />
+      
+      {/* Categories Modals */}
+      <ManageCategoriesModal
+        categories={categories.map(c => ({ ...c, productCount: products.filter(p => p.categoryId === c.id).length }))}
+        onClose={() => setShowManageCategories(false)}
+        onCreate={() => setShowAddCategory(true)}
+        onDelete={(category) => setCategoryPendingDelete(category as unknown as Category)}
+        onEdit={(category) => { setEditingCategoryId(category.id); setShowAddCategory(true); }}
+        visible={showManageCategories}
+      />
+
+      <AddCategoryModal
+        isSavingCategory={saveCategoryMutation.isPending}
+        initialValues={{
+          categoryName: (editingCategoryId !== null ? categories.find(c => c.id === editingCategoryId)?.name : '') || '',
+          categoryDescription: (editingCategoryId !== null ? (categories.find(c => c.id === editingCategoryId) as any)?.description : '') || ''
+        }}
+        mode={editingCategoryId !== null ? 'edit' : 'create'}
+        onClose={() => setShowAddCategory(false)}
+        onSave={(values) => saveCategoryMutation.mutate(values)}
+        serverError={saveCategoryMutation.isError ? (saveCategoryMutation.error?.message || '') : ''}
+        visible={showAddCategory}
       />
 
       <DeleteCategoryModal
         categoryName={categoryPendingDelete?.name || ''}
-        isDeleting={isDeletingCategory}
-        onClose={closeDeleteCategoryModal}
-        onConfirm={handleConfirmDeleteCategory}
+        
+        isDeleting={deleteCategoryMutation.isPending}
+        onClose={() => setCategoryPendingDelete(null)}
+        onConfirm={() => {
+          if (categoryPendingDelete) deleteCategoryMutation.mutate(categoryPendingDelete.id);
+        }}
         visible={!!categoryPendingDelete}
       />
+
     </AdminPageScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  categoryActionsRow: {
+  contentCard: { padding: 0, overflow: "hidden", flex: 1 },
+  sectionHeaderWrap: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, paddingBottom: 0 },
+  actionGroup: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.xl + 4,
-  },
-  categoryActionsColumn: {
-    flexDirection: 'column',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  mobileActionButton: {
-    width: '100%',
+  filtersSection: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
   },
-  desktopActionButton: {
-    minWidth: 184,
+  categoriesScroll: {
+    marginHorizontal: -spacing.xl,
   },
-  searchRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.section,
+  categoriesContainer: {
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
   },
-  searchBox: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    minHeight: 60,
+  categoryChip: {
     paddingHorizontal: spacing.lg,
-  },
-  searchInput: {
-    color: colors.textHeading,
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 17,
-    marginLeft: spacing.sm + 2,
-  },
-  filterRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.lg,
-    marginTop: spacing.md,
-  },
-  categorySelect: {
-    minWidth: 180,
-  },
-  filterSummaryText: {
-    color: colors.textTertiary,
-    ...textRoles.label,
-    fontSize: 13,
-  },
-  sectionHeading: {
-    marginBottom: 18,
-  },
-  feedbackBanner: {
-    borderRadius: radius.md,
-    marginBottom: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  feedbackSuccess: {
-    backgroundColor: colors.surfaceSuccessMuted,
-    borderColor: colors.borderSuccess,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: radius.round,
     borderWidth: 1,
+    borderColor: colors.border,
   },
-  feedbackError: {
-    backgroundColor: colors.surfaceDangerMuted,
-    borderColor: colors.borderDangerSoft,
-    borderWidth: 1,
+  categoryChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  feedbackText: {
-    ...textRoles.label,
-    fontSize: 13,
+  categoryChipText: {
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+    color: colors.text,
   },
-  feedbackTextSuccess: {
-    color: colors.successBright,
-  },
-  feedbackTextError: {
-    color: colors.dangerStrong,
-  },
-  screenErrorText: {
-    color: colors.dangerStrong,
-    ...textRoles.label,
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  tableCard: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    overflow: 'hidden',
-  },
-  tableCardCompact: {
-    marginHorizontal: -spacing.md,
-    borderRadius: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-  },
-  listSpacer: {
-    height: 14,
-  },
-  emptyStateText: {
-    color: colors.textSecondary,
-    ...textRoles.body,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  table: {
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-    marginTop: spacing.md,
-  },
-  tableHeader: {
-    backgroundColor: colors.surfaceSoft,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderPanel,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  tableHeaderCell: {
-    color: colors.textSecondary,
-    fontFamily: fonts.bold,
-    fontSize: textSizes.smallCaps,
-    letterSpacing: 1.2,
-  },
-  tableRows: {
-    backgroundColor: '#FFFFFF',
-  },
-  tableFooter: {
-    backgroundColor: colors.surfaceSoft,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderPanel,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+  categoryChipTextActive: {
+    color: colors.white,
+    fontFamily: fonts.semiBold,
   },
 });

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,7 +17,7 @@ import { AppButton } from '../ui/app-button';
 
 type CashierProductCardProps = {
   imageUrl?: string | null;
-  name: string;
+  name: ReactNode;
   onAdd: () => void;
   price: string;
   stock: number;
@@ -45,8 +46,10 @@ export function CashierProductCard({
           </View>
         )}
         {stock <= 10 ? (
-          <View style={styles.lowBadge}>
-            <Text style={styles.lowBadgeText}>LOW</Text>
+          <View style={[styles.lowBadge, stock === 0 ? styles.outOfStockBadge : styles.warningBadge]}>
+            <Text style={[styles.lowBadgeText, stock === 0 ? styles.outOfStockText : styles.warningText]}>
+              {stock === 0 ? 'NO STOCKS' : 'LOW'}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -57,6 +60,7 @@ export function CashierProductCard({
       <Text style={[styles.price, compactPhone && styles.priceCompact]}>{price}</Text>
 
       <AppButton
+        disabled={stock === 0}
         fullWidth
         icon={({ color, size }) => <Plus color={color} size={size} strokeWidth={2.2} />}
         label="Add"
@@ -107,7 +111,6 @@ const styles = StyleSheet.create({
     fontSize: textSizes.titleLarge,
   },
   lowBadge: {
-    backgroundColor: colors.surfaceDanger,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -115,10 +118,21 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     top: spacing.sm,
   },
+  warningBadge: {
+    backgroundColor: colors.surfaceWarningSoft,
+  },
+  outOfStockBadge: {
+    backgroundColor: colors.surfaceDanger,
+  },
   lowBadgeText: {
-    color: colors.dangerStrong,
     ...textRoles.label,
     fontSize: textSizes.xsmall,
+  },
+  warningText: {
+    color: colors.warningStrong,
+  },
+  outOfStockText: {
+    color: colors.dangerStrong,
   },
   name: {
     color: colors.textStrong,

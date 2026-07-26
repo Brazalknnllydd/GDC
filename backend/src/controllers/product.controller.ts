@@ -1,36 +1,6 @@
 import type { Request, Response } from "express";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { prisma } from "../lib/prisma.js";
-
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const uploadsRootDir = path.resolve(currentDir, "../../uploads");
-
-function getImageUrlFromFile(file?: Express.Multer.File) {
-  if (!file) {
-    return undefined;
-  }
-
-  return `/uploads/products/${file.filename}`;
-}
-
-async function removeStoredImage(imageUrl?: string | null) {
-  if (!imageUrl || !imageUrl.startsWith("/uploads/")) {
-    return;
-  }
-
-  const relativePath = imageUrl.replace(/^\/uploads[\\/]/, "");
-  const absolutePath = path.resolve(uploadsRootDir, relativePath);
-
-  try {
-    await fs.unlink(absolutePath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.error(error);
-    }
-  }
-}
+import { ProductService, getImageUrlFromFile, removeStoredImage } from "../services/product.service.js";
+import type { Prisma } from "@prisma/client";
 
 export const createProduct = async (
   req: Request,
@@ -67,22 +37,17 @@ export const createProduct = async (
       });
     }
 
-    const product = await prisma.product.create({
-      data: {
-        name: trimmedName,
-        description: trimmedDescription,
-        barcode: trimmedBarcode,
-        costPrice: parsedCostPrice,
-        price: parsedPrice,
-        stock: parsedStock,
-        unit: trimmedUnit,
-        categoryId: parsedCategoryId,
-        weight: parsedWeight,
-        imageUrl: imageUrl ?? null,
-      },
-      include: {
-        category: true,
-      },
+    const product = await ProductService.createProduct({
+      name: trimmedName,
+      description: trimmedDescription,
+      barcode: trimmedBarcode,
+      costPrice: parsedCostPrice,
+      price: parsedPrice,
+      stock: parsedStock,
+      unit: trimmedUnit,
+      categoryId: parsedCategoryId,
+      weight: parsedWeight,
+      imageUrl: imageUrl ?? null,
     });
 
     res.status(201).json(product);
@@ -113,19 +78,10 @@ export const getProducts = async (
   res: Response
 ) => {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        category: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
+    const products = await ProductService.getProducts();
     res.json(products);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Failed to fetch products",
     });
@@ -145,12 +101,7 @@ export const getProductById = async (
       });
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-      },
-    });
+    const product = await ProductService.getProductById(id);
 
     if (!product) {
       return res.status(404).json({
@@ -161,7 +112,6 @@ export const getProductById = async (
     res.json(product);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Failed to fetch product",
     });
@@ -180,19 +130,7 @@ export const getProductByBarcode = async (
       return res.status(400).json({ message: "Barcode is required" });
     }
 
-    const product = await prisma.product.findUnique({
-      where: {
-        barcode,
-      },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+    const product = await ProductService.getProductByBarcode(barcode);
 
     if (!product) {
       return res.status(404).json({
@@ -203,7 +141,6 @@ export const getProductByBarcode = async (
     res.json(product);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Failed to fetch product",
     });
@@ -224,10 +161,7 @@ export const updateProduct = async (
       });
     }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { id },
-      select: { imageUrl: true },
-    });
+    const existingProduct = await ProductService.getProductById(id);
 
     if (!existingProduct) {
       await removeStoredImage(getImageUrlFromFile(req.file));
@@ -320,13 +254,7 @@ export const updateProduct = async (
       data.imageUrl = null;
     }
 
-    const product = await prisma.product.update({
-      where: { id },
-      data,
-      include: {
-        category: true,
-      },
-    });
+    const product = await ProductService.updateProduct(id, data as Prisma.ProductUncheckedUpdateInput);
 
     if (req.file && existingProduct.imageUrl && existingProduct.imageUrl !== product.imageUrl) {
       await removeStoredImage(existingProduct.imageUrl);
@@ -381,9 +309,7 @@ export const deleteProduct = async (
       });
     }
 
-    const deletedProduct = await prisma.product.delete({
-      where: { id },
-    });
+    const deletedProduct = await ProductService.deleteProduct(id);
 
     await removeStoredImage(deletedProduct.imageUrl);
 

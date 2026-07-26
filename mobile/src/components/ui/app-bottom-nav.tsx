@@ -45,7 +45,7 @@ export function AppBottomNav<T extends string>({
             key={item.key}
             onPress={() => {
               if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                (document.activeElement as any)?.blur();
+                (document.activeElement as HTMLElement)?.blur();
               }
               onSelect(item.key);
             }}
