@@ -35,7 +35,6 @@ export function AppHeroAction({
 
 const styles = StyleSheet.create({
   button: {
-    alignSelf: 'stretch',
     backgroundColor: colors.hero,
     borderRadius: radius.lg,
     minHeight: 62,
@@ -45,7 +44,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     flexDirection: 'row',
-    height: '100%',
+    flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },

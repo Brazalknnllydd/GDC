@@ -37,13 +37,16 @@ export function CartModal() {
     updateCartQuantity,
     removeFromCart,
     activeCheckoutInput,
+    selectedCustomerId,
+    selectedCustomerName,
+    setShowCustomerModal,
   } = useCashierStore();
 
   const cartGrossSubtotal = cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  
+
   const activeDiscountItem = activeCheckoutInput.type === 'discount'
     ? cart.find((item) => item.id === activeCheckoutInput.productId) ?? null
     : null;
@@ -85,6 +88,24 @@ export function CartModal() {
           <Text style={styles.emptyText}>Your cart is empty.</Text>
         )}
       </ScrollView>
+
+      <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View>
+          <Text style={{ fontSize: textSizes.small, color: colors.textSecondary, fontFamily: fonts.medium }}>CUSTOMER</Text>
+          <Text style={{ fontSize: textSizes.body, color: colors.text, fontFamily: fonts.bold }}>
+            {selectedCustomerName || 'Walk-in'}
+          </Text>
+        </View>
+        <AppButton 
+          label={selectedCustomerId ? "Change" : "Attach"} 
+          variant="secondary" 
+          size="sm" 
+          onPress={() => {
+            setShowCustomerModal(true);
+          }}
+          fullWidth={false}
+        />
+      </View>
 
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
@@ -174,24 +195,7 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
     isSubmittingSale,
   } = useCashierStore();
 
-  const [customerType, setCustomerType] = useState<'walkin' | 'registered'>('walkin');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customerResults, setCustomerResults] = useState<{ id: number; name: string; phoneNumber?: string | null }[]>([]);
-  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
-  const { setCustomerId, setCustomerName, customerId, customerName } = useCashierStore();
 
-    const { data: customersResponse } = useQuery({
-    queryKey: ['customers', customerSearch],
-    queryFn: async () => {
-      const res = await apiClient.get<{ data: { id: number; name: string; phoneNumber?: string | null }[] }>('/customers', {
-        params: { search: customerSearch, limit: 5 },
-      });
-      return res.data;
-    },
-    enabled: customerType === 'registered',
-  });
-
-  const searchedCustomers = customersResponse?.data || [];
 
   const cartGrossSubtotal = cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
@@ -201,7 +205,8 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
   const changeAmount = Math.max(amountReceived - cartSubtotal, 0);
   const remainingBalance = Math.max(cartSubtotal - amountReceived, 0);
   const hasEnoughPayment = cartSubtotal > 0 && amountReceived >= cartSubtotal;
-  const canCompleteSale = !isSubmittingSale && cart.length > 0 && hasEnoughPayment;
+  const isUtangValid = paymentMethod === 'Utang';
+  const canCompleteSale = !isSubmittingSale && cart.length > 0 && (paymentMethod === 'Utang' ? true : hasEnoughPayment);
 
   return (
     <AdminModalShell
@@ -229,66 +234,7 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
           </Text>
         </SurfaceCard>
 
-        <Text style={styles.fieldLabel}>CUSTOMER (OPTIONAL)</Text>
-        <View style={{ marginBottom: 12 }}>
-          <AppSegmentedControl
-            onChange={(val) => setCustomerType(val as 'walkin' | 'registered')}
-            options={[
-              { label: 'Walk-in', value: 'walkin' },
-              { label: 'Registered', value: 'registered' },
-            ]}
-            selected={customerType}
-          />
-        </View>
 
-        {customerType === 'registered' ? (
-          <View style={{ marginBottom: 16 }}>
-            <View style={styles.searchContainer}>
-              <Search color={colors.textTertiary} size={20} />
-              <TextInput
-                onChangeText={(text) => {
-                  setCustomerSearch(text);
-                  setCustomerId(null);
-                  setCustomerName(null);
-                }}
-                placeholder="Search by name..."
-                style={styles.searchInput}
-                value={customerSearch}
-              />
-            </View>
-            
-            {customerSearch.length > 0 && customerId === null && (
-              <View style={{ gap: 8, marginTop: 8 }}>
-                {searchedCustomers.map((cust) => (
-                  <Pressable
-                    key={cust.id}
-                    style={styles.customerResultCard}
-                    onPress={() => {
-                      setCustomerId(cust.id);
-                      setCustomerName(cust.name);
-                      setCustomerSearch(cust.name);
-                    }}
-                  >
-                    <UserCircle2 color={colors.primary} size={20} />
-                    <View>
-                      <Text style={styles.customerResultName}>{cust.name}</Text>
-                      {cust.phoneNumber && <Text style={styles.customerResultPhone}>{cust.phoneNumber}</Text>}
-                    </View>
-                  </Pressable>
-                ))}
-                {searchedCustomers.length === 0 && (
-                  <Text style={styles.emptyText}>No customers found.</Text>
-                )}
-              </View>
-            )}
-            {customerId !== null && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                <CheckCircle2 color={colors.success} size={16} style={{ marginRight: 4 }} />
-                <Text style={{ fontFamily: fonts.medium, color: colors.success }}>Selected: {customerName}</Text>
-              </View>
-            )}
-          </View>
-        ) : null}
 
         <Text style={styles.fieldLabel}>ITEM DISCOUNTS</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -312,7 +258,7 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
             );
           })}
         </ScrollView>
-            
+
         <Text style={styles.fieldLabel}>PAYMENT METHOD</Text>
         <View style={{ marginBottom: 16 }}>
           <AppSegmentedControl
@@ -346,8 +292,9 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
           </View>
         </View>
 
+        {saleError ? <Text style={{ color: colors.danger, marginTop: 10, marginBottom: 10, textAlign: 'center', fontFamily: fonts.medium }}>{saleError}</Text> : null}
+
         <CashierKeypad onBackspace={handleKeypadBackspace} onKeyPress={handleKeypadPress} />
-        {saleError ? <Text style={{ color: colors.danger, marginTop: 10 }}>{saleError}</Text> : null}
       </ScrollView>
     </AdminModalShell>
   );
@@ -460,7 +407,7 @@ const styles = StyleSheet.create({
     fontSize: textSizes.xsmall,
     color: colors.textTertiary,
   },
-  
+
   discountCard: {
     backgroundColor: colors.surfaceSoft,
     borderWidth: 1,

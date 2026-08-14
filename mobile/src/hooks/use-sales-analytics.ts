@@ -107,7 +107,11 @@ export function useSalesAnalytics({
   selectedHistoryFilter,
 }: UseSalesAnalyticsParams) {
   const filteredSales = useMemo(
-    () => sales.filter((sale) => isWithinMonthRange(sale.createdAt, overviewMonthRange)),
+    () =>
+      sales.filter(
+        (sale) =>
+          sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, overviewMonthRange)
+      ),
     [overviewMonthRange, sales]
   );
 
@@ -195,7 +199,7 @@ export function useSalesAnalytics({
         : sales.filter((sale) => sale.paymentMethod === selectedHistoryFilter);
 
     return filteredByMethod
-      .filter((sale) => isWithinMonthRange(sale.createdAt, historyMonthRange))
+      .filter((sale) => sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, historyMonthRange))
       .slice()
       .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
   }, [historyMonthRange, sales, selectedHistoryFilter]);

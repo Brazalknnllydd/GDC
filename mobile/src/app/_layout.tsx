@@ -37,6 +37,7 @@ if (typeof console !== 'undefined') {
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../lib/query-client';
+import { GlobalToast } from '../components/global-toast';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -84,6 +85,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin-settings" />
           <Stack.Screen name="cashier" />
         </Stack>
+        <GlobalToast />
       </PaperProvider>
     </QueryClientProvider>
   );

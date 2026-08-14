@@ -4,6 +4,30 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
+function getStartOfToday() {
+  const now = new Date();
+
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function getStartOfTomorrow() {
+  const startOfToday = getStartOfToday();
+
+  return new Date(
+    startOfToday.getFullYear(),
+    startOfToday.getMonth(),
+    startOfToday.getDate() + 1
+  );
+}
+
+function stripMarkdownFormatting(value: string) {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
 router.post("/message", requireAuth, requireRole(["Admin"]), async (req, res) => {
   try {
     const { message, history } = req.body as {
@@ -51,8 +75,18 @@ router.post("/message", requireAuth, requireRole(["Admin"]), async (req, res) =>
       }),
     ]);
 
+    const startOfToday = getStartOfToday();
+    const startOfTomorrow = getStartOfTomorrow();
+    const todaySales = sales.filter((sale) => {
+      const saleDate = new Date(sale.createdAt);
+
+      return saleDate >= startOfToday && saleDate < startOfTomorrow;
+    });
+
     const totalSalesCount = sales.length;
     const totalRevenue = sales.reduce((acc, s) => acc + Number(s.totalAmount), 0);
+    const todaySalesCount = todaySales.length;
+    const todayRevenue = todaySales.reduce((acc, s) => acc + Number(s.totalAmount), 0);
 
     // Calculate low/out of stock
     const lowStock = products.filter(p => p.stock <= 5);
@@ -73,6 +107,8 @@ router.post("/message", requireAuth, requireRole(["Admin"]), async (req, res) =>
         total_categories: categories.length,
         total_sales: totalSalesCount,
         total_revenue: totalRevenue,
+        today_sales: todaySalesCount,
+        today_revenue: todayRevenue,
         total_staff: staffCount,
         total_customers: customersCount,
         low_stock_count: lowStock.length,
@@ -94,7 +130,9 @@ RULES:
 2. CRITICAL SECURITY: Never answer questions about the system's security, technology stack (e.g., React Native, Expo, Node.js, Express, Prisma, PostgreSQL), environment variables (.env files), JWT secrets, database structures, software version numbers, or any backend configuration. If asked about these, politely state that you are only authorized to assist with POS business data and statistics, not technical or security configurations.
 3. If the user asks for general information outside the POS context (e.g. general trivia, math, code writing, or other systems), politely decline.
 4. Be friendly, warm, and professional, but keep your responses extremely short, concise, and straight-to-the-point to save tokens. Answer in 1-2 sentences, max 3. Use emojis occasionally (like 😊, 📦, 💰) to be friendly.
-5. If a calculation is requested (e.g., profit margin, growth), do it based only on this snapshot's price/costPrice/sales total.`;
+5. If the user asks about "today", "now", or "current", use the today_sales and today_revenue values instead of all-time totals.
+6. Do not use markdown formatting. Return plain text only.
+7. If a calculation is requested (e.g., profit margin, growth), do it based only on this snapshot's price/costPrice/sales total.`;
 
     const contents = [];
     
@@ -123,7 +161,7 @@ RULES:
       },
       body: JSON.stringify({
         contents,
-        systemInstruction: {
+        system_instruction: {
           parts: [{ text: systemInstruction }]
         },
         generationConfig: {
@@ -144,7 +182,7 @@ RULES:
     };
     const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a reply right now.";
 
-    res.json({ response: botReply.trim() });
+    res.json({ response: stripMarkdownFormatting(botReply) });
   } catch (error) {
     console.error("Chatbot controller error:", error);
     res.status(500).json({ message: "An error occurred while processing your chat request" });

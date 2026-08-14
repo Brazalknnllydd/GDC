@@ -10,6 +10,7 @@ import { tabs as productTabs } from '../components/admin-products/products-scree
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
+import { useToastStore } from '../store/toast-store';
 import { spacing } from '../constants/design-system';
 import { colors, textRoles, textSizes } from '../constants/theme';
 import { useAdminSettingsData, type StaffCashier } from '../hooks/use-admin-settings-data';
@@ -68,8 +69,11 @@ export default function AdminSettingsScreen() {
       prependCashier(response.data);
       setShowAddCashierModal(false);
       setFormMessage('');
+      useToastStore.getState().showToast('Cashier added successfully', 'success');
     } catch {
-      setFormMessage('Could not create cashier right now.');
+      const msg = 'Could not create cashier right now.';
+      setFormMessage(msg);
+      useToastStore.getState().showToast(msg, 'error');
     } finally {
       setIsSavingCashier(false);
     }

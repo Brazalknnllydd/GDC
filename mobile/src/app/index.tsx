@@ -58,21 +58,14 @@ export default function LoginScreen() {
 
         setAuthenticatedUser(sessionUser);
 
-        if (sessionUser.role.toLowerCase() === 'admin') {
-          router.replace({
-            pathname: '/admin',
-            params: {
-              name: sessionUser.name,
-            },
-          });
+        if (sessionUser.role.toLowerCase() === 'admin' || sessionUser.role.toLowerCase() === 'owner') {
+          router.replace('/admin');
           return;
         }
 
         router.replace({
           pathname: '/cashier',
-          params: {
-            name: sessionUser.name,
-          },
+          params: { name: sessionUser.name },
         });
       } finally {
         if (mounted) {
@@ -113,21 +106,14 @@ export default function LoginScreen() {
       setAuthenticatedUser(response.data.user);
       setPassword('');
 
-      if (response.data.user.role.toLowerCase() === 'admin') {
-        router.replace({
-          pathname: '/admin',
-          params: {
-            name: response.data.user.name,
-          },
-        });
+      if (response.data.user.role.toLowerCase() === 'admin' || response.data.user.role.toLowerCase() === 'owner') {
+        router.replace('/admin');
         return;
       }
 
       router.replace({
         pathname: '/cashier-shift',
-        params: {
-          name: response.data.user.name,
-        },
+        params: { name: response.data.user.name },
       });
     } catch (error) {
       await clearAuthSession();

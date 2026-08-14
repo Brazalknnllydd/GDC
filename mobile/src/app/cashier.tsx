@@ -24,6 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
+import { FlashList } from '@shopify/flash-list';
 
 import {
   cashierPaymentMethods,
@@ -39,11 +40,13 @@ import { CashierKeypad } from '../components/cashier/cashier-keypad';
 import { CashierProductCard } from '../components/cashier/cashier-product-card';
 import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
 import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
+import { CashierCustomerModal } from '../components/cashier/cashier-customer-modal';
 import { type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
 import { AppSegmentedControl } from '../components/ui/app-segmented-control';
 import { AppHeroAction } from '../components/ui/app-hero-action';
 import { AppTextAction } from '../components/ui/app-text-action';
+import { AppSelect } from '../components/ui/app-select';
 import { FilterChip } from '../components/ui/filter-chip';
 import { AdminModalShell } from '../components/ui/admin-modal-shell';
 import { ModalActions } from '../components/ui/modal-actions';
@@ -58,7 +61,9 @@ import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { triggerHaptic } from '../lib/haptics';
 import { apiClient } from '../lib/api';
+import { AppToast } from '../components/ui/app-toast';
 
 type CashierParams = {
   name?: string;
@@ -127,11 +132,36 @@ export default function CashierScreen() {
   const [isSavingOpeningCash, setIsSavingOpeningCash] = useState(false);
   const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
 
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
+  const [isVoiding, setIsVoiding] = useState(false);
+
+  const handleVoidSale = async () => {
+    if (!voidReason.trim()) {
+      setToast({ message: 'Please enter a reason for voiding this sale.', type: 'error' });
+      return;
+    }
+    setIsVoiding(true);
+    try {
+      await apiClient.put(`/sales/${selectedSaleDetails.id}/void`, { reason: voidReason });
+      await reloadWorkspace();
+      setShowVoidModal(false);
+      setSelectedSaleDetails(null);
+      setVoidReason('');
+      setToast({ message: 'Sale voided successfully', type: 'success' });
+    } catch (e) {
+      setToast({ message: 'Failed to void sale.', type: 'error' });
+      console.error(e);
+    } finally {
+      setIsVoiding(false);
+    }
+  };
+
   const handleUpdateOpeningCash = async () => {
     const cleanInput = openingCashInput.replace(/,/g, '');
     const amount = Number(cleanInput);
     if (isNaN(amount) || amount < 0) {
-      alert('Please enter a valid positive number');
+      setToast({ message: 'Please enter a valid positive number', type: 'error' });
       return;
     }
 
@@ -143,187 +173,14 @@ export default function CashierScreen() {
       await reloadWorkspace();
       setShowOpeningCashModal(false);
       setOpeningCashInput('');
+      setToast({ message: 'Opening cash updated successfully', type: 'success' });
     } catch (err) {
       console.error('Failed to update opening cash:', err);
-      alert('Failed to update opening cash. Please try again.');
+      setToast({ message: 'Failed to update opening cash. Please try again.', type: 'error' });
     } finally {
       setIsSavingOpeningCash(false);
     }
   };
-
-  async function handlePrintReceipt(sale: any) {
-    if (!sale) return;
-
-    let logoUri = '';
-    try {
-      const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
-      if (!logoAsset.localUri && Platform.OS !== 'web') {
-        await logoAsset.downloadAsync();
-      }
-      if (Platform.OS === 'web') {
-        logoUri = logoAsset.uri;
-      } else {
-        const localUri = logoAsset.localUri || logoAsset.uri;
-        const base64 = await FileSystem.readAsStringAsync(localUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        logoUri = `data:image/jpeg;base64,${base64}`;
-      }
-    } catch (e) {
-      console.error('Failed to load receipt logo:', e);
-    }
-
-    const itemsHtml = sale.items && Array.isArray(sale.items)
-      ? sale.items.map((item: any) => `
-        <tr>
-          <td style="padding: 6px 0; font-family: monospace;">${item.product?.name || 'Item'} x ${item.quantity}</td>
-          <td style="padding: 6px 0; font-family: monospace; text-align: right;">${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}</td>
-        </tr>
-      `).join('')
-      : '';
-
-    const html = `
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-          <style>
-            @media print {
-              @page {
-                margin: 0;
-              }
-              body {
-                margin: 1.6cm;
-              }
-            }
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              color: #111;
-              padding: 20px;
-              margin: 0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 20px;
-            }
-            .logo-img {
-              width: 72px;
-              height: 72px;
-              border-radius: 36px;
-              object-fit: cover;
-              margin-bottom: 8px;
-            }
-            .title {
-              font-size: 20px;
-              font-weight: bold;
-              margin: 0 0 4px;
-            }
-            .subtitle {
-              font-size: 12px;
-              margin: 0;
-            }
-            .divider {
-              border-top: 1px dashed #333;
-              margin: 15px 0;
-            }
-            .details-table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 14px;
-            }
-            .totals-table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 14px;
-              margin-top: 10px;
-            }
-            .totals-table td {
-              padding: 4px 0;
-            }
-            .footer {
-              text-align: center;
-              font-size: 12px;
-              margin-top: 30px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            ${logoUri ? `<img src="${logoUri}" class="logo-img" />` : ''}
-            <h1 class="title">GDC POS RECEIPT</h1>
-            <p class="subtitle">GDC Store</p>
-            <p class="subtitle">Date: ${new Date(sale.createdAt).toLocaleString()}</p>
-            <p class="subtitle">Receipt No: ${sale.receiptNumber}</p>
-            <p class="subtitle">Cashier: ${sale.cashierName}</p>
-            <p class="subtitle">Customer: ${sale.customerName ?? sale.customer?.name ?? 'Walk-in'}</p>
-          </div>
-
-          <div class="divider"></div>
-
-          <table class="details-table">
-            <thead>
-              <tr>
-                <th style="text-align: left; padding-bottom: 8px;">Item</th>
-                <th style="text-align: right; padding-bottom: 8px;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <div class="divider"></div>
-
-          <table class="totals-table">
-            <tr>
-              <td>Subtotal:</td>
-              <td style="text-align: right;">${formatPeso(sale.subtotal)}</td>
-            </tr>
-            <tr>
-              <td>Discount:</td>
-              <td style="text-align: right;">- ${formatPeso(sale.discountAmount)}</td>
-            </tr>
-            <tr style="font-weight: bold; font-size: 16px;">
-              <td>TOTAL:</td>
-              <td style="text-align: right;">${formatPeso(sale.totalAmount)}</td>
-            </tr>
-            <tr>
-              <td>Amount Paid:</td>
-              <td style="text-align: right;">${formatPeso(sale.amountPaid)}</td>
-            </tr>
-            <tr>
-              <td>Change:</td>
-              <td style="text-align: right;">${formatPeso(sale.changeAmount)}</td>
-            </tr>
-          </table>
-
-          <div class="divider"></div>
-
-          <div class="footer">
-            <p style="margin: 0 0 6px;">Thank you for shopping with us!</p>
-            <p style="margin: 0;">Please visit again.</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    try {
-      if (Platform.OS === 'web') {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.write(html);
-          printWindow.document.close();
-          printWindow.print();
-        } else {
-          alert('Popup blocker is active. Please allow popups to view receipt.');
-        }
-      } else {
-        await Print.printAsync({ html });
-      }
-    } catch (error) {
-      console.error('Failed to print receipt:', error);
-      alert('Could not print receipt.');
-    }
-  }
 
   const cashierName = useMemo(() => {
     if (dashboard.cashier.name) {
@@ -348,7 +205,7 @@ export default function CashierScreen() {
     return 'Cashier';
   }, [dashboard.cashier.name, dashboard.cashier.username]);
 
-  const { cart, addToCart, setShowCartModal, setShowCheckoutModal, handleCompleteSale, completedSale, setShowSuccessModal, updateCartQuantity, removeFromCart } = useCashierStore();
+  const { cart, addToCart, setShowCartModal, setShowCheckoutModal, handleCompleteSale, completedSale, setShowSuccessModal, updateCartQuantity, removeFromCart, toast, setToast, showCustomerModal, setShowCustomerModal, selectedCustomerId, selectedCustomerName, setCustomer } = useCashierStore();
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartGrossSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => {
@@ -392,11 +249,14 @@ export default function CashierScreen() {
     () => filterProducts(products, selectedCategory, searchQuery),
     [products, selectedCategory, searchQuery]
   );
+  // Calculate layout variables for responsive product grid
   const productCardWidth = isWideTablet ? '31.5%' : isTablet ? '48.2%' : '48%';
+  const inventoryProductCardWidth = isWideTablet ? '18.5%' : isTablet ? '31.5%' : '48%';
   const showInlineCart = isWideTablet;
   const registerSummaryText = dashboard.currentShift ? 'Shift Active' : 'No active shift';
 
   async function openProductScanner() {
+    triggerHaptic('medium');
     setScannerFeedback('');
 
     if (!cameraPermission?.granted) {
@@ -439,77 +299,84 @@ export default function CashierScreen() {
     setShowScannerModal(false);
   }
 
+  function handleAddToCart(product: any) {
+    triggerHaptic('light');
+    addToCart(product);
+  }
+
   function renderRegisterSection() {
+    const registerNumColumns = isWideTablet ? 3 : 2;
     return (
       <View style={[styles.registerLayout, showInlineCart && styles.registerLayoutWide]}>
-        <View style={[styles.registerMain, showInlineCart && styles.registerMainWide]}>
-          <View style={[styles.registerHeaderRow, compactPhone && styles.registerHeaderRowCompact]}>
-            <View style={styles.registerHeaderText}>
-              <Text style={styles.screenTitle}>New Sale</Text>
-              <View style={styles.shiftMetaRow}>
-                <View style={styles.shiftDot} />
-                <Text style={styles.shiftMetaText}>{registerSummaryText}</Text>
+        <View style={[styles.registerMain, showInlineCart && styles.registerMainWide, { flex: 1 }]}>
+          <FlashList
+            data={filteredProducts}
+            numColumns={registerNumColumns}
+            contentContainerStyle={{ paddingBottom: spacing.lg }}
+            ListHeaderComponent={
+              <>
+                <View style={[styles.registerHeaderRow, compactPhone && styles.registerHeaderRowCompact]}>
+                  <View style={styles.registerHeaderText}>
+                    <Text style={styles.screenTitle}>New Sale</Text>
+                    <View style={styles.shiftMetaRow}>
+                      <View style={styles.shiftDot} />
+                      <Text style={styles.shiftMetaText}>{registerSummaryText}</Text>
+                    </View>
+                  </View>
+
+                  <AppHeroAction
+                    icon={<ScanLine color={colors.textInverse} size={18} strokeWidth={2.2} />}
+                    label="Scan Product"
+                    onPress={openProductScanner}
+                    subtitle="Fast barcode lookup"
+                    style={[styles.scanProductButton, compactPhone && styles.scanProductButtonCompact]}
+                  />
+                </View>
+
+                <View style={styles.searchActionsRow}>
+                  <View style={styles.searchBox}>
+                    <Search color={colors.textTertiary} size={18} strokeWidth={2} />
+                    <TextInput
+                      onChangeText={setSearchQuery}
+                      placeholder="Search products..."
+                      placeholderTextColor={colors.textSubtle}
+                      style={styles.searchInput}
+                      value={searchQuery}
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.searchActionsRow, compactPhone && styles.searchActionsRowCompact, { marginTop: -spacing.sm }]}>
+                  <AppSelect
+                    options={categoryChips}
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  />
+                </View>
+
+                {filteredProducts.length === 0 ? (
+                  <SurfaceCard style={styles.emptyStateCard}>
+                    <Text style={styles.emptyStateTitle}>No products found</Text>
+                    <Text style={styles.emptyStateText}>
+                      Try another category or search term.
+                    </Text>
+                  </SurfaceCard>
+                ) : null}
+              </>
+            }
+            renderItem={({ item: product }) => (
+              <View style={{ padding: spacing.xs, flex: 1 }}>
+                <CashierProductCard
+                  imageUrl={product.imageUrl}
+                  name={product.name}
+                  onAdd={() => handleAddToCart(product)}
+                  price={formatPeso(normalizeNumber(product.price))}
+                  stock={product.stock}
+                  style={{ width: '100%' }}
+                />
               </View>
-            </View>
-
-            <AppHeroAction
-              icon={<ScanLine color={colors.textInverse} size={18} strokeWidth={2.2} />}
-              label="Scan Product"
-              onPress={openProductScanner}
-              subtitle="Fast barcode lookup"
-              style={[styles.scanProductButton, compactPhone && styles.scanProductButtonCompact]}
-            />
-          </View>
-
-          <View style={styles.searchActionsRow}>
-            <View style={styles.searchBox}>
-              <Search color={colors.textTertiary} size={18} strokeWidth={2} />
-              <TextInput
-                onChangeText={setSearchQuery}
-                placeholder="Search products..."
-                placeholderTextColor={colors.textSubtle}
-                style={styles.searchInput}
-                value={searchQuery}
-              />
-            </View>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryChipRow}>
-            {categoryChips.map((category) => (
-              <FilterChip
-                key={category}
-                active={selectedCategory === category}
-                label={category}
-                onPress={() => setSelectedCategory(category)}
-              />
-            ))}
-          </ScrollView>
-
-          <View style={styles.productsGrid}>
-            {filteredProducts.map((product) => (
-              <CashierProductCard
-                key={product.id}
-                imageUrl={product.imageUrl}
-                name={product.name}
-                onAdd={() => addToCart(product)}
-                price={formatPeso(normalizeNumber(product.price))}
-                stock={product.stock}
-                style={{ width: productCardWidth }}
-              />
-            ))}
-          </View>
-
-          {filteredProducts.length === 0 ? (
-            <SurfaceCard style={styles.emptyStateCard}>
-              <Text style={styles.emptyStateTitle}>No products found</Text>
-              <Text style={styles.emptyStateText}>
-                Try another category or search term.
-              </Text>
-            </SurfaceCard>
-          ) : null}
+            )}
+          />
         </View>
 
         {showInlineCart ? (
@@ -538,6 +405,25 @@ export default function CashierScreen() {
                 <Text style={styles.emptyCartText}>Add products to start a new sale.</Text>
               )}
             </ScrollView>
+
+            <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View>
+                <Text style={{ fontSize: textSizes.small, color: colors.textSecondary, fontFamily: fonts.medium }}>CUSTOMER</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: textSizes.body, color: colors.text }}>
+                  {selectedCustomerName || 'Walk-in'}
+                </Text>
+              </View>
+              <AppButton
+                label={selectedCustomerId ? "Change" : "Attach"}
+                variant="secondary"
+                size="sm"
+                onPress={() => {
+                  triggerHaptic('medium');
+                  setShowCustomerModal(true);
+                }}
+                fullWidth={false}
+              />
+            </View>
 
             <View style={styles.cartSummary}>
               <View style={styles.summaryRow}>
@@ -574,59 +460,71 @@ export default function CashierScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.page}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            compactPhone ? styles.scrollContentCompact : undefined,
-            isTablet ? styles.scrollContentTablet : undefined,
-          ]}
-          showsVerticalScrollIndicator={false}>
-          <CashierDashboardHeader 
-            cashierName={cashierDisplayName} 
-            currentDate={currentDate} 
-          />
+        {(activeSection === 'register' || activeSection === 'inventory') ? (
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: compactPhone ? spacing.md : isTablet ? spacing.xl : spacing.lg, paddingBottom: spacing.sm, paddingTop: spacing.md }}>
+              <CashierDashboardHeader
+                cashierName={cashierDisplayName}
+                currentDate={currentDate}
+              />
+            </View>
+            {activeSection === 'register' ? renderRegisterSection() : (
+              <View style={{ flex: 1, paddingHorizontal: compactPhone ? spacing.md : isTablet ? spacing.xl : spacing.lg }}>
+                <CashierInventorySection
+                  onAddProduct={addToCart}
+                  numColumns={isWideTablet ? 5 : isTablet ? 3 : 2}
+                  products={products}
+                />
+              </View>
+            )}
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              compactPhone ? styles.scrollContentCompact : undefined,
+              isTablet ? styles.scrollContentTablet : undefined,
+            ]}
+            showsVerticalScrollIndicator={false}>
+            <CashierDashboardHeader
+              cashierName={cashierDisplayName}
+              currentDate={currentDate}
+            />
 
-          {activeSection === 'register' ? renderRegisterSection() : null}
-          {activeSection === 'history' ? (
-            <CashierHistorySection
-              dashboard={dashboard}
-              onEditOpeningCash={() => {
-                setOpeningCashInput(
-                  dashboard.currentShift?.openingCash !== undefined
-                    ? String(dashboard.currentShift.openingCash)
-                    : ''
-                );
-                setShowOpeningCashModal(true);
-              }}
-              onSelectSale={(sale) => setSelectedSaleDetails(sale)}
-            />
-          ) : null}
-          {activeSection === 'inventory' ? (
-            <CashierInventorySection
-              onAddProduct={addToCart}
-              productCardWidth={productCardWidth}
-              products={products}
-            />
-          ) : null}
-          {activeSection === 'customers' ? (
-            <CashierCustomersSection />
-          ) : null}
-          {activeSection === 'settings' ? (
-            <CashierSettingsSection
-              cashierName={cashierName}
-              onCloseShift={() => setShowCloseShiftModal(true)}
-              onLogout={() => {
-                void clearAuthSession().finally(() => {
-                  router.replace('/');
-                });
-              }}
-              role={dashboard.cashier.role}
-              username={dashboard.cashier.username}
-            />
-          ) : null}
+            {activeSection === 'history' ? (
+              <CashierHistorySection
+                dashboard={dashboard}
+                onEditOpeningCash={() => {
+                  setOpeningCashInput(
+                    dashboard.currentShift?.openingCash !== undefined
+                      ? String(dashboard.currentShift.openingCash)
+                      : ''
+                  );
+                  setShowOpeningCashModal(true);
+                }}
+                onSelectSale={(sale) => setSelectedSaleDetails(sale)}
+              />
+            ) : null}
+            {activeSection === 'customers' ? (
+              <CashierCustomersSection />
+            ) : null}
+            {activeSection === 'settings' ? (
+              <CashierSettingsSection
+                cashierName={cashierName}
+                onCloseShift={() => setShowCloseShiftModal(true)}
+                onLogout={() => {
+                  void clearAuthSession().finally(() => {
+                    router.replace('/');
+                  });
+                }}
+                role={dashboard.cashier.role}
+                username={dashboard.cashier.username}
+              />
+            ) : null}
 
-          {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
-        </ScrollView>
+            {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
+          </ScrollView>
+        )}
 
         {!showInlineCart && cart.length > 0 ? (
           <View style={[styles.checkoutBarWrap, compactPhone && styles.checkoutBarWrapCompact]}>
@@ -661,7 +559,6 @@ export default function CashierScreen() {
         />
       </View>
 
-
       {/* Shift Close Modal */}
       <ShiftCloseModal
         shiftId={dashboard.currentShift?.id}
@@ -670,7 +567,6 @@ export default function CashierScreen() {
         onSuccess={async () => {
           setShowCloseShiftModal(false);
           await reloadWorkspace();
-          // Optionally redirect back to login or cashier-shift
           router.replace('/cashier-shift');
         }}
       />
@@ -725,6 +621,9 @@ export default function CashierScreen() {
               <CameraView
                 active={showScannerModal}
                 facing="back"
+                barcodeScannerSettings={{
+                  barcodeTypes: ["qr", "ean13", "ean8", "upc_a", "upc_e", "code39", "code128"],
+                }}
                 onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
                 style={styles.cameraPreview}
               />
@@ -752,23 +651,89 @@ export default function CashierScreen() {
         </View>
       </AdminModalShell>
 
+      <AppToast
+        message={toast?.message || ''}
+        type={toast?.type || 'success'}
+        visible={toast !== null}
+        onHide={() => setToast(null)}
+      />
+
       <CartModal />
       <CheckoutModal onComplete={() => handleCompleteSale(cashierDisplayName, dashboard.currentShift?.id ?? null, async () => { setActiveSection('history'); await reloadWorkspace(); })} />
       <SuccessModal onNewSale={() => { setShowSuccessModal(false); setActiveSection('register'); }} onViewReceipt={() => { setShowSuccessModal(false); setSelectedSaleDetails(completedSale); }} />
+
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Cancel"
+              onPress={() => setShowVoidModal(false)}
+              variant="secondary"
+            />
+            <AppButton
+              disabled={isVoiding}
+              label={isVoiding ? 'Voiding...' : 'Confirm Void'}
+              onPress={handleVoidSale}
+              variant="danger"
+            />
+          </ModalActions>
+        }
+        height={320}
+        onClose={() => setShowVoidModal(false)}
+        title="Void Sale"
+        visible={showVoidModal}>
+        <View style={styles.modalInputWrap}>
+          <Text style={styles.modalInputLabel}>Reason for Voiding</Text>
+          <TextInput
+            style={[styles.modalTextInput, { minHeight: 80 }]}
+            multiline
+            placeholder="E.g., Customer changed their mind..."
+            value={voidReason}
+            onChangeText={setVoidReason}
+          />
+        </View>
+      </AdminModalShell>
 
       {/* Sale Details / Digital Receipt Modal */}
       <AdminModalShell
         footer={
           <ModalActions>
+            {selectedSaleDetails?.status === 'pending' && (
+              <AppButton
+                label="Complete Payment"
+                onPress={async () => {
+                  try {
+                    await apiClient.patch(`/sales/${selectedSaleDetails.id}/pay`);
+                    setSelectedSaleDetails(null);
+                    await reloadWorkspace();
+                    setToast({ message: 'Payment completed successfully', type: 'success' });
+                  } catch (e) {
+                    setToast({ message: 'Failed to complete payment', type: 'error' });
+                  }
+                }}
+                variant="success"
+                style={{ flex: 1 }}
+              />
+            )}
+            {selectedSaleDetails?.status !== 'voided' && (
+              <AppButton
+                label="Void"
+                onPress={() => setShowVoidModal(true)}
+                variant="danger"
+                style={{ flex: 1 }}
+              />
+            )}
             <AppButton
-              label="Print Receipt"
+              label="Print"
               onPress={() => handlePrintReceipt(selectedSaleDetails)}
               variant="primary"
+              style={{ flex: 1 }}
             />
             <AppButton
               label="Close"
               onPress={() => setSelectedSaleDetails(null)}
               variant="secondary"
+              style={{ flex: 1 }}
             />
           </ModalActions>
         }
@@ -805,7 +770,11 @@ export default function CashierScreen() {
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Payment Method</Text>
-                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.secondary }}>{formatPaymentMethod(selectedSaleDetails.paymentMethod)}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: selectedSaleDetails.status === 'pending' ? colors.danger : colors.secondary }}>
+                  {formatPaymentMethod(selectedSaleDetails.paymentMethod)}
+                  {selectedSaleDetails.status === 'pending' ? ' (Pending)' : ''}
+                  {selectedSaleDetails.status === 'voided' ? ' (Voided)' : ''}
+                </Text>
               </View>
             </SurfaceCard>
 
@@ -854,6 +823,13 @@ export default function CashierScreen() {
           </ScrollView>
         ) : null}
       </AdminModalShell>
+
+      <CashierCustomerModal
+        visible={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        selectedCustomerId={selectedCustomerId}
+        onSelect={setCustomer}
+      />
     </SafeAreaView>
   );
 }
@@ -883,6 +859,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   registerLayout: {
+    flex: 1,
     width: '100%',
   },
   registerLayoutWide: {
@@ -906,7 +883,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   registerHeaderText: {
-    flex: 1,
+    flexShrink: 1,
   },
   screenTitle: {
     color: colors.secondary,
@@ -940,6 +917,7 @@ const styles = StyleSheet.create({
   searchActionsRow: {
     marginBottom: spacing.md,
   },
+  searchActionsRowCompact: {},
   searchBox: {
     alignItems: 'center',
     backgroundColor: colors.card,

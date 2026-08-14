@@ -27,6 +27,14 @@ type AiChatModalProps = {
   onClose: () => void;
 };
 
+function normalizeAssistantText(text: string) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
 export function AiChatModal({ visible, onClose }: AiChatModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -74,12 +82,14 @@ export function AiChatModal({ visible, onClose }: AiChatModalProps) {
       const res = await apiClient.post("/chatbot/message", {
         message: userMessage.text,
         history,
-      });
+      }, { timeout: 30000 });
 
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "model",
-        text: res.data.response || "Sorry, I am having trouble connecting.",
+        text: normalizeAssistantText(
+          res.data.response || "Sorry, I am having trouble connecting.",
+        ),
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMessage]);
@@ -303,6 +313,7 @@ const styles = StyleSheet.create({
   },
   messageTextBot: {
     color: colors.textDark,
+    fontFamily: fonts.bold,
   },
   messageTime: {
     ...textRoles.label,

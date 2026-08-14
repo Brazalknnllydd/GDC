@@ -51,6 +51,7 @@ type SaleRecord = {
   amountPaid: number | string;
   changeAmount: number | string;
   paymentMethod: string;
+  status?: string;
   user?: {
     name: string;
   } | null;
@@ -280,7 +281,7 @@ export default function AdminSalesScreen() {
   }, []);
 
   const filteredSales = useMemo(
-    () => sales.filter((sale) => isWithinMonthRange(sale.createdAt, overviewMonthRange)),
+    () => sales.filter((sale) => sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, overviewMonthRange)),
     [overviewMonthRange, sales]
   );
 
@@ -923,16 +924,17 @@ export default function AdminSalesScreen() {
           <View>
             <Text style={styles.analyticsTitle}>Revenue Analytics</Text>
             <Text style={styles.analyticsSubtitle}>Monthly view based on selected month range</Text>
+            <Text style={styles.analyticsRangeLabel}>{formatMonthRangeLabel(overviewMonthRange)}</Text>
           </View>
         </View>
 
-        {chartBars.labels.length > 0 ? (
-          <View style={[styles.chartShell, compactPhone && styles.chartShellCompact]}>
-            <AdminBarChart height={240} labels={chartBars.labels} values={chartBars.values} />
-          </View>
-        ) : (
-          <Text style={styles.emptyStateText}>No sales in this range yet.</Text>
-        )}
+        <AdminBarChart
+          emptyDescription="Select a month range that includes completed sales to populate the chart."
+          emptyTitle="No revenue for this range"
+          height={240}
+          labels={chartBars.labels}
+          values={chartBars.values}
+        />
       </SurfaceCard>
 
       <View style={styles.paymentMethodsRow}>
@@ -1089,10 +1091,11 @@ export default function AdminSalesScreen() {
                     <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110, color: sale.customer ? '#475467' : '#98A2B3' }]}>
                       {sale.customer?.name || 'Walk-in'}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1, minWidth: 80 }]}>
+                    <Text style={[styles.tableCell, { flex: 1, minWidth: 80, color: sale.status === 'voided' ? colors.danger : undefined }]}>
                       {sale.paymentMethod}
+                      {sale.status === 'voided' ? '\n(Voided)' : ''}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 90, textAlign: 'right', fontFamily: fonts.semiBold, color: '#101828' }]}>
+                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 90, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : '#101828', textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                       {formatPeso(normalizeNumber(sale.totalAmount))}
                     </Text>
                   </View>
@@ -1216,29 +1219,20 @@ const styles = StyleSheet.create({
   analyticsTitle: {
     color: colors.secondary,
     ...textRoles.value,
+    fontSize: 21,
+    lineHeight: 26,
   },
   analyticsSubtitle: {
     color: colors.textTertiary,
     ...textRoles.label,
     marginTop: spacing.xs,
   },
-  chartShell: {
-    backgroundColor: colors.surfaceSubtle,
-    borderColor: colors.borderPanel,
-    borderRadius: layout.cardGap,
-    borderWidth: 1,
-    minHeight: 240,
-    overflow: 'hidden',
-    paddingBottom: 18,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.md,
-    position: 'relative',
-  },
-  chartShellCompact: {
-    minHeight: 208,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
-    paddingTop: spacing.sm,
+  analyticsRangeLabel: {
+    color: colors.textStrong,
+    ...textRoles.value,
+    fontSize: 18,
+    lineHeight: 26,
+    marginTop: spacing.xs,
   },
   paymentMethodsRow: {
     flexDirection: 'row',

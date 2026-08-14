@@ -39,7 +39,7 @@ export function CashierProductCard({
     <View style={[styles.card, compactPhone && styles.cardCompact, style]}>
       <View style={[styles.imageWrap, compactPhone && styles.imageWrapCompact]}>
         {resolvedImage ? (
-          <Image contentFit="cover" source={{ uri: resolvedImage }} style={styles.image} />
+          <Image contentFit="contain" source={{ uri: resolvedImage }} style={styles.image} />
         ) : (
           <View style={styles.fallbackImage}>
             <Text style={styles.fallbackText}>GDC</Text>
@@ -56,6 +56,9 @@ export function CashierProductCard({
 
       <Text numberOfLines={2} style={[styles.name, compactPhone && styles.nameCompact]}>
         {name}
+      </Text>
+      <Text style={[styles.stockText, compactPhone && styles.stockTextCompact, stock === 0 && { color: colors.danger }]}>
+        {stock} in stock
       </Text>
       <Text style={[styles.price, compactPhone && styles.priceCompact]}>{price}</Text>
 
@@ -139,13 +142,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     fontSize: textSizes.body,
     lineHeight: 19,
-    marginBottom: spacing.xs,
+    marginBottom: 4,
     minHeight: 38,
   },
   nameCompact: {
     fontSize: textSizes.small + 1,
     lineHeight: 18,
     minHeight: 36,
+  },
+  stockText: {
+    color: colors.textTertiary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small,
+    marginBottom: spacing.xs,
+  },
+  stockTextCompact: {
+    fontSize: textSizes.xsmall,
   },
   price: {
     color: colors.secondary,

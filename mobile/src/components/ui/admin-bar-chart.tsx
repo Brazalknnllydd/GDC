@@ -1,77 +1,185 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
 import { BarChart } from 'react-native-gifted-charts';
 
-import { colors, fonts, textSizes } from '../../constants/theme';
+import { radius, spacing } from '../../constants/design-system';
+import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { formatCompactTick } from './admin-chart-utils';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
+import { formatPeso } from '../../lib/product-utils';
 
 type AdminBarChartProps = {
   height?: number;
   labels: string[];
   values: number[];
+  emptyDescription?: string;
+  emptyTitle?: string;
 };
 
 export function AdminBarChart({
   height = 240,
   labels,
   values,
+  emptyDescription = 'No revenue is available for the selected range.',
+  emptyTitle = 'No chart data',
 }: AdminBarChartProps) {
   const { compactPhone, width } = useResponsiveLayout();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const chartWidth = Math.max(Math.min(width - (compactPhone ? 56 : 96), 920), 248);
-  const data = labels.map((label, index) => ({
-    frontColor: colors.secondary,
-    label,
-    value: values[index] ?? 0,
-  }));
+  const data = useMemo(
+    () =>
+      labels.map((label, index) => {
+        const value = values[index] ?? 0;
+        const isSelected = selectedIndex === index;
+
+        return {
+          frontColor: colors.secondary,
+          label,
+          onPress: () => setSelectedIndex(index),
+          topLabelComponent: isSelected
+            ? () => (
+                <View style={styles.valuePill}>
+                  <Text style={styles.valuePillText}>{formatPeso(value)}</Text>
+                </View>
+              )
+            : undefined,
+          value,
+        };
+      }),
+    [labels, selectedIndex, values]
+  );
   const maxValue = Math.max(...values, 0);
-  const normalizedMax = maxValue > 0 ? maxValue : 1;
-  const initialSpacing = compactPhone ? 10 : 14;
-  const barWidth = Math.max(Math.min(chartWidth / (data.length * 2.5), 48), 16);
+  const hasChartData = data.length > 0 && values.some((value) => value > 0);
+  const normalizedMax = maxValue > 0 ? maxValue * 1.15 : 1;
+  const barWidth = data.length > 0 ? Math.max(Math.min(chartWidth / (data.length * 3.2), 36), 18) : 18;
   const totalBarWidth = data.length * barWidth;
+  const centerSpacing = Math.max((chartWidth - barWidth) / 2, compactPhone ? 10 : 16);
+  const initialSpacing =
+    data.length <= 1
+      ? centerSpacing
+      : compactPhone
+        ? 12
+        : 16;
   const remainingSpace = chartWidth - initialSpacing - totalBarWidth;
-  const spacing = data.length > 0 ? Math.max(remainingSpace / data.length, 10) : 10;
-  const endSpacing = spacing;
+  const spacing = data.length > 1 ? Math.max(remainingSpace / (data.length - 1), 12) : 0;
+  const endSpacing = data.length <= 1 ? centerSpacing : initialSpacing;
 
   return (
     <View style={styles.wrap}>
-      <BarChart
-        barBorderRadius={8}
-        barWidth={barWidth}
-        data={data.length > 0 ? data : [{ label: 'No data', value: 0, frontColor: colors.secondary }]}
-        disableScroll
-        frontColor={colors.secondary}
-        height={compactPhone ? Math.max(height - 28, 196) : height}
-        width={chartWidth}
-        hideAxesAndRules={false}
-        hideOrigin
-        hideRules={false}
-        initialSpacing={initialSpacing}
-        endSpacing={endSpacing}
-        isAnimated
-        maxValue={normalizedMax}
-        noOfSections={4}
-        roundedTop
-        rulesColor={colors.borderPanel}
-        rulesThickness={1}
-        showFractionalValues={false}
-        spacing={spacing}
-        xAxisColor={colors.borderPanel}
-        xAxisLabelTextStyle={styles.xAxisLabel}
-        xAxisThickness={1}
-        yAxisColor={colors.borderPanel}
-        yAxisLabelWidth={44}
-        yAxisTextStyle={styles.yAxisLabel}
-        formatYLabel={formatCompactTick}
-      />
+      <View style={[styles.shell, compactPhone && styles.shellCompact]}>
+        {!hasChartData ? (
+          <View style={[styles.emptyState, compactPhone && styles.emptyStateCompact]}>
+            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+            <Text style={styles.emptyDescription}>{emptyDescription}</Text>
+          </View>
+        ) : (
+          <>
+            <BarChart
+              barBorderRadius={12}
+              barWidth={barWidth}
+              data={data}
+              disableScroll
+              focusBarOnPress
+              focusedBarConfig={{
+                borderRadius: 12,
+                color: colors.secondary,
+                opacity: 0.92,
+                roundedTop: true,
+              }}
+              frontColor={colors.secondary}
+              height={compactPhone ? Math.max(height - 28, 196) : height}
+              width={chartWidth}
+              hideAxesAndRules={false}
+              hideOrigin
+              hideRules={false}
+              initialSpacing={initialSpacing}
+              endSpacing={endSpacing}
+              isAnimated
+              maxValue={normalizedMax}
+              noOfSections={5}
+              roundedTop
+              rulesColor={colors.borderPanel}
+              rulesThickness={1}
+              showFractionalValues={false}
+              spacing={spacing}
+              xAxisColor={colors.borderPanel}
+              xAxisLabelTextStyle={styles.xAxisLabel}
+              xAxisThickness={1}
+              yAxisColor={colors.borderPanel}
+              yAxisLabelWidth={44}
+              yAxisTextStyle={styles.yAxisLabel}
+              formatYLabel={formatCompactTick}
+            />
+
+            <View style={styles.valueBanner}>
+              {selectedIndex !== null ? (
+                <>
+                  <View>
+                    <Text style={styles.valueBannerLabel}>Selected bar</Text>
+                    <Text style={styles.valueBannerTitle}>{labels[selectedIndex]}</Text>
+                  </View>
+                  <Text style={styles.valueBannerAmount}>
+                    {formatPeso(values[selectedIndex] ?? 0)}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.valueBannerHint}>
+                  Tap any bar to reveal the exact amount.
+                </Text>
+              )}
+            </View>
+          </>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    alignItems: 'center',
     width: '100%',
-    paddingBottom: 8,
+  },
+  shell: {
+    backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.borderPanel,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingBottom: 14,
+    paddingHorizontal: spacing.sm,
+    paddingTop: 10,
+    width: '100%',
+  },
+  shellCompact: {
+    paddingBottom: 10,
+    paddingHorizontal: spacing.xs,
+    paddingTop: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 208,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  emptyStateCompact: {
+    minHeight: 186,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+  },
+  emptyTitle: {
+    color: colors.textHeading,
+    ...textRoles.value,
+    fontSize: 15,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   xAxisLabel: {
     color: colors.textSecondary,
@@ -82,5 +190,52 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: textSizes.smallCaps,
+  },
+  valueBanner: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfoStrong,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    minHeight: 58,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  valueBannerLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.1,
+    marginBottom: 2,
+  },
+  valueBannerTitle: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  valueBannerAmount: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.large,
+  },
+  valueBannerHint: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+  },
+  valuePill: {
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    borderRadius: radius.round,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  valuePillText: {
+    color: colors.textInverse,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.small,
   },
 });

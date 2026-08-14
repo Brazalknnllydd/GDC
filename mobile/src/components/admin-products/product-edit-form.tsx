@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-errors';
+import { useToastStore } from '../../store/toast-store';
 import { AddProductModal } from './add-product-modal';
 import type { Category, Product } from './products-screen-data';
 import { normalizeNumber, parseWeight } from '../../lib/product-utils';
@@ -102,6 +104,7 @@ export function ProductEditForm({
     },
     onError: (error) => {
       setProductError(error.message);
+      useToastStore.getState().showToast(`Failed to save product: ${error.message}`, 'error');
     }
   });
 

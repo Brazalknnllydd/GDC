@@ -3,10 +3,11 @@ import { prisma } from "../lib/prisma.js";
 import {
   createSaleWithInventoryUpdate,
   isValidSaleItem,
+  voidSale,
 } from "../services/sale.service.js";
 import type { AuthenticatedRequest } from "../types/express.js";
 
-const allowedPaymentMethods = new Set(["Cash", "GCash"]);
+const allowedPaymentMethods = new Set(["Cash", "GCash", "Utang"]);
 
 export const getSales = async (
   req: Request,
@@ -205,9 +206,10 @@ export const createSale = async (
       !allowedPaymentMethods.has(paymentMethod.trim())
     ) {
       return res.status(400).json({
-        message: "Payment method must be Cash or GCash",
+        message: "Payment method must be Cash, GCash, or Utang",
       });
     }
+
 
     if (!Array.isArray(items) || items.length === 0 || !items.every(isValidSaleItem)) {
       return res.status(400).json({
@@ -267,5 +269,75 @@ export const createSale = async (
     res.status(statusCode).json({
       message,
     });
+  }
+};
+
+export const markSaleAsPaid = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const id = Number(req.params.id);
+
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ message: "Sale not found" });
+    }
+
+    if (sale.status !== "pending") {
+      return res.status(400).json({ message: "Only pending sales can be marked as paid" });
+    }
+
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
+    if (!isAdmin && sale.userId !== authReq.authUser.id) {
+      return res.status(403).json({ message: "Cashiers can only update their own sales" });
+    }
+
+    const updatedSale = await prisma.sale.update({
+      where: { id },
+      data: {
+        status: "completed",
+        amountPaid: sale.totalAmount,
+        changeAmount: 0,
+      },
+    });
+
+    res.json(updatedSale);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to mark sale as paid" });
+  }
+};
+
+export const voidSaleController = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const id = Number(req.params.id);
+    const { reason } = req.body;
+
+    if (!reason || typeof reason !== 'string') {
+      return res.status(400).json({ message: "A void reason is required" });
+    }
+
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ message: "Sale not found" });
+    }
+
+    const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
+    if (!isAdmin && sale.userId !== authReq.authUser.id) {
+      return res.status(403).json({ message: "Cashiers can only void their own sales" });
+    }
+
+    const voidedSale = await voidSale(id, authReq.authUser.id, reason);
+    res.json(voidedSale);
+  } catch (error) {
+    console.error(error);
+    const message = error instanceof Error ? error.message : "Failed to void sale";
+    res.status(400).json({ message });
   }
 };

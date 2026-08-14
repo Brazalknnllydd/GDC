@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { UserRoundPlus } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,6 +31,7 @@ export function AddCashierModal({
   onSave,
   visible,
 }: AddCashierModalProps) {
+  const { height: viewportHeight } = useWindowDimensions();
   const {
     control,
     formState: { errors },
@@ -75,6 +76,7 @@ export function AddCashierModal({
 
   return (
     <AdminModalShell
+      height={Math.min(viewportHeight * 0.84, 620)}
       footer={
         <ModalActions stacked>
           <AppButton
@@ -101,7 +103,12 @@ export function AddCashierModal({
       onClose={onClose}
       title="Add Cashier"
       visible={visible}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.formContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+      >
         <Controller
           control={control}
           name="name"
@@ -157,7 +164,7 @@ export function AddCashierModal({
         </View>
 
         <View style={styles.modalCategoryWrap}>
-        {categories.map((category) => (
+          {categories.map((category) => (
             <FilterChip
               key={category.id}
               active={selectedCategoryIds.includes(category.id)}
@@ -209,6 +216,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.sm,
+  },
+  formContent: {
+    paddingBottom: spacing.lg,
   },
   formErrorText: {
     color: colors.dangerStrong,

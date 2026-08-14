@@ -44,7 +44,11 @@
           "cameraPermission": "Allow GDC POS to scan product barcodes.",
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "expo-image",
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

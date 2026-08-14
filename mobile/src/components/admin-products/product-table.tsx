@@ -1,16 +1,15 @@
-import { useMemo } from 'react';
-import { StyleSheet, View, Text, useWindowDimensions } from 'react-native';
-import { createColumnHelper } from '@tanstack/react-table';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
-import { Pencil, Trash2 } from 'lucide-react-native';
+import { Package, Pencil, Trash2 } from 'lucide-react-native';
+import { IconButton } from 'react-native-paper';
 
 import type { Product } from './products-screen-data';
-import { DataTable } from '../ui/data-table';
 import { PaginationControls } from '../ui/pagination-controls';
-import { AppButton } from '../ui/app-button';
 import { resolveApiAssetUrl } from '../../lib/api';
+import { formatPeso, normalizeNumber } from '../../lib/product-utils';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { radius, spacing } from '../../constants/design-system';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 export function ProductTable({
   paginatedProducts,
@@ -31,203 +30,288 @@ export function ProductTable({
   onDelete: (product: Product) => void;
   isLoading: boolean;
 }) {
-  const { width } = useWindowDimensions();
-  const isCompactPhone = width < 430;
+  const { compactPhone, isTablet, isWideTablet } = useResponsiveLayout();
+  const numColumns = compactPhone ? 1 : isWideTablet ? 3 : isTablet ? 2 : 1;
 
-  const columns = useMemo(() => {
-    const columnHelper = createColumnHelper<Product>();
+  if (isLoading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator color={colors.secondary} size="small" />
+      </View>
+    );
+  }
 
-    return [
-      columnHelper.accessor('name', {
-        header: 'Product',
-        meta: { flex: 1 },
-        cell: (info) => {
-          const product = info.row.original;
-          const resolvedImage = resolveApiAssetUrl(product.imageUrl);
-          
-          return (
-            <View style={styles.productCell}>
-              <View style={styles.imageWrap}>
-                {resolvedImage ? (
-                  <Image source={{ uri: resolvedImage }} style={styles.image} contentFit="cover" />
-                ) : (
-                  <View style={styles.fallbackImage}>
-                    <Text style={styles.fallbackText}>GDC</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.productInfo}>
-                <Text style={styles.nameText} numberOfLines={1}>{product.name}</Text>
-                {product.barcode ? <Text style={styles.skuText}>{product.barcode}</Text> : null}
-              </View>
-            </View>
-          );
-        },
-      }),
-      ...(isCompactPhone ? [] : [
-        columnHelper.accessor('category.name', {
-          header: 'Category',
-          meta: { width: 140 },
-          cell: (info) => (
-            <View style={styles.categoryPill}>
-              <Text style={styles.categoryText}>{info.getValue()}</Text>
-            </View>
-          ),
-        }),
-      ]),
-      columnHelper.accessor('price', {
-        header: 'Price',
-        meta: { width: 110, align: 'right' },
-        cell: (info) => <Text style={styles.priceText}>₱{Number(info.getValue()).toFixed(2)}</Text>,
-      }),
-      columnHelper.accessor('stock', {
-        header: 'Stock',
-        meta: { width: 90, align: 'right' },
-        cell: (info) => {
-          const stock = info.getValue();
-          const weight = info.row.original.weight;
-          const unit = info.row.original.unit;
-          
-          return (
-            <View style={styles.stockCell}>
-              <Text style={[styles.stockText, stock <= 10 && styles.lowStockText]}>
-                {stock}
-              </Text>
-              {weight !== null && weight !== undefined && (
-                <Text style={styles.weightText}>
-                  {weight}{unit !== 'pcs' ? unit : ''}
-                </Text>
-              )}
-            </View>
-          );
-        },
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        meta: { width: 84 },
-        cell: (info) => (
-          <View style={styles.actions}>
-            <AppButton
-              variant="secondary"
-              size="sm"
-              icon={({ color, size }) => <Pencil color={color} size={size} strokeWidth={2.5} />}
-              onPress={() => onEdit(info.row.original)}
-              label=""
-            />
-            <AppButton
-              variant="dangerOutline"
-              size="sm"
-              icon={({ color, size }) => <Trash2 color={color} size={size} strokeWidth={2.5} />}
-              onPress={() => onDelete(info.row.original)}
-              label=""
-            />
-          </View>
-        ),
-      })
-    ];
-  }, [isCompactPhone, onDelete, onEdit]);
+  if (paginatedProducts.length === 0) {
+    return (
+      <View style={styles.centeredState}>
+        <Package color={colors.textSubtle} size={32} strokeWidth={1.5} />
+        <Text style={styles.emptyText}>No products found.</Text>
+      </View>
+    );
+  }
 
   return (
-    <>
-      <DataTable
-        columns={columns}
-        data={paginatedProducts}
-        isLoading={isLoading}
-        estimatedItemSize={isCompactPhone ? 116 : 84}
-        emptyStateMessage="No products found in this category."
-        keyExtractor={(item) => item.id.toString()}
-      />
-      <PaginationControls
-        currentPage={productPage}
-        onPageChange={setProductPage}
-        totalPages={totalPages}
-        visiblePageNumbers={visiblePageNumbers}
-      />
-    </>
+    <View style={styles.container}>
+      <View style={styles.grid}>
+        {paginatedProducts.map((product) => {
+          const resolvedImage = resolveApiAssetUrl(product.imageUrl);
+          const isLowStock = product.stock <= 10;
+
+          return (
+            <View
+              key={product.id}
+              style={[styles.itemWrap, { flexBasis: `${100 / numColumns}%` }]}
+            >
+              <View style={styles.card}>
+                <View style={styles.imageWrap}>
+                  {resolvedImage ? (
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: resolvedImage }}
+                      style={styles.image}
+                    />
+                  ) : (
+                    <View style={styles.fallbackImage}>
+                      <Text style={styles.fallbackText}>GDC</Text>
+                    </View>
+                  )}
+                  {isLowStock ? (
+                    <View
+                      style={[
+                        styles.badge,
+                        product.stock === 0 ? styles.badgeDanger : styles.badgeWarning,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          product.stock === 0 ? styles.badgeTextDanger : styles.badgeTextWarning,
+                        ]}
+                      >
+                        {product.stock === 0 ? 'OUT' : 'LOW'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.body}>
+                  <Text numberOfLines={2} style={styles.nameText}>
+                    {product.name}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.skuText}>
+                    {product.barcode || 'No barcode'}
+                  </Text>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Category</Text>
+                    <Text numberOfLines={1} style={styles.metaValue}>
+                      {product.category?.name || '—'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Price</Text>
+                    <Text style={[styles.metaValue, styles.priceText]}>
+                      {formatPeso(normalizeNumber(product.price))}
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Stock</Text>
+                    <Text
+                      style={[
+                        styles.metaValue,
+                        product.stock === 0 && styles.dangerText,
+                        isLowStock && product.stock > 0 && styles.warningText,
+                      ]}
+                    >
+                      {product.stock} {product.unit}
+                    </Text>
+                  </View>
+
+                  {product.weight !== null && product.weight !== undefined ? (
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Weight</Text>
+                      <Text style={styles.metaValue}>
+                        {product.weight}
+                        {product.unit !== 'pcs' ? product.unit : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.actionsRow}>
+                  <IconButton
+                    icon={() => <Pencil color={colors.secondary} size={18} strokeWidth={2.5} />}
+                    onPress={() => onEdit(product)}
+                    size={22}
+                    style={styles.actionButton}
+                  />
+                  <IconButton
+                    icon={() => <Trash2 color={colors.danger} size={18} strokeWidth={2.5} />}
+                    onPress={() => onDelete(product)}
+                    size={22}
+                    style={[styles.actionButton, styles.deleteButton]}
+                  />
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.paginationRow}>
+        <PaginationControls
+          borderless
+          currentPage={productPage}
+          onPageChange={setProductPage}
+          totalPages={totalPages}
+          visiblePageNumbers={visiblePageNumbers}
+        />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  productCell: {
+  container: {
+    backgroundColor: '#FFFFFF',
+    borderTopColor: '#EAECF0',
+    borderTopWidth: 1,
+    flex: 1,
+  },
+  grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: spacing.xl,
+  },
+  centeredState: {
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 240,
+    paddingVertical: 48,
+  },
+  emptyText: {
+    color: '#D0D5DD',
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+    marginTop: 8,
+  },
+  itemWrap: {
+    padding: spacing.sm,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#EAECF0',
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   imageWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.fallbackImage,
+    backgroundColor: colors.surfaceSoft,
+    height: 160,
+    position: 'relative',
   },
   image: {
-    width: '100%',
     height: '100%',
+    width: '100%',
   },
   fallbackImage: {
-    flex: 1,
     alignItems: 'center',
+    backgroundColor: colors.fallbackImage,
+    flex: 1,
     justifyContent: 'center',
   },
   fallbackText: {
+    color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: textSizes.small,
-    color: colors.secondary,
+    fontSize: textSizes.titleLarge,
   },
-  productInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  nameText: {
-    fontFamily: fonts.semiBold,
-    fontSize: textSizes.body,
-    color: colors.textStrong,
-  },
-  skuText: {
-    fontFamily: fonts.regular,
-    fontSize: textSizes.small,
-    color: colors.text,
-    marginTop: 2,
-  },
-  categoryPill: {
-    backgroundColor: colors.surfaceSubtle,
-    alignSelf: 'flex-start',
+  badge: {
+    borderRadius: radius.round,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
+    paddingVertical: 3,
+    position: 'absolute',
+    right: spacing.sm,
+    top: spacing.sm,
   },
-  categoryText: {
-    fontFamily: fonts.medium,
+  badgeWarning: {
+    backgroundColor: colors.surfaceWarningSoft,
+  },
+  badgeDanger: {
+    backgroundColor: colors.surfaceDanger,
+  },
+  badgeText: {
+    fontFamily: fonts.bold,
     fontSize: textSizes.xsmall,
-    color: colors.text,
+    letterSpacing: 0.8,
   },
-  priceText: {
-    ...textRoles.value,
-    fontSize: textSizes.body,
-    color: colors.secondary,
-    textAlign: 'right',
+  badgeTextWarning: {
+    color: colors.warningStrong,
   },
-  stockCell: {
-    alignItems: 'flex-end',
-  },
-  stockText: {
-    fontFamily: fonts.semiBold,
-    fontSize: textSizes.body,
-    color: colors.textStrong,
-  },
-  lowStockText: {
+  badgeTextDanger: {
     color: colors.dangerStrong,
   },
-  weightText: {
+  body: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  nameText: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+    lineHeight: 19,
+  },
+  skuText: {
+    color: colors.textTertiary,
     fontFamily: fonts.regular,
     fontSize: textSizes.small,
-    color: colors.text,
-    marginTop: 2,
+    marginTop: 4,
   },
-  actions: {
+  metaRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.xs,
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  metaLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1,
+  },
+  metaValue: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  priceText: {
+    color: colors.secondary,
+    ...textRoles.value,
+  },
+  dangerText: {
+    color: colors.danger,
+  },
+  warningText: {
+    color: colors.warningStrong,
+  },
+  actionsRow: {
+    flexDirection: 'row',
     justifyContent: 'flex-end',
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+  },
+  actionButton: {
+    backgroundColor: colors.surfaceSoft,
+    margin: 0,
+  },
+  deleteButton: {
+    backgroundColor: colors.surfaceDanger,
+  },
+  paginationRow: {
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
 });

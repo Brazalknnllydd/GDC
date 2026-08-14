@@ -56,7 +56,10 @@ export function AppBottomNav<T extends string>({
                 size={20}
                 strokeWidth={isActive ? 2.3 : 1.9}
               />
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+              <Text
+                adjustsFontSizeToFit
+                numberOfLines={1}
+                style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                 {item.label}
               </Text>
               {isActive ? (

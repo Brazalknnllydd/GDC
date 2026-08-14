@@ -5,6 +5,13 @@ import { Prisma } from '@prisma/client';
 export const ShiftService = {
   async getAllShifts() {
     return prisma.shift.findMany({
+      where: {
+        user: {
+          role: {
+            name: 'Cashier',
+          },
+        },
+      },
       orderBy: { startedAt: 'desc' },
       include: {
         user: {

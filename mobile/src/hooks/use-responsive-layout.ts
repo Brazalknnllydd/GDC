@@ -6,9 +6,9 @@ export function useResponsiveLayout() {
   return {
     width,
     height,
-    compactPhone: width < 390,
-    isCompactPhone: width < 390,
-    isTablet: width >= 820,
+    compactPhone: width < 768,
+    isCompactPhone: width < 768,
+    isTablet: width >= 768,
     isWideTablet: width >= 1080,
   };
 }

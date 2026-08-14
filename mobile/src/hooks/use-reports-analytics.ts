@@ -17,6 +17,10 @@ function endOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 }
 
+function isSameMonth(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
+}
+
 function isWithinMonthRange(dateValue: string, range: MonthRangeValue) {
   if (!range.startMonth || !range.endMonth) {
     return true;
@@ -71,6 +75,53 @@ function buildMonthlyLineSeries(
     );
 
     cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return { discountValues, labels, revenueValues };
+}
+
+function buildDailyLineSeries(
+  sales: SaleRecord[],
+  month: Date,
+  normalizeNumber: (value: number | string | undefined) => number
+) {
+  const labels: string[] = [];
+  const revenueValues: number[] = [];
+  const discountValues: number[] = [];
+  const cursor = startOfMonth(month);
+  const monthEnd = endOfMonth(month);
+  const visibleLabelDays = new Set([1, 7, 14, 21, 28, monthEnd.getDate()]);
+
+  while (cursor.getTime() <= monthEnd.getTime()) {
+    const year = cursor.getFullYear();
+    const monthIndex = cursor.getMonth();
+    const dayOfMonth = cursor.getDate();
+
+    labels.push(visibleLabelDays.has(dayOfMonth) ? String(dayOfMonth) : '');
+
+    revenueValues.push(
+      sales.reduce((sum, sale) => {
+        const saleDate = new Date(sale.createdAt);
+        return saleDate.getFullYear() === year &&
+          saleDate.getMonth() === monthIndex &&
+          saleDate.getDate() === dayOfMonth
+          ? sum + normalizeNumber(sale.totalAmount)
+          : sum;
+      }, 0)
+    );
+
+    discountValues.push(
+      sales.reduce((sum, sale) => {
+        const saleDate = new Date(sale.createdAt);
+        return saleDate.getFullYear() === year &&
+          saleDate.getMonth() === monthIndex &&
+          saleDate.getDate() === dayOfMonth
+          ? sum + normalizeNumber(sale.discountAmount)
+          : sum;
+      }, 0)
+    );
+
+    cursor.setDate(cursor.getDate() + 1);
   }
 
   return { discountValues, labels, revenueValues };
@@ -150,7 +201,21 @@ export function useReportsAnalytics({
   );
 
   const chartSeries = useMemo(
-    () => buildMonthlyLineSeries(filteredSales, reportMonthRange, normalizeNumber),
+    () => {
+      if (filteredSales.length === 0) {
+        return { discountValues: [], labels: [], revenueValues: [] };
+      }
+
+      if (!reportMonthRange.startMonth || !reportMonthRange.endMonth) {
+        return { discountValues: [], labels: [], revenueValues: [] };
+      }
+
+      if (isSameMonth(reportMonthRange.startMonth, reportMonthRange.endMonth)) {
+        return buildDailyLineSeries(filteredSales, reportMonthRange.startMonth, normalizeNumber);
+      }
+
+      return buildMonthlyLineSeries(filteredSales, reportMonthRange, normalizeNumber);
+    },
     [filteredSales, normalizeNumber, reportMonthRange]
   );
 

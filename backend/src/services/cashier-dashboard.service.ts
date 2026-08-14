@@ -41,19 +41,21 @@ export async function getCashierDashboard(userId: number) {
     throw new Error("User not found");
   }
 
-  const latestShift = await prisma.shift.findFirst({
+  const activeShift = await prisma.shift.findFirst({
     where: {
       userId,
+      endedAt: null,
     },
     orderBy: {
       startedAt: "desc",
     },
   });
 
-  const todaySales = latestShift?.status === 'OPEN' ? await prisma.sale.findMany({
+  const todaySales = activeShift
+    ? await prisma.sale.findMany({
     where: {
       userId,
-      shiftId: latestShift.id,
+      shiftId: activeShift.id,
     },
     include: {
       customer: {
@@ -74,15 +76,17 @@ export async function getCashierDashboard(userId: number) {
         },
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-  }) : [];
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+    : [];
 
   const recentSales = todaySales.map((sale) => ({
     id: sale.id,
     customerName: sale.customer?.name ?? null,
     paymentMethod: sale.paymentMethod,
+    status: sale.status,
     receiptNumber: sale.receiptNumber,
     time: sale.createdAt.toISOString(),
     totalAmount: toNumber(sale.totalAmount),
@@ -100,17 +104,19 @@ export async function getCashierDashboard(userId: number) {
     })),
   }));
 
-  const salesToday = todaySales.reduce(
+  const completedSales = todaySales.filter((sale) => sale.status !== "voided");
+
+  const salesToday = completedSales.reduce(
     (sum, sale) => sum + toNumber(sale.totalAmount),
     0
   );
-  const itemsSold = todaySales.reduce(
+  const itemsSold = completedSales.reduce(
     (sum, sale) =>
       sum +
       sale.items.reduce((itemSum, item) => itemSum + toNumber(item.quantity), 0),
     0
   );
-  const paymentBreakdownMap = todaySales.reduce((accumulator, sale) => {
+  const paymentBreakdownMap = completedSales.reduce((accumulator, sale) => {
     const key = sale.paymentMethod?.trim() || "Cash";
     const currentTotal = accumulator.get(key) ?? 0;
 
@@ -126,12 +132,9 @@ export async function getCashierDashboard(userId: number) {
     }))
     .sort((left, right) => right.total - left.total);
 
-  const cashSalesTotal =
-    paymentBreakdown.find((entry) => entry.method.toLowerCase() === "cash")?.total ?? 0;
-
   let cashReceived = 0;
   let changeGiven = 0;
-  for (const sale of todaySales) {
+  for (const sale of completedSales) {
     if (sale.paymentMethod.trim().toLowerCase() === "cash") {
       cashReceived += toNumber(sale.amountPaid);
       changeGiven += toNumber(sale.changeAmount);
@@ -151,33 +154,33 @@ export async function getCashierDashboard(userId: number) {
       role: user.role.name,
       username: user.username,
     },
-    currentShift: latestShift
+    currentShift: activeShift
       ? {
-          id: latestShift.id,
+          id: activeShift.id,
           durationMinutes: Math.max(
             0,
             Math.floor(
-              ((latestShift.endedAt ?? new Date()).getTime() - latestShift.startedAt.getTime()) /
+              ((activeShift.endedAt ?? new Date()).getTime() - activeShift.startedAt.getTime()) /
                 60000
             )
           ),
-          expectedCashOnHand: toNumber(latestShift.openingCash) + cashSalesTotal,
-          openingCash: toNumber(latestShift.openingCash),
-          startedAt: latestShift.startedAt.toISOString(),
-          status: latestShift.endedAt ? "Closed Shift" : "Active Shift",
+          expectedCashOnHand: toNumber(activeShift.openingCash) + salesToday,
+          openingCash: toNumber(activeShift.openingCash),
+          startedAt: activeShift.startedAt.toISOString(),
+          status: activeShift.endedAt ? "Closed Shift" : "Active Shift",
         }
       : null,
     paymentBreakdown,
     performance: {
       itemsSold,
       salesToday,
-      served: todaySales.length,
-      transactions: todaySales.length,
+      served: completedSales.length,
+      transactions: completedSales.length,
     },
     recentSales,
     totals: {
-      drawerVariance: latestShift && latestShift.closingCash !== null
-        ? toNumber(latestShift.closingCash) - (toNumber(latestShift.openingCash) + cashSalesTotal)
+      drawerVariance: activeShift && activeShift.closingCash !== null
+        ? toNumber(activeShift.closingCash) - (toNumber(activeShift.openingCash) + salesToday)
         : 0,
       totalReportedSales: salesToday,
       cashReceived,

@@ -64,7 +64,7 @@ export function DataTable<TData>({
                 style={[
                   styles.headerCell,
                   meta?.flex ? { flex: meta.flex } : undefined,
-                  meta?.width ? { width: meta.width } : undefined,
+                  meta?.width ? { width: meta.width, flexShrink: 0 } : undefined,
                 ]}
               >
                 {!header.isPlaceholder && (
@@ -99,7 +99,7 @@ export function DataTable<TData>({
                     style={[
                       styles.cell,
                       meta?.flex ? { flex: meta.flex } : undefined,
-                      meta?.width ? { width: meta.width } : undefined,
+                      meta?.width ? { width: meta.width, flexShrink: 0 } : undefined,
                     ]}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

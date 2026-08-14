@@ -17,20 +17,20 @@ export function SalesSummaryCard({
   return (
     <AdminMetricCard
       detail={detail}
-      minHeight={140}
-      paddingHorizontal={16}
-      paddingVertical={16}
+      minHeight={138}
+      paddingHorizontal={18}
+      paddingVertical={18}
       title={title}
       titleColor={colors.textHeading}
-      titleLetterSpacing={2}
-      titleMarginBottom={14}
+      titleLetterSpacing={1.8}
+      titleMarginBottom={16}
       tone={detailTone}
       value={value}
       valueColor={colors.secondary}
-      valueFontSize={textSizes.large}
-      valueLineHeight={24}
-      valueMarginBottom={10}
-      width="48%"
+      valueFontSize={21}
+      valueLineHeight={26}
+      valueMarginBottom={8}
+      width="47.5%"
     />
   );
 }

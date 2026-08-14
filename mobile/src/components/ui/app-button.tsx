@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import React, { type ReactNode, type ComponentType } from 'react';
 import {
   StyleSheet,
   Text,
@@ -25,7 +25,7 @@ type AppButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 type AppButtonProps = {
   disabled?: boolean;
   fullWidth?: boolean;
-  icon?: (props: { color: string; size: number }) => ReactNode;
+  icon?: ComponentType<{ color?: string; size?: number }> | ReactNode;
   label: string;
   loading?: boolean;
   onPress?: () => void;
@@ -145,7 +145,21 @@ export function AppButton({
       uppercase={false}>
       <View style={styles.inner}>
         {icon ? (
-          <View style={styles.iconWrap}>{icon({ color: variantStyle.textColor, size: 16 })}</View>
+          <View style={styles.iconWrap}>
+            {(() => {
+              const IconCandidate = (icon as any)?.default ?? icon;
+              if (React.isValidElement(IconCandidate)) return IconCandidate;
+              if (typeof IconCandidate === 'function' || typeof IconCandidate === 'object') {
+                try {
+                  const IconComp = IconCandidate as ComponentType<{ color?: string; size?: number }>;
+                  return <IconComp color={variantStyle.textColor} size={16} />;
+                } catch (e) {
+                  return null;
+                }
+              }
+              return null;
+            })()}
+          </View>
         ) : null}
         <Text
           style={[

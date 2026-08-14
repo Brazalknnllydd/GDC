@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { Package } from 'lucide-react-native';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
@@ -15,15 +16,21 @@ export function TopProductRow({ emoji, name, soldText, total }: TopProductRowPro
     <View style={styles.row}>
       <View style={styles.leftColumn}>
         <View style={styles.thumb}>
-          <Text style={styles.thumbEmoji}>{emoji}</Text>
+          <Package color={colors.secondary} size={18} strokeWidth={2.1} />
         </View>
-        <View>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.soldText}>{soldText}</Text>
+        <View style={styles.textBlock}>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.name}>
+            {name}
+          </Text>
+          <Text numberOfLines={1} style={styles.soldText}>
+            {soldText}
+          </Text>
         </View>
       </View>
 
-      <Text style={styles.total}>{total}</Text>
+      <Text numberOfLines={1} style={styles.total}>
+        {total}
+      </Text>
     </View>
   );
 }
@@ -39,7 +46,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flex: 1,
-    marginRight: spacing.md + 2,
+    marginRight: spacing.md,
+    minWidth: 0,
   },
   thumb: {
     alignItems: 'center',
@@ -50,20 +58,29 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
     width: 42,
   },
-  thumbEmoji: {
-    fontSize: 20,
+  textBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   name: {
     color: colors.textStrong,
     ...textRoles.value,
-    marginBottom: 2,
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: 1,
   },
   soldText: {
     color: colors.textSubtle,
     ...textRoles.label,
+    fontSize: 11,
+    lineHeight: 15,
   },
   total: {
     color: colors.secondary,
-    ...textRoles.value,
+    fontFamily: textRoles.value.fontFamily,
+    fontSize: 15,
+    lineHeight: 20,
+    marginLeft: spacing.sm,
+    textAlign: 'right',
   },
 });

@@ -25,6 +25,7 @@ import { AiChatModal } from "../components/ui/ai-chat-modal";
 import { AppFab } from "../components/ui/app-fab";
 import { PaginationControls } from "../components/ui/pagination-controls";
 import { SurfaceCard } from "../components/ui/surface-card";
+import { tabs as baseTabs } from "../components/admin-products/products-screen-data";
 import { apiClient } from "../lib/api";
 import { formatPeso, normalizeNumber } from "../lib/product-utils";
 import { usePagination } from "../hooks/use-pagination";
@@ -48,50 +49,11 @@ type SaleRecord = {
   createdAt: string;
 };
 
-const tabs = [
-  {
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    active: true,
-    route: "/admin" as const,
-  },
-  {
-    label: "Products",
-    icon: Package,
-    active: false,
-    route: "/admin-products" as const,
-  },
-  {
-    label: "Customers",
-    icon: Users,
-    active: false,
-    route: "/admin-customers" as const,
-  },
-  {
-    label: "Sales",
-    icon: ReceiptText,
-    active: false,
-    route: "/admin-sales" as const,
-  },
-  {
-    label: "Shifts",
-    icon: FileText,
-    active: false,
-    route: "/admin-shifts" as const,
-  },
-  {
-    label: "Reports",
-    icon: BarChart3,
-    active: false,
-    route: "/admin-reports" as const,
-  },
-  {
-    label: "Settings",
-    icon: Settings,
-    active: false,
-    route: "/admin-settings" as const,
-  },
-];
+const dashboardTabs = baseTabs.map((tab) =>
+  tab.label === "Dashboard"
+    ? { ...tab, active: true, route: "/admin" as const }
+    : { ...tab, active: false }
+);
 
 function startOfDay(date: Date) {
   const next = new Date(date);
@@ -103,6 +65,34 @@ function isToday(value: string) {
   return (
     startOfDay(new Date(value)).getTime() === startOfDay(new Date()).getTime()
   );
+}
+
+function buildSevenDayRevenueSeries(sales: SaleRecord[]) {
+  const labels: string[] = [];
+  const values: number[] = [];
+  const today = startOfDay(new Date());
+  const startDate = new Date(today);
+
+  startDate.setDate(startDate.getDate() - 6);
+
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = new Date(startDate);
+    day.setDate(startDate.getDate() + offset);
+
+    labels.push(
+      `${day.toLocaleDateString("en-PH", { weekday: "short" })} ${day.getDate()}`
+    );
+    values.push(
+      sales.reduce((sum, sale) => {
+        const saleDate = startOfDay(new Date(sale.createdAt));
+        return saleDate.getTime() === day.getTime()
+          ? sum + normalizeNumber(sale.totalAmount)
+          : sum;
+      }, 0),
+    );
+  }
+
+  return { labels, values };
 }
 
 export default function AdminScreen() {
@@ -167,19 +157,7 @@ export default function AdminScreen() {
     [products],
   );
   const weeklyRevenueChart = useMemo(() => {
-    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const totals = labels.map((_, index) =>
-      sales.reduce((sum, sale) => {
-        const saleDate = new Date(sale.createdAt);
-        const day = saleDate.getDay();
-        const mondayBasedDay = day === 0 ? 6 : day - 1;
-        return mondayBasedDay === index
-          ? sum + normalizeNumber(sale.totalAmount)
-          : sum;
-      }, 0),
-    );
-
-    return { labels, values: totals };
+    return buildSevenDayRevenueSeries(sales);
   }, [sales]);
 
   const summaryCards = useMemo(
@@ -235,7 +213,7 @@ export default function AdminScreen() {
     <AdminPageScreen
       title="Dashboard"
       introDescription={`Good morning, ${displayName}. Here's today's business snapshot.`}
-      bottomNavItems={tabs}
+      bottomNavItems={dashboardTabs}
       floatingContent={
         <AppFab
           icon={<Bot color="#FFFFFF" size={28} strokeWidth={2.2} />}
@@ -289,18 +267,17 @@ export default function AdminScreen() {
             <Text style={styles.periodText}>LIVE DATA</Text>
           </View>
         </View>
+        <Text style={styles.revenueRangeText}>
+          Last 7 days
+        </Text>
 
-        {sales.length > 0 ? (
-          <AdminBarChart
-            height={250}
-            labels={weeklyRevenueChart.labels}
-            values={weeklyRevenueChart.values}
-          />
-        ) : (
-          <Text style={styles.emptyCardText}>
-            Revenue will appear once sales are recorded.
-          </Text>
-        )}
+        <AdminBarChart
+          emptyDescription="Revenue will appear once sales are recorded."
+          emptyTitle="Weekly revenue is empty"
+          height={250}
+          labels={weeklyRevenueChart.labels}
+          values={weeklyRevenueChart.values}
+        />
       </SurfaceCard>
 
       <View style={styles.transactionsHeader}>
@@ -419,6 +396,12 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     ...textRoles.value,
     fontSize: 21,
+  },
+  revenueRangeText: {
+    color: colors.textTertiary,
+    ...textRoles.label,
+    marginBottom: spacing.sm,
+    marginTop: -8,
   },
   periodPill: {
     alignItems: "center",

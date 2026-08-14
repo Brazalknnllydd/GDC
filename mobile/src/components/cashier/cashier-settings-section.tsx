@@ -99,5 +99,6 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: spacing.xl,
+    minWidth: 160,
   },
 });

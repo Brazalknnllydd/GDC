@@ -10,6 +10,7 @@ import { DeleteProductModal } from '../components/admin-products/delete-product-
 import { AddCategoryModal } from '../components/admin-products/add-category-modal';
 import { DeleteCategoryModal } from '../components/admin-products/delete-category-modal';
 import { ManageCategoriesModal } from '../components/admin-products/manage-categories-modal';
+import { useToastStore } from '../store/toast-store';
 
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { SurfaceCard } from '../components/ui/surface-card';
@@ -17,26 +18,37 @@ import { AdminMetricGrid } from '../components/ui/admin-metric-grid';
 import { InventoryStatCard } from '../components/ui/inventory-stat-card';
 import { SectionHeading } from '../components/ui/section-heading';
 import { AppButton } from '../components/ui/app-button';
+import { AppSelect } from '../components/ui/app-select';
 
 import { usePagination } from '../hooks/use-pagination';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { normalizeNumber } from '../lib/product-utils';
 import { radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
-import type { Category, Product } from '../components/admin-products/products-screen-data';
+import { tabs as productTabs, type Category, type Product } from '../components/admin-products/products-screen-data';
 import type { CategoryFormValues } from '../lib/form-schemas';
 
 const lowStockThreshold = 10;
 const productsPerPage = 10;
-type FeedbackState = { tone: 'success' | 'error'; message: string } | null;
 
 export default function AdminProductsScreen() {
+  const { compactPhone } = useResponsiveLayout();
+  const activeTabs = productTabs.map((tab) =>
+    tab.label === 'Products'
+      ? { ...tab, active: true, route: '/admin-products' as const }
+      : { ...tab, active: false }
+  );
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 430;
+  const metricCardStyle = isCompactPhone
+    ? { width: '100%' as const }
+    : width >= 1200
+      ? { width: '31.5%' as const }
+      : { width: '48.2%' as const };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   // Modals state
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -75,8 +87,11 @@ export default function AdminProductsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setCategoryPendingDelete(null);
-      setFeedback({ tone: 'success', message: 'Category deleted successfully.' });
+      useToastStore.getState().showToast('Category deleted successfully.', 'success');
     },
+    onError: (error) => {
+      useToastStore.getState().showToast(`Failed to delete category: ${error.message}`, 'error');
+    }
   });
 
   const deleteProductMutation = useMutation({
@@ -86,8 +101,11 @@ export default function AdminProductsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setProductPendingDelete(null);
-      setFeedback({ tone: 'success', message: 'Product deleted successfully.' });
+      useToastStore.getState().showToast('Product deleted successfully.', 'success');
     },
+    onError: (error) => {
+      useToastStore.getState().showToast(`Failed to delete product: ${error.message}`, 'error');
+    }
   });
 
   
@@ -101,7 +119,10 @@ export default function AdminProductsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setShowAddCategory(false);
-      setFeedback({ tone: 'success', message: `Category ${editingCategoryId ? 'updated' : 'added'} successfully.` });
+      useToastStore.getState().showToast(`Category ${editingCategoryId ? 'updated' : 'added'} successfully.`, 'success');
+    },
+    onError: (error) => {
+      useToastStore.getState().showToast(`Failed to save category: ${error.message}`, 'error');
     }
   });
 
@@ -110,13 +131,6 @@ export default function AdminProductsScreen() {
       setSelectedCategory('All');
     }
   }, [categories, selectedCategory]);
-
-  useEffect(() => {
-    if (feedback) {
-      const timeout = setTimeout(() => setFeedback(null), 2600);
-      return () => clearTimeout(timeout);
-    }
-  }, [feedback]);
 
   const categoryChips = useMemo(() => ['All', ...categories.map(c => c.name)], [categories]);
 
@@ -161,36 +175,38 @@ export default function AdminProductsScreen() {
     <AdminPageScreen
       title="Products & Inventory"
       introDescription="Manage your product catalog, categories, and track inventory levels across your store."
+      bottomNavItems={activeTabs}
     >
       <AdminMetricGrid>
         {overviewCards.map((card) => (
-          <InventoryStatCard key={card.id} title={card.title} value={card.value} detail="Overview" accent={card.accent as 'default' | 'danger' | 'success'} />
+          <InventoryStatCard
+            key={card.id}
+            style={metricCardStyle}
+            title={card.title}
+            value={card.value}
+            detail="Overview"
+            accent={card.accent as 'default' | 'danger' | 'success'}
+          />
         ))}
       </AdminMetricGrid>
 
       <SurfaceCard style={styles.contentCard}>
-        <View style={styles.sectionHeaderWrap}>
+        <View style={[styles.sectionHeaderWrap, compactPhone && styles.sectionHeaderWrapCompact]}>
           <SectionHeading>Inventory Catalog</SectionHeading>
-          <View style={styles.actionGroup}>
-            <AppButton variant="secondary" icon={Shapes} onPress={() => setShowManageCategories(true)} label="Categories" />
-            <AppButton variant="primary" icon={PackagePlus} onPress={() => { setEditingProduct(null); setShowAddProduct(true); }} label="Add Product" />
+          <View style={[styles.actionGroup, compactPhone && styles.actionGroupCompact]}>
+            <AppButton fullWidth={false} variant="secondary" icon={Shapes} onPress={() => setShowManageCategories(true)} label="Categories" />
+            <AppButton fullWidth={false} variant="primary" icon={PackagePlus} onPress={() => { setEditingProduct(null); setShowAddProduct(true); }} label="Add Product" />
           </View>
         </View>
 
         <View style={styles.filtersSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesContainer}>
-            {categoryChips.map((chip) => (
-              <Pressable
-                key={chip}
-                onPress={() => setSelectedCategory(chip)}
-                style={[styles.categoryChip, selectedCategory === chip && styles.categoryChipActive]}
-              >
-                <Text style={[styles.categoryChipText, selectedCategory === chip && styles.categoryChipTextActive]}>
-                  {chip}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={{ marginBottom: spacing.md }}>
+            <AppSelect
+              options={categoryChips}
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+            />
+          </View>
         </View>
 
         <ProductTable
@@ -210,7 +226,7 @@ export default function AdminProductsScreen() {
         onClose={() => setShowAddProduct(false)}
         productToEdit={editingProduct}
         categories={categories}
-        onSuccess={(msg) => setFeedback({ tone: 'success', message: msg })}
+        onSuccess={(msg) => useToastStore.getState().showToast(msg, 'success')}
       />
 
       <DeleteProductModal
@@ -263,43 +279,19 @@ export default function AdminProductsScreen() {
 }
 
 const styles = StyleSheet.create({
-  contentCard: { padding: 0, overflow: "hidden", flex: 1 },
+  contentCard: { padding: 0, overflow: "hidden", flex: 1, marginTop: spacing.sm },
   sectionHeaderWrap: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, paddingBottom: 0 },
+  sectionHeaderWrapCompact: { flexDirection: "column", alignItems: "flex-start", gap: spacing.md },
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
+  actionGroupCompact: {
+    justifyContent: "flex-start",
+  },
   filtersSection: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
-  },
-  categoriesScroll: {
-    marginHorizontal: -spacing.xl,
-  },
-  categoriesContainer: {
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  categoryChip: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surfaceSubtle,
-    borderRadius: radius.round,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  categoryChipText: {
-    fontFamily: fonts.medium,
-    fontSize: textSizes.small,
-    color: colors.text,
-  },
-  categoryChipTextActive: {
-    color: colors.white,
-    fontFamily: fonts.semiBold,
   },
 });

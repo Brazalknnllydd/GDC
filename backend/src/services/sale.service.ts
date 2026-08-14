@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 
-const allowedPaymentMethods = new Set(["Cash", "GCash"]);
+const allowedPaymentMethods = new Set(["Cash", "GCash", "Utang"]);
 
 export type SaleItemInput = {
   productId: number;
@@ -67,7 +67,7 @@ export async function createSaleWithInventoryUpdate({
     const normalizedPaymentMethod = paymentMethod.trim() || "Cash";
 
     if (!allowedPaymentMethods.has(normalizedPaymentMethod)) {
-      throw new Error("Payment method must be Cash or GCash");
+      throw new Error("Payment method must be Cash, GCash, or Utang");
     }
 
     const user = await tx.user.findUnique({
@@ -106,16 +106,16 @@ export async function createSaleWithInventoryUpdate({
       }
     }
 
-    const productIds = [...new Set(items.map((item) => item.productId))];
+    const validProductIds = [...new Set(items.map((item) => item.productId).filter((id): id is number => typeof id === "number"))];
     const products = await tx.product.findMany({
       where: {
         id: {
-          in: productIds,
+          in: validProductIds,
         },
       },
     });
 
-    if (products.length !== productIds.length) {
+    if (products.length !== validProductIds.length) {
       throw new Error("One or more products were not found");
     }
 
@@ -191,7 +191,7 @@ export async function createSaleWithInventoryUpdate({
           productId: item.productId,
           type: "SALE",
           quantity: item.quantity,
-          note: `Sold via receipt ${receiptNumber.trim()}${product ? ` - ${product.name}` : ""}`,
+          note: `Sold via receipt ${receiptNumber.trim()} - ${product!.name}`,
         },
       });
     }
@@ -230,5 +230,57 @@ export async function createSaleWithInventoryUpdate({
         },
       },
     });
+  });
+}
+
+export async function voidSale(saleId: number, userId: number, reason: string) {
+  return prisma.$transaction(async (tx) => {
+    const sale = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { items: true },
+    });
+
+    if (!sale) {
+      throw new Error("Sale not found");
+    }
+
+    if (sale.status === "voided") {
+      throw new Error("Sale is already voided");
+    }
+
+    const voidNotes = `[VOIDED] Reason: ${reason}`;
+    const newNotes = sale.notes ? `${sale.notes}\n${voidNotes}` : voidNotes;
+
+    const updatedSale = await tx.sale.update({
+      where: { id: saleId },
+      data: {
+        status: "voided",
+        notes: newNotes,
+      },
+    });
+
+    for (const item of sale.items) {
+      if (!item.productId) continue;
+      
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: {
+            increment: item.quantity,
+          },
+        },
+      });
+
+      await tx.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          type: "VOID_RESTOCK",
+          quantity: item.quantity,
+          note: `Voided receipt ${sale.receiptNumber}`,
+        },
+      });
+    }
+
+    return updatedSale;
   });
 }

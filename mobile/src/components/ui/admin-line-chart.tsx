@@ -1,9 +1,11 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
 import { LineChart } from 'react-native-gifted-charts';
 
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { formatCompactTick } from './admin-chart-utils';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
+import { formatPeso } from '../../lib/product-utils';
 
 type AdminLineChartDataset = {
   color: string;
@@ -22,11 +24,31 @@ export function AdminLineChart({
   labels,
 }: AdminLineChartProps) {
   const { compactPhone, width } = useResponsiveLayout();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const chartWidth = Math.max(Math.min(width - (compactPhone ? 56 : 96), 920), 248);
-  const primaryData = labels.map((label, index) => ({
-    label,
-    value: datasets[0]?.data[index] ?? 0,
-  }));
+  const isDenseSeries = labels.length > 12;
+  const primaryData = useMemo(
+    () =>
+      labels.map((label, index) => {
+        const value = datasets[0]?.data[index] ?? 0;
+        const isSelected = selectedIndex === index;
+
+        return {
+          dataPointText: formatPeso(value),
+          focusedDataPointLabelComponent: isSelected
+            ? () => (
+                <View style={styles.valuePill}>
+                  <Text style={styles.valuePillText}>{formatPeso(value)}</Text>
+                </View>
+              )
+            : undefined,
+          label,
+          onPress: () => setSelectedIndex(index),
+          value,
+        };
+      }),
+    [datasets, labels, selectedIndex]
+  );
   const secondaryData = labels.map((_, index) => ({
     value: datasets[1]?.data[index] ?? 0,
   }));
@@ -47,17 +69,25 @@ export function AdminLineChart({
         data={primaryData.length > 0 ? primaryData : [{ label: 'No data', value: 0 }]}
         data2={datasets.length > 1 ? secondaryData : undefined}
         disableScroll
+        focusEnabled
         height={compactPhone ? Math.max(height - 24, 188) : height}
-        hideDataPoints
+        hideDataPoints={false}
         hideOrigin
         hideRules={false}
-        initialSpacing={compactPhone ? 10 : 14}
+        initialSpacing={isDenseSeries ? 8 : compactPhone ? 10 : 14}
+        showDataPointLabelOnFocus
+        showDataPointOnFocus
+        showTextOnFocus
         isAnimated
         maxValue={maxValue > 0 ? maxValue : 1}
         noOfSections={4}
+        focusedDataPointIndex={selectedIndex ?? undefined}
         rulesColor={colors.borderPanel}
         rulesThickness={1}
-        spacing={Math.max(Math.min(chartWidth / Math.max(labels.length * 1.8, 6), 56), 28)}
+        spacing={Math.max(
+          Math.min(chartWidth / Math.max(labels.length - 1, 1), isDenseSeries ? 22 : 56),
+          isDenseSeries ? 10 : 28
+        )}
         thickness={3}
         thickness1={3}
         thickness2={3}
@@ -70,6 +100,24 @@ export function AdminLineChart({
         yAxisTextStyle={styles.yAxisLabel}
         formatYLabel={formatCompactTick}
       />
+
+      <View style={styles.valueBanner}>
+        {selectedIndex !== null ? (
+          <>
+            <View>
+              <Text style={styles.valueBannerLabel}>Selected point</Text>
+              <Text style={styles.valueBannerTitle}>{labels[selectedIndex]}</Text>
+            </View>
+            <Text style={styles.valueBannerAmount}>
+              {formatPeso(primaryData[selectedIndex]?.value ?? 0)}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.valueBannerHint}>
+            Tap any point to reveal the exact amount.
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -89,5 +137,53 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: textSizes.smallCaps,
+  },
+  valueBanner: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceInfo,
+    borderColor: colors.borderInfoStrong,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    minHeight: 58,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  valueBannerLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.1,
+    marginBottom: 2,
+  },
+  valueBannerTitle: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  valueBannerAmount: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.large,
+  },
+  valueBannerHint: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+  },
+  valuePill: {
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  valuePillText: {
+    color: colors.textInverse,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.small,
   },
 });

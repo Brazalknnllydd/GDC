@@ -21,6 +21,7 @@ import { spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { apiClient } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-errors';
+import { useToastStore } from '../../store/toast-store';
 
 type Customer = {
   id: number;
@@ -119,13 +120,17 @@ export function CashierCustomersSection() {
       };
       if (editingCustomer) {
         await apiClient.put(`/customers/${editingCustomer.id}`, payload);
+        useToastStore.getState().showToast('Customer updated successfully', 'success');
       } else {
         await apiClient.post('/customers', payload);
+        useToastStore.getState().showToast('Customer added successfully', 'success');
       }
       setShowFormModal(false);
       void loadCustomers();
     } catch (err) {
-      setFormError(getApiErrorMessage(err, 'Could not save customer.'));
+      const msg = getApiErrorMessage(err, 'Could not save customer.');
+      setFormError(msg);
+      useToastStore.getState().showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -137,9 +142,11 @@ export function CashierCustomersSection() {
       setIsDeleting(true);
       await apiClient.delete(`/customers/${deletingCustomer.id}`);
       setDeletingCustomer(null);
+      useToastStore.getState().showToast('Customer deleted successfully', 'success');
       void loadCustomers();
-    } catch {
-      setDeletingCustomer(null);
+    } catch (err) {
+      useToastStore.getState().showToast('Failed to delete customer', 'error');
+      console.error('Failed to delete customer:', err);
     } finally {
       setIsDeleting(false);
     }
@@ -180,7 +187,7 @@ export function CashierCustomersSection() {
             <Text style={[styles.headerCell, { flex: 2.5 }]}>CUSTOMER</Text>
             <Text style={[styles.headerCell, { flex: 1.5 }]}>PHONE</Text>
             <Text style={[styles.headerCell, { flex: 1.5 }]}>ADDRESS</Text>
-            <Text style={[styles.headerCell, { flex: 2 }]}>DESCRIPTION</Text>
+            <Text style={[styles.headerCell, { flex: 2 }]}>NOTES</Text>
           </View>
           <View style={styles.headerCellActions} />
         </View>

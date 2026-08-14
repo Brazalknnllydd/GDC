@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LogOut, Store } from 'lucide-react-native';
+import { LogOut, Wallet } from 'lucide-react-native';
 
 import { AppButton } from '../components/ui/app-button';
-import { SurfaceCard } from '../components/ui/surface-card';
 import { colors, fonts, textSizes } from '../constants/theme';
-import { spacing } from '../constants/design-system';
+import { spacing, radius } from '../constants/design-system';
 import { apiClient } from '../lib/api';
 import { clearAuthSession } from '../lib/auth-session';
 
 export default function CashierShiftScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [openingCash, setOpeningCash] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,38 +67,57 @@ export default function CashierShiftScreen() {
     );
   }
 
+  const isTablet = width > 600;
+
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>GDC POS</Text>
+        <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+          <LogOut color={colors.danger} size={18} strokeWidth={2.5} />
+          <Text style={styles.logoutText}>Logout</Text>
+        </Pressable>
+      </View>
+
       <KeyboardAvoidingView 
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <SurfaceCard style={styles.card}>
+        <View style={[styles.card, isTablet && styles.cardTablet]}>
           <View style={styles.iconContainer}>
-            <Store color={colors.secondary} size={48} strokeWidth={1.5} />
+            <Wallet color={colors.secondary} size={44} strokeWidth={1.5} />
           </View>
           
-          <Text style={styles.title}>Open Shift</Text>
+          <Text style={styles.title}>Start Your Shift</Text>
           <Text style={styles.subtitle}>
-            Please enter the starting cash amount in your drawer to begin processing sales.
+            Enter the starting cash amount in your drawer to begin processing transactions.
           </Text>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.currencySymbol}>₱</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              value={openingCash}
-              onChangeText={(text) => {
-                setOpeningCash(text);
-                setError('');
-              }}
-              autoFocus
-            />
+          <View style={styles.inputSection}>
+            <Text style={styles.inputLabel}>OPENING CASH</Text>
+            <View style={[styles.inputWrapper, error ? styles.inputWrapperError : null]}>
+              <Text style={styles.currencySymbol}>₱</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0.00"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+                value={openingCash}
+                onChangeText={(text) => {
+                  setOpeningCash(text);
+                  setError('');
+                }}
+                autoFocus
+                selectionColor={colors.secondary}
+              />
+            </View>
           </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.actions}>
             <AppButton
@@ -106,17 +125,11 @@ export default function CashierShiftScreen() {
               onPress={handleOpenShift}
               variant="primary"
               loading={isLoading}
+              size="lg"
               fullWidth
-            />
-            <AppButton
-              label="Logout"
-              onPress={handleLogout}
-              variant="secondary"
-              fullWidth
-              icon={({ color, size }) => <LogOut color={color} size={size} />}
             />
           </View>
-        </SurfaceCard>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -125,37 +138,78 @@ export default function CashierShiftScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundMuted,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+  },
+  headerTitle: {
+    fontFamily: fonts.bold,
+    fontSize: textSizes.title,
+    color: colors.secondary,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceDanger,
+    borderRadius: radius.round,
+  },
+  logoutText: {
+    fontFamily: fonts.bold,
+    fontSize: textSizes.small,
+    color: colors.danger,
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundMuted,
   },
   keyboardView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   card: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
     alignItems: 'center',
     padding: spacing.xl,
+    paddingVertical: 40,
+    backgroundColor: colors.card,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  cardTablet: {
+    maxWidth: 480,
+    padding: 48,
   },
   iconContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: `${colors.secondary}15`,
+    backgroundColor: colors.surfaceBrandSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   title: {
-    fontFamily: fonts.semiBold,
+    fontFamily: fonts.bold,
     fontSize: textSizes.titleLarge,
     color: colors.textStrong,
     marginBottom: spacing.sm,
@@ -166,42 +220,63 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
+    lineHeight: 21,
+    paddingHorizontal: spacing.sm,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceNeutral,
-    borderWidth: 1,
-    borderColor: colors.borderInput,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
+  inputSection: {
     width: '100%',
-    height: 64,
     marginBottom: spacing.lg,
   },
-  currencySymbol: {
+  inputLabel: {
     fontFamily: fonts.semiBold,
-    fontSize: 24,
+    fontSize: textSizes.smallCaps,
     color: colors.textSecondary,
-    marginRight: spacing.sm,
+    letterSpacing: 1.2,
+    marginBottom: spacing.sm,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    width: '100%',
+    height: 60,
+    borderWidth: 1.5,
+    borderColor: colors.borderMuted,
+  },
+  inputWrapperError: {
+    borderColor: colors.danger,
+    backgroundColor: colors.surfaceDanger,
+  },
+  currencySymbol: {
+    fontFamily: fonts.bold,
+    fontSize: 22,
+    color: colors.secondary,
+    marginRight: spacing.xs,
   },
   input: {
     flex: 1,
     fontFamily: fonts.semiBold,
-    fontSize: 28,
+    fontSize: 24,
     color: colors.textStrong,
     height: '100%',
+  },
+  errorContainer: {
+    backgroundColor: colors.surfaceDanger,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    marginBottom: spacing.lg,
+    width: '100%',
   },
   errorText: {
     color: colors.danger,
     fontFamily: fonts.medium,
     fontSize: textSizes.small,
-    marginBottom: spacing.md,
     textAlign: 'center',
   },
   actions: {
     width: '100%',
-    gap: spacing.sm,
   },
 });

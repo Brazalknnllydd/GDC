@@ -47,6 +47,7 @@ export type CashierDashboardResponse = {
   recentSales: Array<{
     id: number;
     paymentMethod: string;
+    status?: string;
     receiptNumber: string;
     time: string;
     createdAt: string;
@@ -73,6 +74,7 @@ export type CashierSaleRecord = {
   amountPaid: number | string;
   changeAmount: number | string;
   paymentMethod: string;
+  status?: string;
   createdAt: string;
   user?: {
     id: number;
@@ -108,6 +110,7 @@ export const cashierQuickActions = [
 export const cashierPaymentMethods = [
   { key: 'Cash', label: 'Cash', icon: Wallet },
   { key: 'GCash', label: 'GCash', icon: CreditCard },
+  { key: 'Utang', label: 'Utang (Credit)', icon: UserPlus },
 ] as const;
 
 export const cashierSections = [

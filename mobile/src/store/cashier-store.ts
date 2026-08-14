@@ -9,16 +9,17 @@ import { normalizeNumber } from '../lib/product-utils';
 export type CartItem = {
   barcode: string | null;
   categoryName: string;
-  discountInput: string;
   id: number;
   imageUrl: string | null;
   name: string;
   price: number;
   quantity: number;
   stock: number;
+  discountInput?: string;
 };
 
 export type CompletedSale = {
+  id: number;
   amountPaid: number;
   cashierName: string;
   changeAmount: number;
@@ -120,7 +121,7 @@ type CashierState = {
 
   // Checkout state
   cart: CartItem[];
-  paymentMethod: 'Cash' | 'GCash';
+  paymentMethod: 'Cash' | 'GCash' | 'Utang';
   amountReceivedInput: string;
   showCartModal: boolean;
   showCheckoutModal: boolean;
@@ -129,14 +130,17 @@ type CashierState = {
   isSubmittingSale: boolean;
   completedSale: CompletedSale | null;
   activeCheckoutInput: ActiveCheckoutInput;
-  customerId: number | null;
-  customerName: string | null;
+  selectedCustomerId: number | null;
+  selectedCustomerName: string | null;
+  showCustomerModal: boolean;
+  toast: { message: string; type: 'success' | 'error' } | null;
 };
 
 type CashierActions = {
   loadWorkspace: () => Promise<void>;
   setScreenError: (error: string) => void;
 
+  clearCart: () => void;
   addToCart: (product: Product) => void;
   updateCartQuantity: (productId: number, nextQuantity: number) => void;
   removeFromCart: (productId: number) => void;
@@ -145,16 +149,17 @@ type CashierActions = {
   handleKeypadPress: (value: string) => void;
   handleKeypadBackspace: () => void;
   
-  setPaymentMethod: (method: 'Cash' | 'GCash') => void;
+  setPaymentMethod: (method: 'Cash' | 'GCash' | 'Utang') => void;
   setActiveCheckoutInput: (input: ActiveCheckoutInput) => void;
-  setCustomerId: (id: number | null) => void;
-  setCustomerName: (name: string | null) => void;
+  setCustomer: (id: number | null, name: string | null) => void;
   setAmountReceivedInput: (val: string) => void;
   setSaleError: (val: string) => void;
   
   setShowCartModal: (val: boolean) => void;
   setShowCheckoutModal: (val: boolean) => void;
   setShowSuccessModal: (val: boolean) => void;
+  setShowCustomerModal: (val: boolean) => void;
+  setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   
   resetSaleFlow: () => void;
   handleCompleteSale: (cashierDisplayName: string, shiftId: number | null, onSaleCompleted?: () => void | Promise<void>) => Promise<boolean>;
@@ -175,12 +180,14 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
   showCartModal: false,
   showCheckoutModal: false,
   showSuccessModal: false,
+  showCustomerModal: false,
   saleError: '',
   isSubmittingSale: false,
   completedSale: null,
   activeCheckoutInput: { type: 'amount' },
-  customerId: null,
-  customerName: null,
+  selectedCustomerId: null,
+  selectedCustomerName: null,
+  toast: null,
 
   // Actions
   setScreenError: (screenError) => set({ screenError }),
@@ -220,37 +227,43 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
     }
   },
 
+  clearCart: () => set({ cart: [], amountReceivedInput: '', selectedCustomerId: null, selectedCustomerName: null }),
+
   addToCart: (product) => {
     set((state) => {
-      const price = normalizeNumber(product.price);
-      const existingItem = state.cart.find((item) => item.id === product.id);
+      const existingItemIndex = state.cart.findIndex((item) => item.id === product.id);
 
-      if (existingItem) {
-        return {
-          cart: state.cart.map((item) =>
-            item.id === product.id
-              ? {
-                  ...item,
-                  quantity: Math.min(item.quantity + 1, item.stock),
-                }
-              : item
-          ),
+      if (existingItemIndex >= 0) {
+        const updatedCart = [...state.cart];
+        const existingItem = updatedCart[existingItemIndex];
+        if (existingItem.quantity >= (product as Product).stock) {
+          return state; // Reached stock limit
+        }
+
+        updatedCart[existingItemIndex] = {
+          ...existingItem,
+          quantity: existingItem.quantity + 1,
         };
+        return { cart: updatedCart };
+      }
+
+      if ((product as Product).stock === 0) {
+        return state; // Cannot add out of stock item
       }
 
       return {
         cart: [
           ...state.cart,
           {
-            barcode: product.barcode,
-            categoryName: product.category.name,
-            discountInput: '',
+            barcode: (product as Product).barcode,
+            categoryName: 'Product',
             id: product.id,
-            imageUrl: product.imageUrl,
+            discountInput: '',
+            imageUrl: (product as Product).imageUrl,
             name: product.name,
-            price,
+            price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
             quantity: 1,
-            stock: product.stock,
+            stock: (product as Product).stock,
           },
         ],
       };
@@ -302,7 +315,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
           item.id === productId
             ? {
                 ...item,
-                discountInput: appendCurrencyInput(item.discountInput, value),
+                discountInput: appendCurrencyInput(item.discountInput || '', value),
               }
             : item
         ),
@@ -322,7 +335,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
           item.id === productId
             ? {
                 ...item,
-                discountInput: item.discountInput.slice(0, -1),
+                discountInput: (item.discountInput || '').slice(0, -1),
               }
             : item
         ),
@@ -335,14 +348,15 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setActiveCheckoutInput: (activeCheckoutInput) => set({ activeCheckoutInput }),
-  setCustomerId: (customerId) => set({ customerId }),
-  setCustomerName: (customerName) => set({ customerName }),
+  setCustomer: (id, name) => set({ selectedCustomerId: id, selectedCustomerName: name }),
   setAmountReceivedInput: (amountReceivedInput) => set({ amountReceivedInput }),
   setSaleError: (saleError) => set({ saleError }),
+  setToast: (toast) => set({ toast }),
   
   setShowCartModal: (showCartModal) => set({ showCartModal }),
   setShowCheckoutModal: (showCheckoutModal) => set({ showCheckoutModal }),
   setShowSuccessModal: (showSuccessModal) => set({ showSuccessModal }),
+  setShowCustomerModal: (showCustomerModal) => set({ showCustomerModal }),
 
   resetSaleFlow: () => {
     set({
@@ -350,10 +364,11 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
       paymentMethod: 'Cash',
       saleError: '',
       activeCheckoutInput: { type: 'amount' },
-      customerId: null,
-      customerName: null,
+      selectedCustomerId: null,
+      selectedCustomerName: null,
       showCartModal: false,
       showCheckoutModal: false,
+      toast: null,
     });
   },
 
@@ -362,15 +377,21 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
     const cartGrossSubtotal = state.cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0);
     const cartDiscountTotal = state.cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
     const cartSubtotal = state.cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0);
-    const amountReceived = Number(state.amountReceivedInput) || 0;
-    const changeAmount = Math.max(amountReceived - cartSubtotal, 0);
+    
+    let amountReceived = Number(state.amountReceivedInput) || 0;
+    let changeAmount = Math.max(amountReceived - cartSubtotal, 0);
+    let status = 'completed';
+
+    if (state.paymentMethod === 'Utang') {
+      status = 'pending';
+    }
 
     if (state.cart.length === 0) {
       set({ saleError: 'Add at least one product before completing the sale.' });
       return false;
     }
 
-    if (amountReceived < cartSubtotal) {
+    if (state.paymentMethod !== 'Utang' && amountReceived < cartSubtotal) {
       set({ saleError: 'Amount received must cover the total payable.' });
       return false;
     }
@@ -379,10 +400,10 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
       set({ isSubmittingSale: true, saleError: '' });
 
       const receiptNumber = buildReceiptNumber();
-      await apiClient.post('/sales', {
+      const response = await apiClient.post('/sales', {
         amountPaid: amountReceived,
         changeAmount,
-        customerId: state.customerId ?? null,
+        customerId: state.selectedCustomerId,
         discountAmount: cartDiscountTotal,
         items: state.cart.map((item) => ({
           price: item.price,
@@ -395,15 +416,19 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
         shiftId,
         subtotal: cartGrossSubtotal,
         totalAmount: cartSubtotal,
+        status,
       });
 
+      const createdSale = response.data;
+
       const completedSale: CompletedSale = {
+        id: createdSale.id,
         amountPaid: amountReceived,
         cashierName: cashierDisplayName,
         changeAmount,
         createdAt: new Date().toISOString(),
-        customerId: state.customerId,
-        customerName: state.customerName,
+        customerId: state.selectedCustomerId,
+        customerName: state.selectedCustomerName,
         discountAmount: cartDiscountTotal,
         paymentMethod: state.paymentMethod,
         receiptNumber,
@@ -420,6 +445,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
       set({ completedSale, cart: [] });
       get().resetSaleFlow();
       set({ showSuccessModal: true });
+      get().setToast({ message: 'Sale completed successfully', type: 'success' });
 
       if (onSaleCompleted) {
         await onSaleCompleted();
@@ -427,7 +453,9 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
       return true;
     } catch (error) {
-      set({ saleError: getApiErrorMessage(error, 'Could not complete the sale right now.') });
+      const msg = getApiErrorMessage(error, 'Could not complete the sale right now.');
+      set({ saleError: msg });
+      get().setToast({ message: msg, type: 'error' });
       return false;
     } finally {
       set({ isSubmittingSale: false });

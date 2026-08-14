@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    minHeight: 112,
+    minHeight: 114,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
   },
@@ -52,11 +52,13 @@ const styles = StyleSheet.create({
   label: {
     color: colors.textTertiary,
     ...textRoles.label,
+    fontSize: 11,
     marginBottom: spacing.sm,
   },
   value: {
     color: colors.textStrong,
     ...textRoles.value,
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 20,
   },
 });

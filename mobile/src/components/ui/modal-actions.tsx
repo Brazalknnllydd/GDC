@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { spacing } from '../../constants/design-system';
@@ -9,7 +9,15 @@ type ModalActionsProps = {
 };
 
 export function ModalActions({ children, stacked = false }: ModalActionsProps) {
-  return <View style={[styles.row, stacked && styles.stacked]}>{children}</View>;
+  const content = React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child;
+    return React.cloneElement(child, {
+      // @ts-ignore - assume children accept style array
+      style: [!stacked && { flex: 1 }, child.props.style],
+    });
+  });
+
+  return <View style={[styles.row, stacked && styles.stacked]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

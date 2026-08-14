@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 import type { CashierDashboardResponse } from './cashier-screen-data';
@@ -10,10 +10,12 @@ import { CashierShiftCard } from './cashier-shift-card';
 import { PaginationControls } from '../ui/pagination-controls';
 import { SectionHeading } from '../ui/section-heading';
 import { SurfaceCard } from '../ui/surface-card';
-import { spacing } from '../../constants/design-system';
+import { spacing, radius } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { formatPeso } from '../../lib/product-utils';
 import { formatCashierTime, formatPaymentMethod } from '../../lib/cashier-formatters';
+import { apiClient } from '../../lib/api';
+import { useCashierStore } from '../../store/cashier-store';
 
 type CashierHistorySectionProps = {
   dashboard: CashierDashboardResponse;
@@ -27,11 +29,27 @@ export function CashierHistorySection({
   onSelectSale,
 }: CashierHistorySectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [payingSaleId, setPayingSaleId] = useState<number | null>(null);
+  const { loadWorkspace, setToast } = useCashierStore();
   const itemsPerPage = 15;
 
   const totalPages = Math.ceil(dashboard.recentSales.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedSales = dashboard.recentSales.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleMarkAsPaid = async (saleId: number) => {
+    try {
+      setPayingSaleId(saleId);
+      await apiClient.patch(`/sales/${saleId}/pay`);
+      await loadWorkspace();
+      setToast({ message: 'Sale marked as paid', type: 'success' });
+    } catch (error) {
+      console.error('Failed to mark sale as paid', error);
+      setToast({ message: 'Failed to mark sale as paid', type: 'error' });
+    } finally {
+      setPayingSaleId(null);
+    }
+  };
 
   return (
     <>
@@ -65,8 +83,8 @@ export function CashierHistorySection({
 
       <SurfaceCard style={styles.recentSalesCard}>
         {/* Table Header */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: 900 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={{ minWidth: 900, flex: 1 }}>
             <View style={styles.tableHeader}>
               <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
               <Text style={[styles.headerCell, { flex: 1.5 }]}>DATE/TIME</Text>
@@ -101,13 +119,15 @@ export function CashierHistorySection({
                   <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]} numberOfLines={1}>
                     {sale.customerName || 'Walk-in'}
                   </Text>
-                  <Text style={[styles.rowCell, styles.methodText, { flex: 1 }]}>
+                  <Text style={[styles.rowCell, styles.methodText, { flex: 1, color: sale.status === 'pending' || sale.status === 'voided' ? colors.danger : colors.textSecondary }]}>
                     {formatPaymentMethod(sale.paymentMethod)}
+                    {sale.status === 'pending' ? '\n(Pending)' : ''}
+                    {sale.status === 'voided' ? '\n(Voided)' : ''}
                   </Text>
                   <Text style={[styles.rowCell, styles.timeText, { flex: 1, textAlign: 'right' }]}>
                     {formatPeso(sale.changeAmount || 0)}
                   </Text>
-                  <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right' }]}>
+                  <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right', color: sale.status === 'voided' ? colors.textTertiary : colors.secondary, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                     {formatPeso(sale.totalAmount)}
                   </Text>
                 </TouchableOpacity>
@@ -249,5 +269,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: textSizes.small,
     color: colors.textSecondary,
+  },
+  payButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+    backgroundColor: `${colors.primary}20`,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  payButtonText: {
+    fontFamily: fonts.medium,
+    fontSize: textSizes.xsmall,
+    color: colors.primary,
   },
 });

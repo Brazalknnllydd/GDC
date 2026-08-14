@@ -8,6 +8,7 @@ import { ProductFormInput } from '../ui/product-form-input';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { spacing } from '../../constants/design-system';
 import { apiClient } from '../../lib/api';
+import { useToastStore } from '../../store/toast-store';
 
 type ShiftCloseModalProps = {
   shiftId: number | null | undefined;
@@ -38,9 +39,12 @@ export function ShiftCloseModal({ shiftId, visible, onClose, onSuccess }: ShiftC
       await apiClient.put(`/shifts/${shiftId}/close`, {
         closingCash: amount,
       });
+      useToastStore.getState().showToast('Shift closed successfully', 'success');
       onSuccess();
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to close shift.');
+      const msg = err?.response?.data?.error || 'Failed to close shift.';
+      setError(msg);
+      useToastStore.getState().showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
