@@ -61,7 +61,7 @@ export function AdminModalShell({
   return (
     <Portal>
       <Pressable onPress={onClose} style={styles.backdropOverlay}>
-        <Pressable onPress={() => undefined} style={{ width: modalWidth }}>
+        <View style={{ width: modalWidth }}>
           <Surface
             style={[
               styles.card,
@@ -94,7 +94,7 @@ export function AdminModalShell({
               </View>
             ) : null}
           </Surface>
-        </Pressable>
+        </View>
       </Pressable>
     </Portal>
   );

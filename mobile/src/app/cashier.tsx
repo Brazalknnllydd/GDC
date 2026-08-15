@@ -742,7 +742,13 @@ export default function CashierScreen() {
         title="Receipt Details"
         visible={selectedSaleDetails !== null}>
         {selectedSaleDetails ? (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.receiptScrollContent}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}>
             {/* Store Header */}
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: colors.secondary }}>GDC STORE</Text>
@@ -1094,6 +1100,10 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontFamily: fonts.bold,
     fontSize: 18,
+  },
+  receiptScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl * 2,
   },
   checkoutBarWrap: {
     bottom: 84,

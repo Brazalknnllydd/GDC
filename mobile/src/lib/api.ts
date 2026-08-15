@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import axios from 'axios';
 import { Platform } from 'react-native';
-import { getAuthToken } from './auth-session';
+import { getAuthToken, getPersistedAuthToken } from './auth-session';
 
 const DEV_API_PORT = '5000';
 
@@ -55,7 +55,7 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = getAuthToken();
+  const token = getAuthToken() || getPersistedAuthToken();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -23,7 +23,7 @@ export function AdminBottomNav({ items }: AdminBottomNavProps) {
         const selectedItem = items.find((item) => item.label === key);
 
         if (selectedItem?.route) {
-          router.push(selectedItem.route);
+          router.replace(selectedItem.route);
         }
       }}
     />

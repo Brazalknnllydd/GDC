@@ -75,7 +75,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <PaperProvider theme={paperTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false, animation: 'none' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="admin" />
           <Stack.Screen name="admin-products" />

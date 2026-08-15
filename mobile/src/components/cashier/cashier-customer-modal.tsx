@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Search, UserCircle2 } from 'lucide-react-native';
 
 import { AdminModalShell } from '../ui/admin-modal-shell';
@@ -12,6 +21,7 @@ import { triggerHaptic } from '../../lib/haptics';
 type Customer = {
   id: number;
   name: string;
+  phone?: string | null;
 };
 
 type CashierCustomerModalProps = {
@@ -23,6 +33,7 @@ type CashierCustomerModalProps = {
 
 export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, visible }: CashierCustomerModalProps) {
   const { compactPhone } = useResponsiveLayout();
+  const { height: viewportHeight } = useWindowDimensions();
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,9 +69,10 @@ export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, vi
   return (
     <AdminModalShell
       compact={compactPhone}
+      height={Math.min(viewportHeight * 0.76, 620)}
       onClose={onClose}
       title="Attach Customer"
-      visible={true}
+      visible={visible}
     >
       <View style={styles.content}>
         <View style={styles.searchContainer}>
@@ -76,8 +88,9 @@ export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, vi
 
         <ScrollView 
           style={styles.list} 
-          contentContainerStyle={{ gap: 8 }}
+          contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
         >
           <Pressable 
             style={[styles.customerResultCard, selectedCustomerId === null && styles.customerResultCardSelected]}
@@ -121,6 +134,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     flex: 1,
   },
+  listContent: {
+    gap: 8,
+    paddingBottom: spacing.md,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -140,7 +157,7 @@ const styles = StyleSheet.create({
     color: colors.textStrong,
   },
   list: {
-    maxHeight: 350,
+    flex: 1,
   },
   customerResultCard: {
     flexDirection: 'row',
@@ -165,7 +182,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: fonts.bold,
   },
-  customerResultPhone: {
+  customerResultMeta: {
     fontFamily: fonts.regular,
     fontSize: textSizes.xsmall,
     color: colors.textTertiary,

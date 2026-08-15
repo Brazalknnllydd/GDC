@@ -75,10 +75,6 @@ export const ShiftService = {
     
     const expectedClosingCash = shift.openingCash.add(cashSalesTotal);
 
-    if (!new Prisma.Decimal(closingCash).equals(expectedClosingCash)) {
-      throw new Error('Actual cash does not match expected cash in drawer. Please recount.');
-    }
-
     return prisma.shift.update({
       where: { id: shiftId },
       data: {

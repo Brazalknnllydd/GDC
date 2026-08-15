@@ -1,16 +1,12 @@
-import { useState } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { CameraView } from 'expo-camera';
-import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, QrCode, Search, UserCircle2 } from 'lucide-react-native';
+import { CheckCircle2, QrCode } from 'lucide-react-native';
 
 import { useCashierStore, getCartItemGrossTotal, getCartItemDiscount, getCartItemNetTotal } from '../../store/cashier-store';
 import { AdminModalShell } from '../ui/admin-modal-shell';
@@ -69,7 +65,13 @@ export function CartModal() {
       title="Cart Details"
       visible={showCartModal}
     >
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalContent}>
+      <ScrollView
+        contentContainerStyle={styles.modalContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        style={styles.modalScroll}>
         {cart.length > 0 ? (
           cart.map((item) => (
             <CashierCartItemRow
@@ -162,16 +164,83 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
         </View>
 
         {completedSale ? (
-          <SurfaceCard style={{ padding: 16 }}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>TOTAL PAID</Text>
-              <Text style={styles.totalValue}>{formatPeso(completedSale.totalAmount)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Change</Text>
-              <Text style={styles.summaryValue}>{formatPeso(completedSale.changeAmount)}</Text>
-            </View>
-          </SurfaceCard>
+          <>
+            <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+              <View style={styles.detailRow}>
+                <Text style={styles.summaryLabel}>Receipt No</Text>
+                <Text style={styles.detailValue}>#{completedSale.receiptNumber}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.summaryLabel}>Date & Time</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(completedSale.createdAt).toLocaleString('en-PH', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.summaryLabel}>Cashier</Text>
+                <Text style={styles.detailValue}>{completedSale.cashierName}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.summaryLabel}>Customer</Text>
+                <Text style={styles.detailValue}>{completedSale.customerName || 'Walk-in'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.summaryLabel}>Payment Method</Text>
+                <Text style={styles.detailValue}>{formatPaymentMethod(completedSale.paymentMethod)}</Text>
+              </View>
+            </SurfaceCard>
+
+            {completedSale.items?.length ? (
+              <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+                <Text style={styles.sectionTitle}>ITEMS SOLD</Text>
+                {completedSale.items.map((item, index) => (
+                  <View
+                    key={`${item.product?.name || 'item'}-${index}`}
+                    style={[
+                      styles.itemRow,
+                      index < completedSale.items!.length - 1 && styles.itemRowBorder,
+                    ]}>
+                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                      <Text style={styles.itemName}>{item.product?.name || 'Item'}</Text>
+                      <Text style={styles.itemMeta}>
+                        {item.quantity} x {formatPeso(item.price)}
+                      </Text>
+                    </View>
+                    <Text style={styles.itemTotal}>{formatPeso(item.subtotal)}</Text>
+                  </View>
+                ))}
+              </SurfaceCard>
+            ) : null}
+
+            <SurfaceCard style={{ padding: 16 }}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>{formatPeso(completedSale.subtotal)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Discount</Text>
+                <Text style={styles.summaryDiscountValue}>- {formatPeso(completedSale.discountAmount)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.totalLabel}>TOTAL AMOUNT</Text>
+                <Text style={styles.totalValue}>{formatPeso(completedSale.totalAmount)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total Paid</Text>
+                <Text style={styles.summaryValue}>{formatPeso(completedSale.amountPaid)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.totalLabel}>Change</Text>
+                <Text style={styles.totalValue}>{formatPeso(completedSale.changeAmount)}</Text>
+              </View>
+            </SurfaceCard>
+          </>
         ) : null}
       </ScrollView>
     </AdminModalShell>
@@ -229,9 +298,8 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
         <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
           <Text style={styles.summaryLabel}>TOTAL PAYABLE</Text>
           <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
-          <Text style={styles.summaryLabel}>
-            {cartItemCount} items {cartDiscountTotal > 0 ? `• ${formatPeso(cartDiscountTotal)} discount` : ''}
-          </Text>
+          <Text style={styles.summaryLabel}>{cartItemCount} items</Text>
+          <Text style={styles.discountLine}>Discount: - {formatPeso(cartDiscountTotal)}</Text>
         </SurfaceCard>
 
 
@@ -302,7 +370,11 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
 
 const styles = StyleSheet.create({
   modalContent: {
+    flexGrow: 1,
     padding: spacing.md,
+  },
+  modalScroll: {
+    flex: 1,
   },
   emptyText: {
     fontFamily: fonts.regular,
@@ -320,13 +392,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   summaryLabel: {
     fontFamily: fonts.medium,
     color: colors.textSecondary,
   },
+  detailValue: {
+    color: colors.textStrong,
+    flexShrink: 1,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    textAlign: 'right',
+  },
   summaryValue: {
     fontFamily: fonts.semiBold,
     color: colors.textStrong,
+  },
+  summaryDiscountValue: {
+    color: colors.successStrong,
+    fontFamily: fonts.semiBold,
   },
   totalLabel: {
     fontFamily: fonts.bold,
@@ -432,5 +521,44 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: textSizes.body,
     color: colors.textStrong,
+  },
+  discountLine: {
+    color: colors.successStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  sectionTitle: {
+    color: colors.textSecondary,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.2,
+    marginBottom: spacing.sm,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  itemRowBorder: {
+    borderBottomColor: colors.divider,
+    borderBottomWidth: 1,
+  },
+  itemName: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: 14,
+  },
+  itemMeta: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  itemTotal: {
+    alignSelf: 'center',
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 14,
   },
 });

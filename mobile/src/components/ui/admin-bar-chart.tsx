@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
 import { useMemo, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 
 import { radius, spacing } from '../../constants/design-system';
@@ -25,7 +25,9 @@ export function AdminBarChart({
 }: AdminBarChartProps) {
   const { compactPhone, width } = useResponsiveLayout();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const chartWidth = Math.max(Math.min(width - (compactPhone ? 56 : 96), 920), 248);
+  const [chartAreaWidth, setChartAreaWidth] = useState<number | null>(null);
+  const fallbackChartWidth = Math.max(Math.min(width - (compactPhone ? 56 : 96), 1200), 248);
+  const chartWidth = Math.max(chartAreaWidth ?? fallbackChartWidth, compactPhone ? 248 : 320);
   const data = useMemo(
     () =>
       labels.map((label, index) => {
@@ -54,19 +56,30 @@ export function AdminBarChart({
   const barWidth = data.length > 0 ? Math.max(Math.min(chartWidth / (data.length * 3.2), 36), 18) : 18;
   const totalBarWidth = data.length * barWidth;
   const centerSpacing = Math.max((chartWidth - barWidth) / 2, compactPhone ? 10 : 16);
-  const initialSpacing =
+  const sideSpacing =
     data.length <= 1
       ? centerSpacing
       : compactPhone
         ? 12
         : 16;
-  const remainingSpace = chartWidth - initialSpacing - totalBarWidth;
-  const spacing = data.length > 1 ? Math.max(remainingSpace / (data.length - 1), 12) : 0;
-  const endSpacing = data.length <= 1 ? centerSpacing : initialSpacing;
+  const availableSpacing = chartWidth - totalBarWidth - sideSpacing * 2;
+  const barSpacing = data.length > 1 ? Math.max(availableSpacing / (data.length - 1), 12) : 0;
+  const initialSpacing = sideSpacing;
+  const endSpacing = sideSpacing;
+  const chartPadding = compactPhone ? spacing.xs * 2 : spacing.sm * 2;
+  const chartContentWidth = Math.max(chartWidth - chartPadding, 248);
+
+  function handleChartLayout(event: LayoutChangeEvent) {
+    const nextWidth = Math.floor(event.nativeEvent.layout.width);
+
+    if (nextWidth > 0) {
+      setChartAreaWidth(nextWidth);
+    }
+  }
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.shell, compactPhone && styles.shellCompact]}>
+      <View onLayout={handleChartLayout} style={[styles.shell, compactPhone && styles.shellCompact]}>
         {!hasChartData ? (
           <View style={[styles.emptyState, compactPhone && styles.emptyStateCompact]}>
             <Text style={styles.emptyTitle}>{emptyTitle}</Text>
@@ -88,7 +101,7 @@ export function AdminBarChart({
               }}
               frontColor={colors.secondary}
               height={compactPhone ? Math.max(height - 28, 196) : height}
-              width={chartWidth}
+              width={chartContentWidth}
               hideAxesAndRules={false}
               hideOrigin
               hideRules={false}
@@ -101,7 +114,7 @@ export function AdminBarChart({
               rulesColor={colors.borderPanel}
               rulesThickness={1}
               showFractionalValues={false}
-              spacing={spacing}
+              spacing={barSpacing}
               xAxisColor={colors.borderPanel}
               xAxisLabelTextStyle={styles.xAxisLabel}
               xAxisThickness={1}

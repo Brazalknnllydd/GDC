@@ -59,6 +59,14 @@ export function getAuthToken() {
   return authToken;
 }
 
+export function getPersistedAuthToken() {
+  if (!isWeb() || typeof window === 'undefined') {
+    return '';
+  }
+
+  return window.localStorage.getItem(authTokenKey)?.trim() ?? '';
+}
+
 export function getAuthUser() {
   return authUser;
 }

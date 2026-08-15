@@ -29,6 +29,7 @@ type Customer = {
   phoneNumber?: string | null;
   address?: string | null;
   notes?: string | null;
+  createdAt?: string;
 };
 
 type FormState = {
@@ -58,6 +59,7 @@ export function CashierCustomersSection() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
 
   // Delete confirm modal
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
@@ -213,6 +215,7 @@ export function CashierCustomersSection() {
                   phoneNumber={c.phoneNumber}
                   address={c.address}
                   description={c.notes}
+                  onPress={() => setViewingCustomer(c)}
                   onEdit={() => openEdit(c)}
                   onDelete={() => setDeletingCustomer(c)}
                 />
@@ -283,6 +286,76 @@ export function CashierCustomersSection() {
           />
           {formError ? <Text style={styles.formError}>{formError}</Text> : null}
         </ScrollView>
+      </AdminModalShell>
+
+      <AdminModalShell
+        footer={
+          <ModalActions>
+            <AppButton
+              label="Close"
+              onPress={() => setViewingCustomer(null)}
+              variant="secondary"
+            />
+          </ModalActions>
+        }
+        height={420}
+        onClose={() => setViewingCustomer(null)}
+        title="Customer Details"
+        visible={viewingCustomer !== null}
+      >
+        {viewingCustomer ? (
+          <ScrollView
+            contentContainerStyle={styles.detailsContent}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            style={styles.detailsScroll}
+          >
+            <SurfaceCard style={styles.detailsCard}>
+              <Text style={styles.detailsName}>{viewingCustomer.name}</Text>
+              <Text style={styles.detailsMeta}>
+                {viewingCustomer.phoneNumber || 'No phone number'}
+              </Text>
+            </SurfaceCard>
+
+            <SurfaceCard style={styles.detailsCard}>
+              <Text style={styles.detailsLabel}>PHONE</Text>
+              <Text style={styles.detailsValue}>
+                {viewingCustomer.phoneNumber || 'Not provided'}
+              </Text>
+            </SurfaceCard>
+
+            <SurfaceCard style={styles.detailsCard}>
+              <Text style={styles.detailsLabel}>ADDRESS</Text>
+              <Text style={styles.detailsValue}>
+                {viewingCustomer.address?.trim() || 'Not provided'}
+              </Text>
+            </SurfaceCard>
+
+            <SurfaceCard style={styles.detailsCard}>
+              <Text style={styles.detailsLabel}>NOTES</Text>
+              <Text style={styles.detailsValue}>
+                {viewingCustomer.notes?.trim() || 'No notes added.'}
+              </Text>
+            </SurfaceCard>
+
+            <SurfaceCard style={styles.detailsCard}>
+              <Text style={styles.detailsLabel}>ADDED</Text>
+              <Text style={styles.detailsValue}>
+                {viewingCustomer.createdAt
+                  ? new Date(viewingCustomer.createdAt).toLocaleString('en-PH', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
+                  : 'Unknown'}
+              </Text>
+            </SurfaceCard>
+          </ScrollView>
+        ) : null}
       </AdminModalShell>
 
       {/* Delete Confirm Modal */}
@@ -408,5 +481,41 @@ const styles = StyleSheet.create({
   deleteConfirmName: {
     color: colors.textStrong,
     fontFamily: fonts.semiBold,
+  },
+  detailsContent: {
+    flexGrow: 1,
+    gap: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  detailsScroll: {
+    flex: 1,
+  },
+  detailsCard: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  detailsName: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 22,
+    marginBottom: spacing.xs,
+  },
+  detailsMeta: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  detailsLabel: {
+    color: colors.textSubtle,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.smallCaps,
+    letterSpacing: 1.1,
+    marginBottom: spacing.xs,
+  },
+  detailsValue: {
+    color: colors.textStrong,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+    lineHeight: 22,
   },
 });

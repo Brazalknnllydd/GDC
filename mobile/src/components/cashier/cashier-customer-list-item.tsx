@@ -11,6 +11,7 @@ type CashierCustomerListItemProps = {
   description?: string | null;
   onEdit?: () => void;
   onDelete?: () => void;
+  onPress?: () => void;
 };
 
 export function CashierCustomerListItem({
@@ -20,9 +21,10 @@ export function CashierCustomerListItem({
   description,
   onEdit,
   onDelete,
+  onPress,
 }: CashierCustomerListItemProps) {
   return (
-    <View style={styles.row}>
+    <Pressable onPress={onPress} style={styles.row}>
       {/* Scrollable data columns */}
       <View style={styles.dataArea}>
         {/* Avatar + Name */}
@@ -74,7 +76,7 @@ export function CashierCustomerListItem({
           <Trash2 color="#667085" size={16} strokeWidth={2} />
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
