@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { LogOut } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { LogOut, Printer, Bluetooth } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { AddCashierModal } from '../components/admin-settings/add-cashier-modal';
@@ -18,6 +18,7 @@ import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
 import { clearAuthSession } from '../lib/auth-session';
 import type { AddCashierFormValues } from '../lib/form-schemas';
+import { usePrinterStore } from '../store/printer-store';
 
 export default function AdminSettingsScreen() {
   const { compactPhone } = useResponsiveLayout();
@@ -39,6 +40,45 @@ export default function AdminSettingsScreen() {
     prependCashier,
     screenError,
   } = useAdminSettingsData();
+
+  const {
+    printerName,
+    printerMacAddress,
+    discoveredDevices,
+    isScanning,
+    isConnecting,
+    loadPrinter,
+    scanForPrinters,
+    connectPrinter,
+    disconnectPrinter,
+  } = usePrinterStore();
+
+  useEffect(() => {
+    void loadPrinter();
+  }, [loadPrinter]);
+
+  const handleScan = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Not Supported', 'Direct Bluetooth printing is only supported on Android.');
+      return;
+    }
+    await scanForPrinters();
+  };
+
+  const handleConnect = async (device: { name: string; macAddress: string }) => {
+    const success = await connectPrinter(device);
+    if (success) {
+      useToastStore.getState().showToast('Printer connected', 'success');
+    } else {
+      useToastStore.getState().showToast('Failed to connect', 'error');
+    }
+  };
+
+  const handleDisconnect = async () => {
+    await disconnectPrinter();
+    useToastStore.getState().showToast('Printer disconnected', 'success');
+  };
+
 
   function openAddCashierModal() {
     setFormMessage('');
@@ -119,6 +159,68 @@ export default function AdminSettingsScreen() {
         </SurfaceCard>
       )}
 
+      <Text style={styles.sectionTitle}>Receipt Printer</Text>
+      <SurfaceCard style={styles.printerCard}>
+        <View style={styles.printerCardHeader}>
+          <View style={styles.printerIconContainer}>
+            <Printer color={colors.primary} size={24} strokeWidth={2} />
+          </View>
+          <View style={styles.printerInfo}>
+            <Text style={styles.printerTitle}>Bluetooth Thermal Printer</Text>
+            {Platform.OS === 'android' ? (
+              <Text style={styles.printerStatus}>
+                {printerMacAddress ? `Connected: ${printerName || printerMacAddress}` : 'No printer connected'}
+              </Text>
+            ) : (
+              <Text style={styles.printerStatus}>
+                Bluetooth printing is only supported on Android custom builds
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {Platform.OS === 'android' && (
+          <View style={styles.printerActions}>
+            <AppButton
+              label={printerMacAddress ? "Change Printer" : (isScanning ? "Scanning..." : "Scan for Printers")}
+              onPress={() => { void handleScan(); }}
+              disabled={isScanning || isConnecting}
+              style={{ flex: 1 }}
+              variant="secondary"
+              icon={({ color, size }) => <Bluetooth color={color} size={size} />}
+            />
+            {printerMacAddress && (
+              <AppButton
+                label="Disconnect"
+                onPress={() => { void handleDisconnect(); }}
+                disabled={isConnecting}
+                variant="danger"
+              />
+            )}
+          </View>
+        )}
+        
+        {discoveredDevices.length > 0 && !printerMacAddress && (
+          <View style={styles.deviceList}>
+            <Text style={styles.deviceListTitle}>Discovered Devices:</Text>
+            {discoveredDevices.map((device) => (
+              <TouchableOpacity 
+                key={device.macAddress} 
+                style={styles.deviceCard}
+                onPress={() => { void handleConnect(device); }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.deviceName}>{device.name}</Text>
+                  <Text style={styles.deviceMac}>{device.macAddress}</Text>
+                </View>
+                {isConnecting ? <ActivityIndicator color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </SurfaceCard>
+
+
       {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
 
       <AppButton
@@ -187,5 +289,68 @@ const styles = StyleSheet.create({
   logoutButton: {
     marginBottom: spacing.md,
     marginTop: spacing.xl,
+  },
+  printerCard: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  printerCardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: spacing.md,
+  },
+  printerIconContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    marginRight: spacing.md,
+    width: 48,
+  },
+  printerInfo: {
+    flex: 1,
+  },
+  printerTitle: {
+    ...textRoles.value,
+    color: colors.textStrong,
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  printerStatus: {
+    ...textRoles.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  printerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  deviceList: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  deviceListTitle: {
+    ...textRoles.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  deviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  deviceName: {
+    ...textRoles.value,
+    color: colors.textStrong,
+  },
+  deviceMac: {
+    ...textRoles.body,
+    color: colors.textSecondary,
+    fontSize: 12,
   },
 });

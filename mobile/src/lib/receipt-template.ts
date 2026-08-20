@@ -4,6 +4,14 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { formatPeso, normalizeNumber } from './product-utils';
 import type { CompletedSale } from '../store/cashier-store';
+import { usePrinterStore } from '../store/printer-store';
+
+let BLEPrinter: any = null;
+if (Platform.OS === 'android') {
+  try {
+    BLEPrinter = require('react-native-thermal-receipt-printer').BLEPrinter;
+  } catch(e) {}
+}
 
 export async function handlePrintReceipt(sale: CompletedSale | null) {
   if (!sale) return;
@@ -170,8 +178,55 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
       } else {
         alert('Popup blocker is active. Please allow popups to view receipt.');
       }
+    } else if (Platform.OS === 'android') {
+      const printerMacAddress = usePrinterStore.getState().printerMacAddress;
+      
+      if (printerMacAddress && BLEPrinter) {
+        // Direct Bluetooth ESC/POS printing
+        const lineLen = 32;
+        const center = (text: string) => {
+          const spaces = Math.max(0, Math.floor((lineLen - text.length) / 2));
+          return ' '.repeat(spaces) + text + '\n';
+        };
+        const row = (left: string, right: string) => {
+          const spaces = Math.max(0, lineLen - left.length - right.length);
+          return left + ' '.repeat(spaces) + right + '\n';
+        };
+
+        let bill = '';
+        bill += center('GDC POS RECEIPT');
+        bill += center('GDC Store');
+        bill += '\n';
+        bill += `Date: ${new Date(sale.createdAt).toLocaleString()}\n`;
+        bill += `Receipt No: ${sale.receiptNumber}\n`;
+        bill += `Cashier: ${sale.cashierName}\n`;
+        bill += `Customer: ${sale.customerName ?? sale.customerId ?? 'Walk-in'}\n`;
+        bill += '-'.repeat(lineLen) + '\n';
+        
+        for (const item of sale.items || []) {
+           const itemName = (item.product?.name || 'Item').substring(0, 18);
+           const qtyAndPrice = `x${item.quantity} ${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}`;
+           bill += row(itemName, qtyAndPrice);
+        }
+        
+        bill += '-'.repeat(lineLen) + '\n';
+        bill += row('Subtotal:', formatPeso(sale.subtotal));
+        bill += row('Discount:', `-${formatPeso(sale.discountAmount)}`);
+        bill += row('TOTAL:', formatPeso(sale.totalAmount));
+        bill += row('Paid:', formatPeso(sale.amountPaid));
+        bill += row('Change:', formatPeso(sale.changeAmount));
+        bill += '\n';
+        bill += center('Thank you for shopping!');
+        bill += '\n\n\n';
+
+        await BLEPrinter.printBill(bill, { beep: false, cut: false, tailingLine: true });
+      } else {
+        // Fallback to Expo Print
+        await Print.printAsync({ html });
+      }
     } else {
-      await Print.printAsync({ html });
+      const printerUrl = usePrinterStore.getState().printerUrl;
+      await Print.printAsync({ html, printerUrl: printerUrl || undefined });
     }
   } catch (error) {
     console.error('Failed to print receipt:', error);

@@ -17,7 +17,16 @@
         "backgroundImage": "./assets/images/logo.jpg",
         "monochromeImage": "./assets/images/logo.jpg"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.mobile"
     },
     "web": {
       "output": "static",
@@ -53,6 +62,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f71a4a27-2840-4b13-aebe-63430d10ae0a"
+      }
     }
   }
 }
