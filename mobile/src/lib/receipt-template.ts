@@ -1,10 +1,10 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
+import { Buffer } from 'buffer';
 import * as Print from 'expo-print';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
 import { formatPeso, normalizeNumber } from './product-utils';
 import type { CompletedSale } from '../store/cashier-store';
 import { usePrinterStore } from '../store/printer-store';
+import { useToastStore } from '../store/toast-store';
 
 let BLEPrinter: any = null;
 if (Platform.OS === 'android') {
@@ -15,35 +15,52 @@ if (Platform.OS === 'android') {
 
 let isPrinting = false;
 
+function formatReceiptDateTime(value: string) {
+  const date = new Date(value);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const hour = hours % 12 || 12;
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const meridiem = hours >= 12 ? 'PM' : 'AM';
+
+  return `${month}/${day}/${year}, ${hour}:${minutes}:${seconds} ${meridiem}`;
+}
+
+function printerText(value: string) {
+  return value.replace(/[^\x20-\x7E\r\n]/g, '');
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function shortenProductName(name: string) {
+  const baseName = name.replace(/\s*\([^)]*\)/g, '').trim();
+  const maxLength = 32;
+  return baseName.length > maxLength
+    ? `${baseName.slice(0, maxLength - 3).trimEnd()}...`
+    : baseName;
+}
+
 export async function handlePrintReceipt(sale: CompletedSale | null) {
   if (!sale) return;
   if (isPrinting) return;
   isPrinting = true;
 
-  let logoUri = '';
   try {
-    const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
-    if (!logoAsset.localUri && Platform.OS !== 'web') {
-      await logoAsset.downloadAsync();
-    }
-    if (Platform.OS === 'web') {
-      logoUri = logoAsset.uri;
-    } else {
-      const localUri = logoAsset.localUri || logoAsset.uri;
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      logoUri = `data:image/jpeg;base64,${base64}`;
-    }
-  } catch (e) {
-    console.error('Failed to load receipt logo:', e);
-  }
-
   const itemsHtml = sale.items && Array.isArray(sale.items)
     ? sale.items.map((item: any) => `
       <tr>
-        <td style="padding: 6px 0; font-family: monospace;">${item.product?.name || 'Item'} x ${item.quantity}</td>
-        <td style="padding: 6px 0; font-family: monospace; text-align: right;">${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}</td>
+        <td>${escapeHtml(shortenProductName(item.product?.name || 'Item'))} x ${item.quantity}</td>
+        <td class="amount">${escapeHtml(formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity))}</td>
       </tr>
     `).join('')
     : '';
@@ -58,69 +75,87 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
               margin: 0;
             }
             body {
-              margin: 1.6cm;
+              margin: 0;
             }
           }
           body {
             font-family: 'Courier New', Courier, monospace;
             color: #111;
-            padding: 20px;
+            padding: 78px 14px 0;
             margin: 0;
+            font-size: 11px;
           }
           .header {
             text-align: center;
-            margin-bottom: 20px;
-          }
-          .logo-img {
-            width: 72px;
-            height: 72px;
-            border-radius: 36px;
-            object-fit: cover;
-            margin-bottom: 8px;
+            margin-bottom: 13px;
           }
           .title {
-            font-size: 20px;
+            font-size: 14px;
             font-weight: bold;
-            margin: 0 0 4px;
+            margin: 0 0 5px;
           }
           .subtitle {
-            font-size: 12px;
+            font-size: 9px;
+            line-height: 12px;
             margin: 0;
           }
           .divider {
-            border-top: 1px dashed #333;
-            margin: 15px 0;
+            border-top: 1px dashed #777;
+            margin: 13px 0;
           }
           .details-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 11px;
+          }
+          .details-table th {
+            padding-bottom: 9px;
+          }
+          .details-table td {
+            padding: 0 0 13px;
+            white-space: nowrap;
+          }
+          .details-table th:first-child,
+          .details-table td:first-child {
+            text-align: left;
+          }
+          .details-table th:last-child,
+          .details-table td:last-child {
+            text-align: right;
+          }
+          .amount {
+            font-weight: bold;
           }
           .totals-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
-            margin-top: 10px;
+            font-size: 11px;
           }
           .totals-table td {
-            padding: 4px 0;
+            padding: 3px 0;
+          }
+          .totals-table td:last-child {
+            text-align: right;
+          }
+          .total-row {
+            font-weight: bold;
           }
           .footer {
             text-align: center;
-            font-size: 12px;
-            margin-top: 30px;
+            font-size: 9px;
+            line-height: 15px;
+            margin-top: 21px;
           }
         </style>
       </head>
       <body>
         <div class="header">
-          ${logoUri ? `<img src="${logoUri}" class="logo-img" />` : ''}
           <h1 class="title">GDC POS RECEIPT</h1>
           <p class="subtitle">GDC Store</p>
-          <p class="subtitle">Date: ${new Date(sale.createdAt).toLocaleString()}</p>
-          <p class="subtitle">Receipt No: ${sale.receiptNumber}</p>
-          <p class="subtitle">Cashier: ${sale.cashierName}</p>
-          <p class="subtitle">Customer: ${sale.customerName ?? sale.customerId ?? 'Walk-in'}</p>
+          <p class="subtitle">Date: ${formatReceiptDateTime(sale.createdAt)}</p>
+          <p class="subtitle">Receipt No: ${escapeHtml(sale.receiptNumber)}</p>
+          <p class="subtitle">Cashier: ${escapeHtml(sale.cashierName)}</p>
+          <p class="subtitle">Customer: ${escapeHtml(String(sale.customerName ?? sale.customerId ?? 'Walk-in'))}</p>
         </div>
 
         <div class="divider"></div>
@@ -142,23 +177,23 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
         <table class="totals-table">
           <tr>
             <td>Subtotal:</td>
-            <td style="text-align: right;">${formatPeso(sale.subtotal)}</td>
+            <td style="text-align: right;">${escapeHtml(formatPeso(sale.subtotal))}</td>
           </tr>
           <tr>
             <td>Discount:</td>
-            <td style="text-align: right;">- ${formatPeso(sale.discountAmount)}</td>
+            <td style="text-align: right;">- ${escapeHtml(formatPeso(sale.discountAmount))}</td>
           </tr>
-          <tr style="font-weight: bold; font-size: 16px;">
+            <tr class="total-row">
             <td>TOTAL:</td>
-            <td style="text-align: right;">${formatPeso(sale.totalAmount)}</td>
+            <td style="text-align: right;">${escapeHtml(formatPeso(sale.totalAmount))}</td>
           </tr>
           <tr>
             <td>Amount Paid:</td>
-            <td style="text-align: right;">${formatPeso(sale.amountPaid)}</td>
+            <td style="text-align: right;">${escapeHtml(formatPeso(sale.amountPaid))}</td>
           </tr>
           <tr>
             <td>Change:</td>
-            <td style="text-align: right;">${formatPeso(sale.changeAmount)}</td>
+            <td style="text-align: right;">${escapeHtml(formatPeso(sale.changeAmount))}</td>
           </tr>
         </table>
 
@@ -172,7 +207,6 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
     </html>
   `;
 
-  try {
     if (Platform.OS === 'web') {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
@@ -184,10 +218,20 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
       }
     } else if (Platform.OS === 'android') {
       const printerMacAddress = usePrinterStore.getState().printerMacAddress;
+      const isPrinterConnected = usePrinterStore.getState().isPrinterConnected;
       
+      if (!printerMacAddress || !isPrinterConnected || !BLEPrinter) {
+        useToastStore.getState().showToast(
+          'No printer connected. Connect a Bluetooth printer in Settings first.',
+          'error'
+        );
+        return;
+      }
+
       if (printerMacAddress && BLEPrinter) {
         // Direct Bluetooth ESC/POS printing
         const lineLen = 32;
+        const formatPrinterAmount = (value: number) => normalizeNumber(value).toFixed(2);
         const center = (text: string) => {
           const spaces = Math.max(0, Math.floor((lineLen - text.length) / 2));
           return ' '.repeat(spaces) + text + '\n';
@@ -201,29 +245,49 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
         bill += center('GDC POS RECEIPT');
         bill += center('GDC Store');
         bill += '\n';
-        bill += `Date: ${new Date(sale.createdAt).toLocaleString()}\n`;
-        bill += `Receipt No: ${sale.receiptNumber}\n`;
-        bill += `Cashier: ${sale.cashierName}\n`;
-        bill += `Customer: ${sale.customerName ?? sale.customerId ?? 'Walk-in'}\n`;
+        bill += `Date: ${formatReceiptDateTime(sale.createdAt)}\n`;
+        bill += `Receipt No: ${printerText(sale.receiptNumber)}\n`;
+        bill += `Cashier: ${printerText(sale.cashierName)}\n`;
+        bill += `Customer: ${printerText(String(sale.customerName ?? sale.customerId ?? 'Walk-in'))}\n`;
         bill += '-'.repeat(lineLen) + '\n';
         
         for (const item of sale.items || []) {
-           const itemName = (item.product?.name || 'Item').substring(0, 18);
-           const qtyAndPrice = `x${item.quantity} ${formatPeso(normalizeNumber(item.price ?? item.subtotal) * item.quantity)}`;
-           bill += row(itemName, qtyAndPrice);
+            const itemAmount = formatPrinterAmount(normalizeNumber(item.price ?? item.subtotal) * item.quantity);
+           const itemRightColumn = `x${item.quantity} ${itemAmount}`;
+            bill += row(printerText(shortenProductName(item.product?.name || 'Item')), itemRightColumn);
         }
         
         bill += '-'.repeat(lineLen) + '\n';
-        bill += row('Subtotal:', formatPeso(sale.subtotal));
-        bill += row('Discount:', `-${formatPeso(sale.discountAmount)}`);
-        bill += row('TOTAL:', formatPeso(sale.totalAmount));
-        bill += row('Paid:', formatPeso(sale.amountPaid));
-        bill += row('Change:', formatPeso(sale.changeAmount));
+          bill += row('Subtotal:', formatPrinterAmount(sale.subtotal));
+          bill += row('Discount:', `-${formatPrinterAmount(sale.discountAmount)}`);
+          bill += row('TOTAL:', formatPrinterAmount(sale.totalAmount));
+          bill += row('Paid:', formatPrinterAmount(sale.amountPaid));
+          bill += row('Change:', formatPrinterAmount(sale.changeAmount));
         bill += '\n';
         bill += center('Thank you for shopping!');
         bill += '\n\n\n';
 
-        await BLEPrinter.printBill(bill, { beep: false, cut: false, tailingLine: true });
+        const rawPrinter = NativeModules.RNBLEPrinter;
+        if (!rawPrinter?.printRawData) {
+          throw new Error('Bluetooth printer module is unavailable');
+        }
+
+        const printerBytes = Buffer.concat([
+          Buffer.from([0x1b, 0x40]),
+          Buffer.from(printerText(bill).replace(/\r?\n/g, '\r\n'), 'ascii'),
+          Buffer.from([0x0d, 0x0a, 0x0d, 0x0a, 0x0d, 0x0a]),
+        ]);
+
+        await new Promise<void>((resolve, reject) => {
+          rawPrinter.printRawData(printerBytes.toString('base64'), (error: unknown) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            resolve();
+          });
+        });
+        useToastStore.getState().showToast('Receipt sent to printer.', 'success');
       } else {
         // Fallback to Expo Print
         await Print.printAsync({ html });
@@ -234,7 +298,7 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
     }
   } catch (error) {
     console.error('Failed to print receipt:', error);
-    alert('Could not print receipt.');
+    useToastStore.getState().showToast('Could not print receipt. Check the printer connection and try again.', 'error');
   } finally {
     isPrinting = false;
   }

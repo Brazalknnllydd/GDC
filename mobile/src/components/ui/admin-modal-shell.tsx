@@ -60,8 +60,11 @@ export function AdminModalShell({
 
   return (
     <Portal>
-      <Pressable onPress={onClose} style={styles.backdropOverlay}>
-        <View style={{ width: modalWidth }}>
+      <View style={styles.backdropOverlay}>
+        <Pressable onPress={onClose} style={styles.backdropPressable} />
+        <View
+          onStartShouldSetResponder={() => true}
+          style={{ width: modalWidth }}>
           <Surface
             style={[
               styles.card,
@@ -95,7 +98,7 @@ export function AdminModalShell({
             ) : null}
           </Surface>
         </View>
-      </Pressable>
+      </View>
     </Portal>
   );
 }
@@ -111,6 +114,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 12,
+  },
+  backdropPressable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   card: {
     alignSelf: 'center',

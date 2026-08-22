@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { BLEPrinter } from 'react-native-thermal-receipt-printer';
+import { useToastStore } from './toast-store';
 
 export interface BluetoothDevice {
   name: string;
@@ -12,6 +13,7 @@ interface PrinterState {
   printerUrl: string | null;
   printerMacAddress: string | null;
   printerName: string | null;
+  isPrinterConnected: boolean;
   discoveredDevices: BluetoothDevice[];
   isScanning: boolean;
   isConnecting: boolean;
@@ -44,6 +46,7 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
   printerUrl: null,
   printerMacAddress: null,
   printerName: null,
+  isPrinterConnected: false,
   discoveredDevices: [],
   isScanning: false,
   isConnecting: false,
@@ -58,12 +61,17 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
 
       if (mac && Platform.OS === 'android') {
         const hasPermission = await requestBluetoothPermissions();
-        if (hasPermission) {
+        if (hasPermission && BLEPrinter?.init) {
           try {
             await BLEPrinter.init();
-            await BLEPrinter.connectPrinter(mac);
-          } catch (e) {
-            console.error('Failed to auto-connect to printer', e);
+            await BLEPrinter.connectPrinter(mac.trim());
+            set({ isPrinterConnected: true });
+          } catch {
+            set({ isPrinterConnected: false });
+            useToastStore.getState().showToast(
+              'Saved printer is unavailable. Turn it on or reconnect it from Printer Settings.',
+              'info'
+            );
           }
         }
       }
@@ -77,14 +85,16 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
     
     // Check if the native module actually loaded (fails in Expo Go)
     if (!BLEPrinter || !BLEPrinter.init) {
-      alert("Native Bluetooth module not found!\n\nYou are likely running in Expo Go. Direct Bluetooth printing requires a Custom Development Build. Please run 'npx expo run:android' to build the app.");
+      useToastStore.getState().showToast('Bluetooth printing needs the installed development build.', 'error');
       return;
     }
 
     set({ isScanning: true, discoveredDevices: [] });
+    useToastStore.getState().showToast('Checking for nearby Bluetooth printers...', 'info');
     try {
       const hasPermission = await requestBluetoothPermissions();
       if (!hasPermission) {
+        useToastStore.getState().showToast('Allow Nearby devices permission to scan for printers.', 'error');
         set({ isScanning: false });
         return;
       }
@@ -98,8 +108,21 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
       }));
       
       set({ discoveredDevices: mappedDevices, isScanning: false });
+      useToastStore.getState().showToast(
+        mappedDevices.length > 0
+          ? `${mappedDevices.length} printer${mappedDevices.length === 1 ? '' : 's'} found. Select one to connect.`
+          : 'No printers found. Turn the printer on and make sure it is nearby.',
+        mappedDevices.length > 0 ? 'success' : 'info'
+      );
     } catch (e) {
       console.error('Scan failed', e);
+      const message = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+      useToastStore.getState().showToast(
+        message.includes('adapter') || message.includes('enabled')
+          ? 'Bluetooth is turned off. Turn it on and try scanning again.'
+          : 'Could not scan for printers. Check Bluetooth and try again.',
+        'error'
+      );
       set({ isScanning: false });
     }
   },
@@ -107,16 +130,49 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
   connectPrinter: async (device: BluetoothDevice) => {
     if (Platform.OS !== 'android') return false;
     set({ isConnecting: true });
+    useToastStore.getState().showToast(`Connecting to ${device.name || 'printer'}...`, 'info');
     try {
+      const hasPermission = await requestBluetoothPermissions();
+      if (!hasPermission) {
+        useToastStore.getState().showToast('Allow Nearby devices permission to connect to the printer.', 'error');
+        set({ isConnecting: false });
+        return false;
+      }
+
       await BLEPrinter.init();
-      await BLEPrinter.connectPrinter(device.macAddress);
+      try {
+        await BLEPrinter.closeConn();
+      } catch {
+        // No active connection is expected on the first attempt.
+      }
+
+      try {
+        await BLEPrinter.connectPrinter(device.macAddress.trim());
+      } catch {
+        // Some printers leave a stale socket behind after a failed attempt.
+        try {
+          await BLEPrinter.closeConn();
+        } catch {
+          // Continue with the retry.
+        }
+        await BLEPrinter.connectPrinter(device.macAddress.trim());
+      }
       set({ printerMacAddress: device.macAddress, printerName: device.name, isConnecting: false });
+      set({ isPrinterConnected: true });
       await SecureStore.setItemAsync('printer_mac', device.macAddress);
       await SecureStore.setItemAsync('printer_name', device.name);
       return true;
     } catch (e) {
       console.error('Connect failed', e);
+      const message = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+      useToastStore.getState().showToast(
+        message.includes('timeout') || message.includes('socket') || message.includes('read failed')
+          ? 'Printer connection timed out. Keep the printer nearby and try again.'
+          : 'Could not connect to the printer. Check that it is on and try again.',
+        'error'
+      );
       set({ isConnecting: false });
+      set({ isPrinterConnected: false });
       return false;
     }
   },
@@ -124,12 +180,15 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
   disconnectPrinter: async () => {
     if (Platform.OS === 'web') return;
     try {
-      // Disconnect might not be explicitly supported by the lib, or it's implicitly handled
-      // Just clear local state
+      try {
+        await BLEPrinter?.closeConn?.();
+      } catch {
+        // Continue clearing local state if the native socket is already closed.
+      }
       await SecureStore.deleteItemAsync('printer_mac');
       await SecureStore.deleteItemAsync('printer_name');
       await SecureStore.deleteItemAsync('printer_url');
-      set({ printerMacAddress: null, printerName: null, printerUrl: null });
+      set({ printerMacAddress: null, printerName: null, printerUrl: null, isPrinterConnected: false });
     } catch (e) {
       console.error('Failed to save printer settings', e);
     }

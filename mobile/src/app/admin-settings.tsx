@@ -44,6 +44,7 @@ export default function AdminSettingsScreen() {
   const {
     printerName,
     printerMacAddress,
+    isPrinterConnected,
     discoveredDevices,
     isScanning,
     isConnecting,
@@ -69,8 +70,6 @@ export default function AdminSettingsScreen() {
     const success = await connectPrinter(device);
     if (success) {
       useToastStore.getState().showToast('Printer connected', 'success');
-    } else {
-      useToastStore.getState().showToast('Failed to connect', 'error');
     }
   };
 
@@ -168,7 +167,7 @@ export default function AdminSettingsScreen() {
           <View style={styles.printerInfo}>
             <Text style={styles.printerTitle}>Bluetooth Thermal Printer</Text>
             <Text style={styles.printerStatus}>
-              {printerMacAddress
+              {isPrinterConnected && printerMacAddress
                 ? `Connected: ${printerName || printerMacAddress}`
                 : 'No printer connected'}
             </Text>
@@ -178,14 +177,14 @@ export default function AdminSettingsScreen() {
         {Platform.OS === 'android' ? (
           <View style={styles.printerActions}>
             <AppButton
-              label={printerMacAddress ? 'Change Printer' : isScanning ? 'Scanning...' : 'Scan for Printers'}
+              label={isPrinterConnected ? 'Change Printer' : isScanning ? 'Scanning...' : 'Scan for Printers'}
               onPress={() => { void handleScan(); }}
               disabled={isScanning || isConnecting}
               style={{ flex: 1 }}
               variant="secondary"
               icon={({ color, size }) => <Bluetooth color={color} size={size} />}
             />
-            {printerMacAddress && (
+            {isPrinterConnected && printerMacAddress && (
               <AppButton
                 label="Disconnect"
                 onPress={() => { void handleDisconnect(); }}
@@ -200,7 +199,7 @@ export default function AdminSettingsScreen() {
           </Text>
         )}
 
-        {discoveredDevices.length > 0 && !printerMacAddress && (
+        {discoveredDevices.length > 0 && (
           <View style={styles.deviceList}>
             <Text style={styles.deviceListTitle}>Discovered Devices:</Text>
             {discoveredDevices.map((device) => (

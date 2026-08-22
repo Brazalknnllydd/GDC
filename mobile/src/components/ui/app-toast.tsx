@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react-native';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { radius, spacing } from '../../constants/design-system';
 
 export type ToastProps = {
   message: string;
-  type?: 'success' | 'error';
+  type?: 'success' | 'error' | 'info';
   visible: boolean;
   onHide?: () => void;
   duration?: number;
@@ -63,11 +63,15 @@ export function AppToast({ message, type = 'success', visible, onHide, duration 
 
   if (!isRendered) return null;
 
+  const toastColor = type === 'success' ? colors.success : type === 'info' ? colors.info : colors.danger;
+
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
-      <View style={[styles.iconWrap, { backgroundColor: type === 'success' ? `${colors.success}15` : `${colors.danger}15` }]}>
+      <View style={[styles.iconWrap, { backgroundColor: `${toastColor}15` }] }>
         {type === 'success' ? (
           <CheckCircle2 color={colors.success} size={18} />
+        ) : type === 'info' ? (
+          <Info color={colors.info} size={18} />
         ) : (
           <AlertCircle color={colors.danger} size={18} />
         )}
