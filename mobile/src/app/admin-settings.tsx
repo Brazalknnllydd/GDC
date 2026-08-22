@@ -167,22 +167,18 @@ export default function AdminSettingsScreen() {
           </View>
           <View style={styles.printerInfo}>
             <Text style={styles.printerTitle}>Bluetooth Thermal Printer</Text>
-            {Platform.OS === 'android' ? (
-              <Text style={styles.printerStatus}>
-                {printerMacAddress ? `Connected: ${printerName || printerMacAddress}` : 'No printer connected'}
-              </Text>
-            ) : (
-              <Text style={styles.printerStatus}>
-                Bluetooth printing is only supported on Android custom builds
-              </Text>
-            )}
+            <Text style={styles.printerStatus}>
+              {printerMacAddress
+                ? `Connected: ${printerName || printerMacAddress}`
+                : 'No printer connected'}
+            </Text>
           </View>
         </View>
 
-        {Platform.OS === 'android' && (
+        {Platform.OS === 'android' ? (
           <View style={styles.printerActions}>
             <AppButton
-              label={printerMacAddress ? "Change Printer" : (isScanning ? "Scanning..." : "Scan for Printers")}
+              label={printerMacAddress ? 'Change Printer' : isScanning ? 'Scanning...' : 'Scan for Printers'}
               onPress={() => { void handleScan(); }}
               disabled={isScanning || isConnecting}
               style={{ flex: 1 }}
@@ -198,14 +194,18 @@ export default function AdminSettingsScreen() {
               />
             )}
           </View>
+        ) : (
+          <Text style={styles.printerStatus}>
+            Bluetooth printing is supported on Android only.
+          </Text>
         )}
-        
+
         {discoveredDevices.length > 0 && !printerMacAddress && (
           <View style={styles.deviceList}>
             <Text style={styles.deviceListTitle}>Discovered Devices:</Text>
             {discoveredDevices.map((device) => (
-              <TouchableOpacity 
-                key={device.macAddress} 
+              <TouchableOpacity
+                key={device.macAddress}
                 style={styles.deviceCard}
                 onPress={() => { void handleConnect(device); }}
               >

@@ -13,8 +13,12 @@ if (Platform.OS === 'android') {
   } catch(e) {}
 }
 
+let isPrinting = false;
+
 export async function handlePrintReceipt(sale: CompletedSale | null) {
   if (!sale) return;
+  if (isPrinting) return;
+  isPrinting = true;
 
   let logoUri = '';
   try {
@@ -231,5 +235,8 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
   } catch (error) {
     console.error('Failed to print receipt:', error);
     alert('Could not print receipt.');
+  } finally {
+    isPrinting = false;
   }
 }
+
