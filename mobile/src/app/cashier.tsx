@@ -85,6 +85,29 @@ function formatReceiptDateTime(value: string) {
   });
 }
 
+function normalizeBarcode(value: string) {
+  return value.trim().replace(/[\s-]/g, '').toUpperCase();
+}
+
+function barcodeMatches(productBarcode: string | null | undefined, scannedBarcode: string) {
+  const stored = normalizeBarcode(productBarcode || '');
+  const scanned = normalizeBarcode(scannedBarcode);
+
+  if (!stored || !scanned) {
+    return false;
+  }
+
+  if (stored === scanned) {
+    return true;
+  }
+
+  if (stored.length === 12 && scanned === `0${stored}`) {
+    return true;
+  }
+
+  return scanned.length === 12 && stored === `0${scanned}`;
+}
+
 function filterProducts(
   products: Product[],
   selectedCategory: string,
@@ -278,9 +301,9 @@ export default function CashierScreen() {
       return;
     }
 
-    const scannedBarcode = result.data.trim();
+    const scannedBarcode = normalizeBarcode(result.data);
     const matchedProduct = products.find(
-      (product) => product.barcode?.trim() === scannedBarcode
+      (product) => barcodeMatches(product.barcode, scannedBarcode)
     );
 
     setScannerEnabled(false);
@@ -561,6 +584,7 @@ export default function CashierScreen() {
 
       {/* Shift Close Modal */}
       <ShiftCloseModal
+        expectedCash={dashboard.currentShift?.expectedCashOnHand}
         shiftId={dashboard.currentShift?.id}
         visible={showCloseShiftModal}
         onClose={() => setShowCloseShiftModal(false)}
@@ -622,7 +646,7 @@ export default function CashierScreen() {
                 active={showScannerModal}
                 facing="back"
                 barcodeScannerSettings={{
-                  barcodeTypes: ["qr", "ean13", "ean8", "upc_a", "upc_e", "code39", "code128"],
+                  barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'itf14', 'code39', 'code128'],
                 }}
                 onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
                 style={styles.cameraPreview}

@@ -8,16 +8,18 @@ import { ProductFormInput } from '../ui/product-form-input';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { spacing } from '../../constants/design-system';
 import { apiClient } from '../../lib/api';
+import { formatPeso } from '../../lib/product-utils';
 import { useToastStore } from '../../store/toast-store';
 
 type ShiftCloseModalProps = {
+  expectedCash: number | null | undefined;
   shiftId: number | null | undefined;
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export function ShiftCloseModal({ shiftId, visible, onClose, onSuccess }: ShiftCloseModalProps) {
+export function ShiftCloseModal({ expectedCash, shiftId, visible, onClose, onSuccess }: ShiftCloseModalProps) {
   const [actualCash, setActualCash] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +31,20 @@ export function ShiftCloseModal({ shiftId, visible, onClose, onSuccess }: ShiftC
     const amount = Number(cleanCash);
     if (isNaN(amount) || amount < 0) {
       setError('Please enter a valid amount.');
+      useToastStore.getState().showToast('Enter a valid closing cash amount.', 'error');
+      return;
+    }
+
+    if (expectedCash === null || expectedCash === undefined) {
+      setError('Expected cash is unavailable. Refresh the shift and try again.');
+      useToastStore.getState().showToast('Expected cash is unavailable. Please refresh and try again.', 'error');
+      return;
+    }
+
+    if (Math.round(amount * 100) !== Math.round(expectedCash * 100)) {
+      const message = `Closing cash must match the expected amount of ${formatPeso(expectedCash)}.`;
+      setError(message);
+      useToastStore.getState().showToast(message, 'error');
       return;
     }
 
@@ -65,8 +81,15 @@ export function ShiftCloseModal({ shiftId, visible, onClose, onSuccess }: ShiftC
     >
       <View style={styles.container}>
         <Text style={styles.description}>
-          Enter the exact amount of cash currently in the drawer to close your shift. The system will automatically calculate any shortages or overages.
+          Count the cash in your drawer and enter the exact expected amount to close your shift.
         </Text>
+
+        <View style={styles.expectedCashCard}>
+          <Text style={styles.expectedCashLabel}>EXPECTED CASH</Text>
+          <Text style={styles.expectedCashValue}>
+            {expectedCash !== null && expectedCash !== undefined ? formatPeso(expectedCash) : 'Unavailable'}
+          </Text>
+        </View>
         
         <ProductFormInput
           label="ACTUAL CASH IN DRAWER"
@@ -95,6 +118,26 @@ const styles = StyleSheet.create({
     fontSize: textSizes.body,
     marginBottom: spacing.xl,
     lineHeight: 22,
+  },
+  expectedCashCard: {
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  expectedCashLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+    letterSpacing: 1,
+  },
+  expectedCashValue: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
+    fontSize: 24,
+    marginTop: spacing.xs,
   },
   errorText: {
     color: colors.danger,

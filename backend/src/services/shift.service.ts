@@ -75,6 +75,10 @@ export const ShiftService = {
     
     const expectedClosingCash = shift.openingCash.add(cashSalesTotal);
 
+    if (!expectedClosingCash.equals(new Prisma.Decimal(closingCash))) {
+      throw new Error(`Closing cash must match the expected amount of ${expectedClosingCash.toFixed(2)}.`);
+    }
+
     return prisma.shift.update({
       where: { id: shiftId },
       data: {
