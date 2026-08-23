@@ -9,6 +9,17 @@ export function formatPeso(value: number) {
   })}`;
 }
 
+export function formatExportAmount(value: number | string | null | undefined) {
+  const normalized = typeof value === 'number'
+    ? value
+    : Number(String(value ?? '').replace(/[^\d.-]/g, '')) || 0;
+
+  return normalized.toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function formatCompactPeso(value: number) {
   if (value >= 1_000_000) {
     return `₱${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;

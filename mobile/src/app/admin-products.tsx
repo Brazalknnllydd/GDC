@@ -43,9 +43,7 @@ export default function AdminProductsScreen() {
   const isCompactPhone = width < 430;
   const metricCardStyle = isCompactPhone
     ? { width: '100%' as const }
-    : width >= 1200
-      ? { width: '31.5%' as const }
-      : { width: '48.2%' as const };
+    : { width: '31.5%' as const };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -119,6 +117,7 @@ export default function AdminProductsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setShowAddCategory(false);
+      setEditingCategoryId(null);
       useToastStore.getState().showToast(`Category ${editingCategoryId ? 'updated' : 'added'} successfully.`, 'success');
     },
     onError: (error) => {
@@ -244,9 +243,17 @@ export default function AdminProductsScreen() {
       <ManageCategoriesModal
         categories={categories.map(c => ({ ...c, productCount: products.filter(p => p.categoryId === c.id).length }))}
         onClose={() => setShowManageCategories(false)}
-        onCreate={() => setShowAddCategory(true)}
+        onCreate={() => {
+          setShowManageCategories(false);
+          setEditingCategoryId(null);
+          setShowAddCategory(true);
+        }}
         onDelete={(category) => setCategoryPendingDelete(category as unknown as Category)}
-        onEdit={(category) => { setEditingCategoryId(category.id); setShowAddCategory(true); }}
+        onEdit={(category) => {
+          setShowManageCategories(false);
+          setEditingCategoryId(category.id);
+          setShowAddCategory(true);
+        }}
         visible={showManageCategories}
       />
 
@@ -257,7 +264,10 @@ export default function AdminProductsScreen() {
           categoryDescription: (editingCategoryId !== null ? (categories.find(c => c.id === editingCategoryId) as any)?.description : '') || ''
         }}
         mode={editingCategoryId !== null ? 'edit' : 'create'}
-        onClose={() => setShowAddCategory(false)}
+        onClose={() => {
+          setShowAddCategory(false);
+          setEditingCategoryId(null);
+        }}
         onSave={(values) => saveCategoryMutation.mutate(values)}
         serverError={saveCategoryMutation.isError ? (saveCategoryMutation.error?.message || '') : ''}
         visible={showAddCategory}

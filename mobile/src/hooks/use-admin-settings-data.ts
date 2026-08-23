@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Category } from '../components/admin-products/products-screen-data';
 import { apiClient } from '../lib/api';
@@ -21,9 +21,11 @@ export function useAdminSettingsData() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [screenError, setScreenError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
   const loadSettingsData = useCallback(async () => {
     try {
+      if (!isMountedRef.current) return;
       setScreenError('');
       setIsLoading(true);
 
@@ -32,19 +34,28 @@ export function useAdminSettingsData() {
         apiClient.get<Category[]>('/categories'),
       ]);
 
+      if (!isMountedRef.current) return;
+
       setCashiers(cashiersResponse.data);
       setCategories(
         categoriesResponse.data.sort((left, right) => left.name.localeCompare(right.name))
       );
     } catch (error) {
+      if (!isMountedRef.current) return;
       setScreenError(getApiErrorMessage(error, 'Could not load admin settings right now.'));
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadSettingsData();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [loadSettingsData]);
 
   const assignedCategoryCount = useMemo(

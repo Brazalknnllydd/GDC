@@ -103,7 +103,7 @@ export function getCartItemGrossTotal(item: CartItem) {
 }
 
 export function getCartItemDiscount(item: CartItem) {
-  const parsedDiscount = Number(sanitizeCurrencyInput(item.discountInput)) || 0;
+  const parsedDiscount = Number(sanitizeCurrencyInput(item.discountInput ?? '')) || 0;
   return Math.max(0, Math.min(parsedDiscount, getCartItemGrossTotal(item)));
 }
 

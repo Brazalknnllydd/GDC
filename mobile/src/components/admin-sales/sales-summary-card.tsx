@@ -26,7 +26,7 @@ export function SalesSummaryCard({
       titleMarginBottom={16}
       tone={detailTone}
       value={value}
-      valueColor={colors.secondary}
+      valueColor={colors.neutral}
       valueFontSize={21}
       valueLineHeight={26}
       valueMarginBottom={8}

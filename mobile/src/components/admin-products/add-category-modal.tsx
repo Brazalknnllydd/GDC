@@ -52,6 +52,7 @@ export function AddCategoryModal({
 
   return (
     <AdminModalShell
+      height="52%"
       maxHeight="72%"
       onClose={onClose}
       title={isEditing ? 'Edit Category' : 'Add Category'}

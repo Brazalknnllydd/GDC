@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { getAuthToken, getPersistedAuthToken } from './auth-session';
 
-const DEV_API_PORT = '5000';
+const DEV_API_PORT = '5001';
 
 function extractHost(value?: string | null) {
   if (!value) {

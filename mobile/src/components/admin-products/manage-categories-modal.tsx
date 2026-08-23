@@ -32,6 +32,7 @@ export function ManageCategoriesModal({
 }: ManageCategoriesModalProps) {
   return (
     <AdminModalShell
+      height="72%"
       maxHeight="72%"
       onClose={onClose}
       title="Manage Categories"
@@ -41,7 +42,11 @@ export function ManageCategoriesModal({
           <AppButton label="Add New Category" onPress={onCreate} variant="primary" />
         </ModalActions>
       }>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+        style={styles.scrollView}>
         {categories.length === 0 ? (
           <Text style={styles.emptyText}>No categories created yet.</Text>
         ) : (
@@ -99,6 +104,9 @@ export function ManageCategoriesModal({
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
   content: {
     gap: spacing.md,
     paddingBottom: spacing.xl,

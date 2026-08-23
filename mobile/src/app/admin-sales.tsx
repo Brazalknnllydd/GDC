@@ -5,7 +5,6 @@ import { CalendarDays, Download, History, QrCode, WalletCards, ChevronLeft, Chev
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 import {
   MonthRangePicker,
@@ -24,7 +23,8 @@ import { SurfaceCard } from '../components/ui/surface-card';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
-import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
+import { shareExportFile } from '../lib/export-file';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type CustomerRef = {
@@ -494,18 +494,7 @@ export default function AdminSalesScreen() {
   }
 
   async function shareFile(uri: string, mimeType: string, dialogTitle: string, uti?: string) {
-    const isSharingAvailable = await Sharing.isAvailableAsync();
-
-    if (!isSharingAvailable) {
-      Alert.alert('Sharing unavailable', 'File sharing is not available on this device.');
-      return;
-    }
-
-    await Sharing.shareAsync(uri, {
-      UTI: uti,
-      dialogTitle,
-      mimeType,
-    });
+    await shareExportFile(uri, { dialogTitle, mimeType, uti });
   }
 
   async function exportExcelReport() {
@@ -517,12 +506,12 @@ export default function AdminSalesScreen() {
       [escapeCsvValue(`Generated: ${formatExportDate(new Date().toISOString())}`)],
       [],
       [escapeCsvValue('Summary')],
-      [escapeCsvValue('Total Sales'), escapeCsvValue(formatPeso(totals.totalSales))],
-      [escapeCsvValue('Profit'), escapeCsvValue(formatPeso(totals.profit))],
+      [escapeCsvValue('Total Sales'), escapeCsvValue(formatExportAmount(totals.totalSales))],
+      [escapeCsvValue('Profit'), escapeCsvValue(formatExportAmount(totals.profit))],
       [escapeCsvValue('Transactions'), escapeCsvValue(totals.transactions)],
-      [escapeCsvValue('Average Sale'), escapeCsvValue(formatPeso(totals.averageSale))],
-      [escapeCsvValue('Cash Sales'), escapeCsvValue(formatPeso(paymentSummary.cash))],
-      [escapeCsvValue('GCash Sales'), escapeCsvValue(formatPeso(paymentSummary.gcash))],
+      [escapeCsvValue('Average Sale'), escapeCsvValue(formatExportAmount(totals.averageSale))],
+      [escapeCsvValue('Cash Sales'), escapeCsvValue(formatExportAmount(paymentSummary.cash))],
+      [escapeCsvValue('GCash Sales'), escapeCsvValue(formatExportAmount(paymentSummary.gcash))],
       [],
       [
         'Receipt No.',
@@ -545,9 +534,9 @@ export default function AdminSalesScreen() {
           row.paymentMethod,
           row.productName,
           row.quantity,
-          formatPeso(row.unitPrice),
-          formatPeso(row.lineTotal),
-          formatPeso(row.totalSaleAmount),
+          formatExportAmount(row.unitPrice),
+          formatExportAmount(row.lineTotal),
+          formatExportAmount(row.totalSaleAmount),
         ].map(escapeCsvValue)
       ),
     ];
@@ -586,7 +575,7 @@ export default function AdminSalesScreen() {
                 <tr>
                   <td>${escapeHtml(product.name)}</td>
                   <td>${escapeHtml(product.soldText)}</td>
-                  <td>${escapeHtml(product.total)}</td>
+                  <td>${escapeHtml(formatExportAmount(product.total))}</td>
                 </tr>
               `
             )
@@ -609,8 +598,8 @@ export default function AdminSalesScreen() {
                   <td>${escapeHtml(row.paymentMethod)}</td>
                   <td>${escapeHtml(row.productName)}</td>
                   <td>${escapeHtml(row.quantity)}</td>
-                  <td>${escapeHtml(formatPeso(row.unitPrice))}</td>
-                  <td>${escapeHtml(formatPeso(row.lineTotal))}</td>
+                  <td>${escapeHtml(formatExportAmount(row.unitPrice))}</td>
+                  <td>${escapeHtml(formatExportAmount(row.lineTotal))}</td>
                 </tr>
               `
             )
@@ -737,11 +726,11 @@ export default function AdminSalesScreen() {
           <div class="summary-grid">
             <div class="summary-card">
               <p class="summary-label">Total Sales</p>
-              <p class="summary-value">${escapeHtml(formatPeso(totals.totalSales))}</p>
+              <p class="summary-value">${escapeHtml(formatExportAmount(totals.totalSales))}</p>
             </div>
             <div class="summary-card">
               <p class="summary-label">Profit</p>
-              <p class="summary-value">${escapeHtml(formatPeso(totals.profit))}</p>
+              <p class="summary-value">${escapeHtml(formatExportAmount(totals.profit))}</p>
             </div>
             <div class="summary-card">
               <p class="summary-label">Transactions</p>
@@ -749,7 +738,7 @@ export default function AdminSalesScreen() {
             </div>
             <div class="summary-card">
               <p class="summary-label">Average Sale</p>
-              <p class="summary-value">${escapeHtml(formatPeso(totals.averageSale))}</p>
+              <p class="summary-value">${escapeHtml(formatExportAmount(totals.averageSale))}</p>
             </div>
           </div>
 
@@ -764,11 +753,11 @@ export default function AdminSalesScreen() {
             <tbody>
               <tr>
                 <td>Cash</td>
-                <td>${escapeHtml(formatPeso(paymentSummary.cash))}</td>
+                <td>${escapeHtml(formatExportAmount(paymentSummary.cash))}</td>
               </tr>
               <tr>
                 <td>GCash</td>
-                <td>${escapeHtml(formatPeso(paymentSummary.gcash))}</td>
+                <td>${escapeHtml(formatExportAmount(paymentSummary.gcash))}</td>
               </tr>
             </tbody>
           </table>
@@ -1066,12 +1055,12 @@ export default function AdminSalesScreen() {
           <View style={[styles.table, { minWidth: '100%' }]}>
             {/* Table Header */}
             <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 100 }]}>RECEIPT NO</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>DATE SOLD</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CASHIER</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>CUSTOMER</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1, minWidth: 80 }]}>PAYMENT</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 90, textAlign: 'right' }]}>TOTAL</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 82 }]}>RECEIPT NO</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 112 }]}>DATE SOLD</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 86 }]}>CASHIER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 86 }]}>CUSTOMER</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1, minWidth: 64 }]}>PAYMENT</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 76, textAlign: 'right' }]}>TOTAL</Text>
             </View>
 
             {/* Table Rows */}
@@ -1079,23 +1068,23 @@ export default function AdminSalesScreen() {
               {paginatedHistoryTransactions.length > 0 ? (
                 paginatedHistoryTransactions.map((sale) => (
                   <View key={sale.id} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, { flex: 1.2, minWidth: 100, fontFamily: fonts.semiBold, color: '#101828' }]}>
+                    <Text style={[styles.tableCell, { flex: 1.2, minWidth: 82, fontFamily: fonts.semiBold, color: colors.textStrong }]}>
                       {sale.receiptNumber}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.6, minWidth: 140 }]}>
+                    <Text style={[styles.tableCell, { flex: 1.6, minWidth: 112 }]}>
                       {formatDateTime(sale.createdAt)}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110 }]}>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 86 }]}>
                       {sale.user?.name || 'Cashier'}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 110, color: sale.customer ? '#475467' : '#98A2B3' }]}>
+                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 86, color: sale.customer ? colors.textSecondary : colors.textSubtle }]}>
                       {sale.customer?.name || 'Walk-in'}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1, minWidth: 80, color: sale.status === 'voided' ? colors.danger : undefined }]}>
+                    <Text style={[styles.tableCell, { flex: 1, minWidth: 64, color: sale.status === 'voided' ? colors.danger : undefined }]}>
                       {sale.paymentMethod}
                       {sale.status === 'voided' ? '\n(Voided)' : ''}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 90, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : '#101828', textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
+                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 76, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : colors.textStrong, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                       {formatPeso(normalizeNumber(sale.totalAmount))}
                     </Text>
                   </View>
@@ -1512,24 +1501,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderPanel,
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     gap: spacing.md,
   },
   tableHeaderCell: {
     color: colors.textSecondary,
     fontFamily: fonts.bold,
-    fontSize: textSizes.smallCaps,
-    letterSpacing: 1.2,
+    fontSize: textSizes.xsmall,
+    letterSpacing: 0.7,
   },
   tableRows: {
     backgroundColor: '#FFFFFF',
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.sm + 1,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderPanel,
     alignItems: 'center',
@@ -1539,7 +1528,7 @@ const styles = StyleSheet.create({
   tableCell: {
     color: '#475467',
     fontFamily: fonts.regular,
-    fontSize: 14,
+    fontSize: textSizes.small,
   },
   emptyTableRow: {
     padding: 32,

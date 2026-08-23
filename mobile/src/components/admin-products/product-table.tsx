@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Package, Pencil, Trash2 } from 'lucide-react-native';
 import { IconButton } from 'react-native-paper';
@@ -31,7 +31,9 @@ export function ProductTable({
   isLoading: boolean;
 }) {
   const { compactPhone, isTablet, isWideTablet } = useResponsiveLayout();
-  const numColumns = compactPhone ? 1 : isWideTablet ? 3 : isTablet ? 2 : 1;
+  const { width } = useWindowDimensions();
+  const isNarrowPhone = width < 430;
+  const numColumns = isNarrowPhone ? 1 : isWideTablet ? 3 : 2;
 
   if (isLoading) {
     return (
@@ -60,10 +62,10 @@ export function ProductTable({
           return (
             <View
               key={product.id}
-              style={[styles.itemWrap, { flexBasis: `${100 / numColumns}%` }]}
+              style={[styles.itemWrap, compactPhone && styles.itemWrapCompact, { flexBasis: `${100 / numColumns}%` }]}
             >
-              <View style={styles.card}>
-                <View style={styles.imageWrap}>
+              <View style={[styles.card, compactPhone && styles.cardCompact]}>
+                <View style={[styles.imageWrap, compactPhone && styles.imageWrapCompact]}>
                   {resolvedImage ? (
                     <Image
                       contentFit="cover"
@@ -94,33 +96,34 @@ export function ProductTable({
                   ) : null}
                 </View>
 
-                <View style={styles.body}>
-                  <Text numberOfLines={2} style={styles.nameText}>
+                <View style={[styles.body, compactPhone && styles.bodyCompact]}>
+                  <Text numberOfLines={2} style={[styles.nameText, compactPhone && styles.nameTextCompact]}>
                     {product.name}
                   </Text>
-                  <Text numberOfLines={1} style={styles.skuText}>
+                  <Text numberOfLines={1} style={[styles.skuText, compactPhone && styles.skuTextCompact]}>
                     {product.barcode || 'No barcode'}
                   </Text>
 
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Category</Text>
-                    <Text numberOfLines={1} style={styles.metaValue}>
+                  <View style={[styles.metaRow, compactPhone && styles.metaRowCompact]}>
+                    <Text style={[styles.metaLabel, compactPhone && styles.metaLabelCompact]}>Category</Text>
+                    <Text numberOfLines={1} style={[styles.metaValue, compactPhone && styles.metaValueCompact]}>
                       {product.category?.name || '—'}
                     </Text>
                   </View>
 
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Price</Text>
-                    <Text style={[styles.metaValue, styles.priceText]}>
+                  <View style={[styles.metaRow, compactPhone && styles.metaRowCompact]}>
+                    <Text style={[styles.metaLabel, compactPhone && styles.metaLabelCompact]}>Price</Text>
+                    <Text style={[styles.metaValue, styles.priceText, compactPhone && styles.metaValueCompact]}>
                       {formatPeso(normalizeNumber(product.price))}
                     </Text>
                   </View>
 
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Stock</Text>
+                  <View style={[styles.metaRow, compactPhone && styles.metaRowCompact]}>
+                    <Text style={[styles.metaLabel, compactPhone && styles.metaLabelCompact]}>Stock</Text>
                     <Text
                       style={[
                         styles.metaValue,
+                        compactPhone && styles.metaValueCompact,
                         product.stock === 0 && styles.dangerText,
                         isLowStock && product.stock > 0 && styles.warningText,
                       ]}
@@ -130,9 +133,9 @@ export function ProductTable({
                   </View>
 
                   {product.weight !== null && product.weight !== undefined ? (
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Weight</Text>
-                      <Text style={styles.metaValue}>
+                    <View style={[styles.metaRow, compactPhone && styles.metaRowCompact]}>
+                      <Text style={[styles.metaLabel, compactPhone && styles.metaLabelCompact]}>Weight</Text>
+                      <Text style={[styles.metaValue, compactPhone && styles.metaValueCompact]}>
                         {product.weight}
                         {product.unit !== 'pcs' ? product.unit : ''}
                       </Text>
@@ -140,7 +143,7 @@ export function ProductTable({
                   ) : null}
                 </View>
 
-                <View style={styles.actionsRow}>
+                <View style={[styles.actionsRow, compactPhone && styles.actionsRowCompact]}>
                   <IconButton
                     icon={() => <Pencil color={colors.secondary} size={18} strokeWidth={2.5} />}
                     onPress={() => onEdit(product)}
@@ -200,6 +203,9 @@ const styles = StyleSheet.create({
   itemWrap: {
     padding: spacing.sm,
   },
+  itemWrapCompact: {
+    padding: spacing.xs,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#EAECF0',
@@ -207,10 +213,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+  cardCompact: {
+    borderRadius: radius.lg,
+  },
   imageWrap: {
     backgroundColor: colors.surfaceSoft,
     height: 160,
     position: 'relative',
+  },
+  imageWrapCompact: {
+    height: 104,
   },
   image: {
     height: '100%',
@@ -256,11 +268,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
+  bodyCompact: {
+    paddingHorizontal: spacing.sm + 1,
+    paddingTop: spacing.sm + 1,
+  },
   nameText: {
     color: colors.textStrong,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.body,
     lineHeight: 19,
+  },
+  nameTextCompact: {
+    fontSize: textSizes.small + 1,
+    lineHeight: 17,
   },
   skuText: {
     color: colors.textTertiary,
@@ -268,11 +288,18 @@ const styles = StyleSheet.create({
     fontSize: textSizes.small,
     marginTop: 4,
   },
+  skuTextCompact: {
+    fontSize: textSizes.xsmall,
+    marginTop: 2,
+  },
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
+  },
+  metaRowCompact: {
+    marginTop: spacing.xs,
   },
   metaLabel: {
     color: colors.textSecondary,
@@ -280,10 +307,17 @@ const styles = StyleSheet.create({
     fontSize: textSizes.smallCaps,
     letterSpacing: 1,
   },
+  metaLabelCompact: {
+    fontSize: textSizes.xsmall,
+    letterSpacing: 0.5,
+  },
   metaValue: {
     color: colors.textStrong,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.body,
+  },
+  metaValueCompact: {
+    fontSize: textSizes.small,
   },
   priceText: {
     color: colors.secondary,
@@ -301,6 +335,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingBottom: spacing.sm,
     paddingTop: spacing.sm,
+  },
+  actionsRowCompact: {
+    paddingBottom: spacing.xs,
+    paddingTop: spacing.xs,
   },
   actionButton: {
     backgroundColor: colors.surfaceSoft,

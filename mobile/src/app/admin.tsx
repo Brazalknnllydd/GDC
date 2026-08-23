@@ -163,7 +163,7 @@ export default function AdminScreen() {
   const summaryCards = useMemo(
     () => [
       {
-        detail: `${todaySales.length} transactions today`,
+        detail: '',
         detailColor: colors.textHeading,
         title: "TODAY'S SALES",
         value: formatPeso(todaySalesTotal),

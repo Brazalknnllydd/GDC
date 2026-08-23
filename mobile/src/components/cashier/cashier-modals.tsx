@@ -157,7 +157,11 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
       title="Payment Success"
       visible={showSuccessModal}
     >
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalContent}>
+      <ScrollView
+        contentContainerStyle={[styles.modalContent, styles.successModalScrollContent]}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+        style={styles.successModalScroll}>
         <View style={{ alignItems: 'center', marginBottom: 20 }}>
           <CheckCircle2 color={colors.success} size={64} strokeWidth={2.2} />
           <Text style={{ fontFamily: fonts.bold, fontSize: 24, marginTop: 10 }}>Payment Success</Text>
@@ -375,6 +379,13 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     flex: 1,
+  },
+  successModalScroll: {
+    flex: 1,
+  },
+  successModalScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.lg,
   },
   emptyText: {
     fontFamily: fonts.regular,

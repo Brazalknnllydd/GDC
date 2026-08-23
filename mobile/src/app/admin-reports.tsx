@@ -4,7 +4,6 @@ import { CalendarDays, CreditCard, Download } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 import {
   MonthRangePicker,
@@ -26,7 +25,8 @@ import { colors, textRoles, textSizes } from '../constants/theme';
 import { useReportsAnalytics } from '../hooks/use-reports-analytics';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
-import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
+import { shareExportFile } from '../lib/export-file';
 import type { SaleRecord } from '../lib/sales-types';
 import { downloadWebPdfReport } from '../lib/web-pdf-export';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
@@ -209,19 +209,8 @@ export default function AdminReportsScreen() {
     window.URL.revokeObjectURL(url);
   }
 
-  async function shareFile(uri: string) {
-    const available = await Sharing.isAvailableAsync();
-
-    if (!available) {
-      Alert.alert('Sharing unavailable', 'File sharing is not available on this device.');
-      return;
-    }
-
-    await Sharing.shareAsync(uri, {
-      UTI: 'com.adobe.pdf',
-      dialogTitle: 'Share PDF Report',
-      mimeType: 'application/pdf',
-    });
+  async function shareFile(uri: string, mimeType: string, dialogTitle: string, uti?: string) {
+    await shareExportFile(uri, { dialogTitle, mimeType, uti });
   }
 
   async function exportExcelReport() {
@@ -232,14 +221,14 @@ export default function AdminReportsScreen() {
       [escapeCsvValue(`Generated: ${formatDateTime(new Date().toISOString())}`)],
       [],
       [escapeCsvValue('Summary')],
-      [escapeCsvValue('Discounts Given'), escapeCsvValue(formatPeso(totals.discounts))],
+      [escapeCsvValue('Discounts Given'), escapeCsvValue(formatExportAmount(totals.discounts))],
       [escapeCsvValue('Items Sold'), escapeCsvValue(totals.itemsSold)],
       [escapeCsvValue('Average Basket'), escapeCsvValue(totals.averageBasket.toFixed(1))],
       [escapeCsvValue('Active Categories'), escapeCsvValue(totals.activeCategories)],
       [],
       [escapeCsvValue('Payment Method'), escapeCsvValue('Total'), escapeCsvValue('Share')],
       ...paymentDistribution.map((payment) =>
-        [payment.label, payment.amount, payment.percentageText].map(escapeCsvValue)
+        [payment.label, formatExportAmount(payment.amount), payment.percentageText].map(escapeCsvValue)
       ),
       [],
       [escapeCsvValue('Category'), escapeCsvValue('Catalog Coverage')],
@@ -260,17 +249,12 @@ export default function AdminReportsScreen() {
       encoding: FileSystem.EncodingType.UTF8,
     });
 
-    const available = await Sharing.isAvailableAsync();
-    if (!available) {
-      Alert.alert('Sharing unavailable', 'File sharing is not available on this device.');
-      return;
-    }
-
-    await Sharing.shareAsync(fileUri, {
-      UTI: 'public.comma-separated-values-text',
-      dialogTitle: 'Share Excel Report',
-      mimeType: 'text/csv',
-    });
+    await shareFile(
+      fileUri,
+      'text/csv',
+      'Share Excel Report',
+      'public.comma-separated-values-text'
+    );
   }
 
   async function handleExportReport() {
@@ -322,7 +306,7 @@ export default function AdminReportsScreen() {
                 (payment) => `
                   <tr>
                     <td>${escapeHtml(payment.label)}</td>
-                    <td>${escapeHtml(payment.amount)}</td>
+                    <td>${escapeHtml(formatExportAmount(payment.amount))}</td>
                     <td>${escapeHtml(payment.percentageText)}</td>
                   </tr>
                 `
@@ -464,7 +448,7 @@ export default function AdminReportsScreen() {
             <div class="summary-grid">
               <div class="summary-card">
                 <p class="summary-label">Discounts Given</p>
-                <p class="summary-value">${escapeHtml(formatPeso(totals.discounts))}</p>
+                <p class="summary-value">${escapeHtml(formatExportAmount(totals.discounts))}</p>
               </div>
               <div class="summary-card">
                 <p class="summary-label">Items Sold</p>
@@ -535,7 +519,7 @@ export default function AdminReportsScreen() {
             { label: 'Generated', value: generatedAt },
           ],
           summary: [
-            { label: 'Discounts Given', value: formatPeso(totals.discounts) },
+            { label: 'Discounts Given', value: formatExportAmount(totals.discounts) },
             { label: 'Items Sold', value: String(totals.itemsSold) },
             { label: 'Average Basket', value: totals.averageBasket.toFixed(1) },
             { label: 'Active Categories', value: String(totals.activeCategories) },
@@ -545,7 +529,7 @@ export default function AdminReportsScreen() {
               headers: ['Payment Method', 'Total', 'Share'],
               rows: paymentDistribution.map((payment) => [
                 payment.label,
-                payment.amount,
+                formatExportAmount(payment.amount),
                 payment.percentageText,
               ]),
               title: 'Payment Distribution',
@@ -566,7 +550,7 @@ export default function AdminReportsScreen() {
       }
 
       const { uri } = await Print.printToFileAsync({ html });
-      await shareFile(uri);
+      await shareFile(uri, 'application/pdf', 'Share PDF Report', 'com.adobe.pdf');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Could not export the report right now.';

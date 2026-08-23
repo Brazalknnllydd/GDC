@@ -84,7 +84,7 @@ export function CashierHistorySection({
       <SurfaceCard style={styles.recentSalesCard}>
         {/* Table Header */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ minWidth: 900, flex: 1 }}>
+          <View style={{ minWidth: 760, flex: 1 }}>
             <View style={styles.tableHeader}>
               <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
               <Text style={[styles.headerCell, { flex: 1.5 }]}>DATE/TIME</Text>
@@ -193,20 +193,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderPanel,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   headerCell: {
     fontFamily: fonts.bold,
-    fontSize: textSizes.smallCaps,
+    fontSize: textSizes.xsmall,
     color: colors.textSecondary,
-    letterSpacing: 1.2,
+    letterSpacing: 0.7,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 1,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },

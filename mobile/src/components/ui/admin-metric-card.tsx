@@ -83,6 +83,7 @@ export function AdminMetricCard({
       : titleLetterSpacing;
   const resolvedTitleFontSize = isNarrowPhone ? 12 : isCompactPhone ? 13 : textSizes.body;
   const resolvedTitleLineHeight = isNarrowPhone ? 16 : isCompactPhone ? 17 : 20;
+  const resolvedTitleHeight = resolvedTitleLineHeight * 2;
   const resolvedValueFontSize = isNarrowPhone
       ? Math.min(valueFontSize, 18)
     : isCompactPhone
@@ -115,7 +116,7 @@ export function AdminMetricCard({
         },
         style,
       ]}>
-      <View style={[styles.headerRow, { marginBottom: resolvedTitleMarginBottom }]}>
+      <View style={[styles.headerRow, { height: resolvedTitleHeight, marginBottom: resolvedTitleMarginBottom }]}>
         <Text
           style={[
             styles.title,

@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   printerIconContainer: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 24,
     height: 48,
     justifyContent: 'center',

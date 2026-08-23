@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { ComponentType } from 'react';
 
 import { radius, spacing } from '../../constants/design-system';
-import { colors, textRoles } from '../../constants/theme';
+import { colors, textRoles, textSizes } from '../../constants/theme';
 import { SurfaceCard } from '../ui/surface-card';
 
 type IconProps = {
@@ -34,8 +34,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    minHeight: 114,
-    paddingHorizontal: spacing.md,
+    minHeight: 118,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
   iconWrap: {
@@ -52,13 +52,13 @@ const styles = StyleSheet.create({
   label: {
     color: colors.textTertiary,
     ...textRoles.label,
-    fontSize: 11,
+    fontSize: textSizes.small,
     marginBottom: spacing.sm,
   },
   value: {
-    color: colors.textStrong,
+    color: colors.neutral,
     ...textRoles.value,
-    fontSize: 15,
+    fontSize: textSizes.medium,
     lineHeight: 20,
   },
 });
