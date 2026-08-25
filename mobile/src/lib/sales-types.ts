@@ -4,10 +4,12 @@ export type CustomerRef = {
 
 export type SaleItem = {
   id?: number;
+  productId?: number;
   price?: number | string;
   quantity: number;
   subtotal: number | string;
   product?: {
+    id?: number;
     costPrice?: number | string;
     name: string;
   };

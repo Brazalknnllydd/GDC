@@ -209,8 +209,14 @@ export default function AdminReportsScreen() {
     window.URL.revokeObjectURL(url);
   }
 
-  async function shareFile(uri: string, mimeType: string, dialogTitle: string, uti?: string) {
-    await shareExportFile(uri, { dialogTitle, mimeType, uti });
+  async function shareFile(
+    uri: string,
+    fileName: string,
+    mimeType: string,
+    dialogTitle: string,
+    uti?: string
+  ) {
+    await shareExportFile(uri, { dialogTitle, fileName, mimeType, uti });
   }
 
   async function exportExcelReport() {
@@ -251,6 +257,7 @@ export default function AdminReportsScreen() {
 
     await shareFile(
       fileUri,
+      fileName,
       'text/csv',
       'Share Excel Report',
       'public.comma-separated-values-text'
@@ -550,7 +557,7 @@ export default function AdminReportsScreen() {
       }
 
       const { uri } = await Print.printToFileAsync({ html });
-      await shareFile(uri, 'application/pdf', 'Share PDF Report', 'com.adobe.pdf');
+      await shareFile(uri, fileName, 'application/pdf', 'Share PDF Report', 'com.adobe.pdf');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Could not export the report right now.';
@@ -715,14 +722,18 @@ export default function AdminReportsScreen() {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Catalog Category Coverage</Text>
+      <Text style={styles.sectionTitle}>
+        {categoryPerformance.length > 0 && !categoryPerformance[0].isFallback
+          ? 'Sales by Category'
+          : 'Catalog Category Coverage'}
+      </Text>
       <SurfaceCard style={styles.performanceCard}>
         {categoryPerformance.length > 0 ? (
           categoryPerformance.map((category) => (
             <CategoryPerformanceRow key={category.label} {...category} />
           ))
         ) : (
-          <Text style={styles.emptyStateText}>Category coverage will appear after products are added.</Text>
+          <Text style={styles.emptyStateText}>No sales data for the selected period.</Text>
         )}
       </SurfaceCard>
 

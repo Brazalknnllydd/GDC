@@ -35,16 +35,9 @@ export function AdminBarChart({
         const isSelected = selectedIndex === index;
 
         return {
-          frontColor: colors.secondary,
+          frontColor: isSelected ? colors.secondary : colors.secondary,
           label,
           onPress: () => setSelectedIndex(index),
-          topLabelComponent: isSelected
-            ? () => (
-                <View style={styles.valuePill}>
-                  <Text style={styles.valuePillText}>{formatPeso(value)}</Text>
-                </View>
-              )
-            : undefined,
           value,
         };
       }),
@@ -92,13 +85,6 @@ export function AdminBarChart({
               barWidth={barWidth}
               data={data}
               disableScroll
-              focusBarOnPress
-              focusedBarConfig={{
-                borderRadius: 12,
-                color: colors.secondary,
-                opacity: 0.92,
-                roundedTop: true,
-              }}
               frontColor={colors.secondary}
               height={compactPhone ? Math.max(height - 28, 196) : height}
               width={chartContentWidth}
@@ -127,17 +113,19 @@ export function AdminBarChart({
             <View style={styles.valueBanner}>
               {selectedIndex !== null ? (
                 <>
-                  <View>
-                    <Text style={styles.valueBannerLabel}>Selected bar</Text>
+                  <View style={styles.valueBannerLeft}>
+                    <Text style={styles.valueBannerLabel}>SELECTED</Text>
                     <Text style={styles.valueBannerTitle}>{labels[selectedIndex]}</Text>
                   </View>
-                  <Text style={styles.valueBannerAmount}>
-                    {formatPeso(values[selectedIndex] ?? 0)}
-                  </Text>
+                  <View style={styles.valueBannerRight}>
+                    <Text style={styles.valueBannerAmount}>
+                      {formatPeso(values[selectedIndex] ?? 0)}
+                    </Text>
+                  </View>
                 </>
               ) : (
                 <Text style={styles.valueBannerHint}>
-                  Tap any bar to reveal the exact amount.
+                  Tap a bar to see the exact amount.
                 </Text>
               )}
             </View>
@@ -206,49 +194,45 @@ const styles = StyleSheet.create({
   },
   valueBanner: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceInfo,
-    borderColor: colors.borderInfoStrong,
+    backgroundColor: colors.card,
+    borderColor: colors.borderPanel,
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: spacing.md,
-    minHeight: 58,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    minHeight: 62,
+    overflow: 'hidden',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  valueBannerLeft: {
+    gap: 2,
+  },
+  valueBannerRight: {
+    alignItems: 'flex-end',
   },
   valueBannerLabel: {
-    color: colors.textSecondary,
-    fontFamily: fonts.medium,
+    color: colors.textTertiary,
+    fontFamily: fonts.semiBold,
     fontSize: textSizes.smallCaps,
-    letterSpacing: 1.1,
-    marginBottom: 2,
+    letterSpacing: 1.2,
   },
   valueBannerTitle: {
     color: colors.textStrong,
-    fontFamily: fonts.semiBold,
-    fontSize: textSizes.body,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.bodyLarge,
   },
   valueBannerAmount: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: textSizes.large,
+    fontSize: textSizes.xlarge,
   },
   valueBannerHint: {
     color: colors.textSecondary,
     fontFamily: fonts.regular,
     fontSize: textSizes.body,
-  },
-  valuePill: {
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    borderRadius: radius.round,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-  },
-  valuePillText: {
-    color: colors.textInverse,
-    fontFamily: fonts.semiBold,
-    fontSize: textSizes.small,
+    flex: 1,
+    textAlign: 'center',
   },
 });

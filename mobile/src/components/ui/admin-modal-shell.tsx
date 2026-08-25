@@ -52,7 +52,7 @@ export function AdminModalShell({
   visible,
 }: AdminModalShellProps) {
   const { height: viewportHeight, width } = useWindowDimensions();
-  const modalWidth = Math.min(width - 24, width >= 900 ? 720 : width >= 640 ? 640 : width);
+  const modalWidth = Math.min(width - 48, width >= 900 ? 720 : width >= 640 ? 600 : 480);
   const resolvedHeight = resolveViewportLength(height, viewportHeight);
   const resolvedMaxHeight = resolveViewportLength(maxHeight, viewportHeight);
 
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlayScrim,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 24,
   },
   backdropPressable: {
     position: 'absolute',

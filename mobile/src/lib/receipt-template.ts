@@ -152,6 +152,7 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
         <div class="header">
           <h1 class="title">GDC POS RECEIPT</h1>
           <p class="subtitle">GDC Store</p>
+          <p class="subtitle">New Sangi Rd, Lapu-Lapu</p>
           <p class="subtitle">Date: ${formatReceiptDateTime(sale.createdAt)}</p>
           <p class="subtitle">Receipt No: ${escapeHtml(sale.receiptNumber)}</p>
           <p class="subtitle">Cashier: ${escapeHtml(sale.cashierName)}</p>
@@ -201,7 +202,7 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
 
         <div class="footer">
           <p style="margin: 0 0 6px;">Thank you for shopping with us!</p>
-          <p style="margin: 0;">Please visit again.</p>
+          <p style="margin: 0;">For feedback, contact 09399302457 or GDC store on FB</p>
         </div>
       </body>
     </html>

@@ -122,7 +122,7 @@ export function ProductEditForm({
     const parsedWeight = parseWeight(weightVolume);
     if (parsedWeight) {
       if (parsedWeight !== null) formData.append('weight', String(parsedWeight));
-      formData.append('unit', 'kg'); // just a hack since unit logic was simplified
+      formData.append('unit', 'pcs'); // just a hack since unit logic was simplified
     }
 
     if (productImageUri === null) {

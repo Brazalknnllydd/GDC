@@ -220,19 +220,52 @@ export function useReportsAnalytics({
   );
 
   const categoryPerformance = useMemo(() => {
-    const counts = new Map<string, number>();
-    products.forEach((product) => {
-      counts.set(product.category.name, (counts.get(product.category.name) || 0) + 1);
-    });
-    const total = Math.max(products.length, 1);
+    // Build a map from productId → category name for quick lookup
+    const idToCategory = new Map<number, string>(
+      (products as Array<{ id?: number; category: { name: string } }>)
+        .filter((p) => p.id !== undefined)
+        .map((p) => [p.id as number, p.category.name])
+    );
 
-    return [...counts.entries()]
-      .map(([label, count]) => ({
+    const soldCounts = new Map<string, number>();
+
+    filteredSales.forEach((sale) => {
+      sale.items.forEach((item) => {
+        // Try productId field first, then product.id
+        const pid = item.productId ?? item.product?.id;
+        const categoryName = pid !== undefined ? idToCategory.get(pid) : undefined;
+        if (!categoryName) return;
+        soldCounts.set(categoryName, (soldCounts.get(categoryName) ?? 0) + item.quantity);
+      });
+    });
+
+    // If no sales data, fall back to product-count distribution (catalog coverage)
+    if (soldCounts.size === 0) {
+      const counts = new Map<string, number>();
+      products.forEach((product) => {
+        counts.set(product.category.name, (counts.get(product.category.name) ?? 0) + 1);
+      });
+      const total = Math.max(products.length, 1);
+      return [...counts.entries()]
+        .map(([label, count]) => ({
+          label,
+          percentage: Math.round((count / total) * 100),
+          soldCount: 0,
+          isFallback: true,
+        }))
+        .sort((a, b) => b.percentage - a.percentage);
+    }
+
+    const totalSold = Math.max([...soldCounts.values()].reduce((s, n) => s + n, 0), 1);
+    return [...soldCounts.entries()]
+      .map(([label, soldCount]) => ({
         label,
-        percentage: Math.round((count / total) * 100),
+        percentage: Math.round((soldCount / totalSold) * 100),
+        soldCount,
+        isFallback: false,
       }))
-      .sort((left, right) => right.percentage - left.percentage);
-  }, [products]);
+      .sort((a, b) => b.soldCount - a.soldCount);
+  }, [filteredSales, products]);
 
   const paymentDistribution = useMemo(() => {
     const totalRevenue = Math.max(

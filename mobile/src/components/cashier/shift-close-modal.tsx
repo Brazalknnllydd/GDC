@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   expectedCashValue: {
     color: colors.secondary,
     fontFamily: fonts.bold,
-    fontSize: 24,
+    fontSize: 20,
     marginTop: spacing.xs,
   },
   errorText: {

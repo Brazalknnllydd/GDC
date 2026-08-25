@@ -9,10 +9,11 @@ import { colors, fonts, textSizes } from '../constants/theme';
 import { spacing, radius } from '../constants/design-system';
 import { apiClient } from '../lib/api';
 import { clearAuthSession } from '../lib/auth-session';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 
 export default function CashierShiftScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, isTablet } = useResponsiveLayout();
   const [openingCash, setOpeningCash] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -66,8 +67,6 @@ export default function CashierShiftScreen() {
       </View>
     );
   }
-
-  const isTablet = width > 600;
 
   return (
     <SafeAreaView style={styles.container}>

@@ -493,8 +493,14 @@ export default function AdminSalesScreen() {
     }, 400);
   }
 
-  async function shareFile(uri: string, mimeType: string, dialogTitle: string, uti?: string) {
-    await shareExportFile(uri, { dialogTitle, mimeType, uti });
+  async function shareFile(
+    uri: string,
+    fileName: string,
+    mimeType: string,
+    dialogTitle: string,
+    uti?: string
+  ) {
+    await shareExportFile(uri, { dialogTitle, fileName, mimeType, uti });
   }
 
   async function exportExcelReport() {
@@ -557,6 +563,7 @@ export default function AdminSalesScreen() {
 
     await shareFile(
       fileUri,
+      fileName,
       'text/csv',
       'Share Excel Report',
       'public.comma-separated-values-text'
@@ -807,7 +814,7 @@ export default function AdminSalesScreen() {
     }
 
     const { uri } = await Print.printToFileAsync({ html });
-    await shareFile(uri, 'application/pdf', 'Share PDF Report', 'com.adobe.pdf');
+    await shareFile(uri, fileName, 'application/pdf', 'Share PDF Report', 'com.adobe.pdf');
   }
 
   async function handleExportReport() {

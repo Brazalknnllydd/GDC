@@ -15,6 +15,7 @@ import type { BottomNavItem } from '../../lib/app-routes';
 import { AdminBottomNav } from './admin-bottom-nav';
 import { AdminPageHeader } from './admin-page-header';
 import { AdminPageIntro } from './admin-page-intro';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type AdminPageScreenProps = {
   title: string;
@@ -37,8 +38,8 @@ export function AdminPageScreen({
   contentContainerStyle,
   pageStyle,
 }: AdminPageScreenProps) {
+  const { isTablet } = useResponsiveLayout();
   const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
   const isCompactPhone = width < 430;
 
   return (

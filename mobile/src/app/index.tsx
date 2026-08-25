@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -21,8 +21,6 @@ import { colors, fonts, textSizes } from '../constants/theme';
 import { API_BASE_URL } from '../lib/api';
 import {
   clearAuthSession,
-  getAuthUser,
-  restoreAuthSession,
   saveAuthSession,
 } from '../lib/auth-session';
 
@@ -39,47 +37,9 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState('');
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function resumeSession() {
-      try {
-        await restoreAuthSession();
-        const sessionUser = getAuthUser();
-
-        if (!mounted || !sessionUser) {
-          return;
-        }
-
-        setAuthenticatedUser(sessionUser);
-
-        if (sessionUser.role.toLowerCase() === 'admin' || sessionUser.role.toLowerCase() === 'owner') {
-          router.replace('/admin');
-          return;
-        }
-
-        router.replace({
-          pathname: '/cashier',
-          params: { name: sessionUser.name },
-        });
-      } finally {
-        if (mounted) {
-          setIsRestoringSession(false);
-        }
-      }
-    }
-
-    resumeSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
@@ -219,14 +179,14 @@ export default function LoginScreen() {
               )}
 
               <Pressable
-                disabled={isSubmitting || isRestoringSession}
+                disabled={isSubmitting}
                 onPress={handleLogin}
                 style={({ pressed }) => [
                   styles.authorizeButton,
-                  (isSubmitting || isRestoringSession) && styles.authorizeButtonDisabled,
-                  pressed && !isSubmitting && !isRestoringSession && styles.authorizeButtonPressed,
+                  isSubmitting && styles.authorizeButtonDisabled,
+                  pressed && !isSubmitting && styles.authorizeButtonPressed,
                 ]}>
-                {isSubmitting || isRestoringSession ? (
+                {isSubmitting ? (
                   <ActivityIndicator color={colors.textInverse} />
                 ) : (
                   <>

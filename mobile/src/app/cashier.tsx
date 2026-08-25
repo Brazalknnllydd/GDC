@@ -41,6 +41,7 @@ import { CashierProductCard } from '../components/cashier/cashier-product-card';
 import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
 import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
 import { CashierCustomerModal } from '../components/cashier/cashier-customer-modal';
+import { CashierRegisterSkeleton } from '../components/cashier/cashier-register-skeleton';
 import { type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
 import { AppSegmentedControl } from '../components/ui/app-segmented-control';
@@ -142,7 +143,17 @@ export default function CashierScreen() {
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [scannerFeedback, setScannerFeedback] = useState('');
   const [scannerEnabled, setScannerEnabled] = useState(true);
-  const { categories, dashboard, products, loadWorkspace: reloadWorkspace, screenError } = useCashierStore();
+  const { categories, dashboard, products, loadWorkspace: reloadWorkspace, screenError, isWorkspaceLoading } = useCashierStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await reloadWorkspace();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     reloadWorkspace();
@@ -328,7 +339,7 @@ export default function CashierScreen() {
   }
 
   function renderRegisterSection() {
-    const registerNumColumns = isWideTablet ? 3 : 2;
+    const registerNumColumns = isTablet ? 3 : 2;
     return (
       <View style={[styles.registerLayout, showInlineCart && styles.registerLayoutWide]}>
         <View style={[styles.registerMain, showInlineCart && styles.registerMainWide, { flex: 1 }]}>
@@ -336,6 +347,8 @@ export default function CashierScreen() {
             data={filteredProducts}
             numColumns={registerNumColumns}
             contentContainerStyle={{ paddingBottom: spacing.lg }}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
             ListHeaderComponent={
               <>
                 <View style={[styles.registerHeaderRow, compactPhone && styles.registerHeaderRowCompact]}>
@@ -491,7 +504,11 @@ export default function CashierScreen() {
                 currentDate={currentDate}
               />
             </View>
-            {activeSection === 'register' ? renderRegisterSection() : (
+            {activeSection === 'register' ? (
+              isWorkspaceLoading && products.length === 0
+                ? <CashierRegisterSkeleton />
+                : renderRegisterSection()
+            ) : (
               <View style={{ flex: 1, paddingHorizontal: compactPhone ? spacing.md : isTablet ? spacing.xl : spacing.lg }}>
                 <CashierInventorySection
                   onAddProduct={addToCart}
