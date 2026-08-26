@@ -19,6 +19,7 @@ import { formatPeso } from '../lib/product-utils';
 import { ProductFormInput } from '../components/ui/product-form-input';
 import { usePagination } from '../hooks/use-pagination';
 import { PaginationControls } from '../components/ui/pagination-controls';
+import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 
 type Shift = {
   id: number;
@@ -41,6 +42,7 @@ type Shift = {
 
 export default function AdminShiftsScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsiveLayout();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -161,21 +163,21 @@ export default function AdminShiftsScreen() {
       </View>
 
       <SurfaceCard style={{ padding: 0, overflow: 'hidden', borderWidth: 0 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.tableContent}>
+        <ScrollView horizontal={!isTablet} showsHorizontalScrollIndicator={false}>
+          <View style={[styles.tableContent, isTablet && styles.tableContentTablet]}>
             {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <View style={styles.nameCol}>
-                <Text style={styles.headerCell}>CASHIER</Text>
+            <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
+              <View style={[styles.nameCol, isTablet && styles.nameColTablet]}>
+                <Text style={[styles.headerCell, isTablet && styles.headerCellTablet]}>CASHIER</Text>
               </View>
-              <View style={styles.colTime}>
-                <Text style={styles.headerCell}>START TIME</Text>
+              <View style={[styles.colTime, isTablet && styles.colTimeTablet]}>
+                <Text style={[styles.headerCell, isTablet && styles.headerCellTablet]}>START TIME</Text>
               </View>
-              <View style={styles.colStatus}>
-                <Text style={styles.headerCell}>STATUS</Text>
+              <View style={[styles.colStatus, isTablet && styles.colStatusTablet]}>
+                <Text style={[styles.headerCell, isTablet && styles.headerCellTablet]}>STATUS</Text>
               </View>
-              <View style={styles.colVariance}>
-                <Text style={[styles.headerCell, { textAlign: 'right' }]}>VARIANCE</Text>
+              <View style={[styles.colVariance, isTablet && styles.colVarianceTablet]}>
+                <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { textAlign: 'right' }]}>VARIANCE</Text>
               </View>
               <View style={styles.colActions} />
             </View>
@@ -194,18 +196,18 @@ export default function AdminShiftsScreen() {
           const isOpen = shift.status === 'OPEN';
 
               return (
-                <View key={shift.id} style={styles.row}>
+                <View key={shift.id} style={[styles.row, isTablet && styles.rowTablet]}>
               {/* Cashier */}
-              <View style={styles.nameCol}>
-                <View style={styles.avatar}>
-                  <UserCircle2 color={colors.textInverse} size={16} strokeWidth={2} />
+              <View style={[styles.nameCol, isTablet && styles.nameColTablet]}>
+                <View style={[styles.avatar, isTablet && styles.avatarTablet]}>
+                  <UserCircle2 color={colors.textInverse} size={isTablet ? 20 : 16} strokeWidth={2} />
                 </View>
-                <Text style={styles.nameText} numberOfLines={1}>{shift.user?.name || 'Unknown'}</Text>
+                <Text style={[styles.nameText, isTablet && styles.nameTextTablet]} numberOfLines={1}>{shift.user?.name || 'Unknown'}</Text>
               </View>
 
               {/* Start Time */}
-              <View style={styles.colTime}>
-                <Text style={styles.metaText} numberOfLines={2}>
+              <View style={[styles.colTime, isTablet && styles.colTimeTablet]}>
+                <Text style={[styles.metaText, isTablet && styles.metaTextTablet]} numberOfLines={2}>
                   {new Date(shift.startedAt).toLocaleString('en-PH', {
                     month: 'short',
                     day: 'numeric',
@@ -216,7 +218,7 @@ export default function AdminShiftsScreen() {
               </View>
 
               {/* Status badge */}
-              <View style={styles.colStatus}>
+              <View style={[styles.colStatus, isTablet && styles.colStatusTablet]}>
                 <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
                   <Text style={[styles.statusText, isOpen ? styles.statusTextOpen : styles.statusTextClosed]}>
                     {isOpen ? 'Open' : 'Closed'}
@@ -225,8 +227,8 @@ export default function AdminShiftsScreen() {
               </View>
 
               {/* Variance */}
-              <View style={styles.colVariance}>
-                <Text style={[styles.metaText, { color: varianceColor, fontFamily: fonts.semiBold, textAlign: 'right' }]}>
+              <View style={[styles.colVariance, isTablet && styles.colVarianceTablet]}>
+                <Text style={[styles.metaText, isTablet && styles.metaTextTablet, { color: varianceColor, fontFamily: fonts.semiBold, textAlign: 'right' }]}>
                   {varianceText}
                 </Text>
               </View>
@@ -326,14 +328,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  tableHeaderTablet: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
   tableContent: {
     minWidth: 650,
+  },
+  tableContentTablet: {
+    minWidth: 0,
+    width: '100%',
   },
   headerCell: {
     color: colors.textSecondary,
     fontFamily: fonts.semiBold,
     fontSize: 10,
     letterSpacing: 0.8,
+  },
+  headerCellTablet: {
+    fontSize: textSizes.small,
   },
   row: {
     alignItems: 'center',
@@ -344,22 +357,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  rowTablet: {
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+  },
   nameCol: {
     alignItems: 'center',
     flexDirection: 'row',
     width: 190,
     gap: 8,
   },
+  nameColTablet: {
+    flex: 2,
+    width: undefined,
+  },
   colTime: {
     width: 145,
+  },
+  colTimeTablet: {
+    flex: 2,
+    width: undefined,
   },
   colStatus: {
     alignItems: 'center',
     width: 90,
   },
+  colStatusTablet: {
+    flex: 1,
+    width: undefined,
+  },
   colVariance: {
     alignItems: 'flex-end',
     width: 105,
+  },
+  colVarianceTablet: {
+    flex: 1.2,
+    width: undefined,
   },
   colActions: {
     alignItems: 'center',
@@ -396,16 +429,27 @@ const styles = StyleSheet.create({
     width: 32,
     flexShrink: 0,
   },
+  avatarTablet: {
+    height: 40,
+    width: 40,
+    borderRadius: 24,
+  },
   nameText: {
     color: '#101828',
     flex: 1,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.body,
   },
+  nameTextTablet: {
+    fontSize: textSizes.bodyLarge,
+  },
   metaText: {
     color: '#475467',
     fontFamily: fonts.regular,
     fontSize: textSizes.body,
+  },
+  metaTextTablet: {
+    fontSize: textSizes.bodyLarge,
   },
   actionIconBtn: {
     alignItems: 'center',

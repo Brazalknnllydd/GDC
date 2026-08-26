@@ -710,7 +710,7 @@ export default function AdminReportsScreen() {
           </Text>
         </SurfaceCard>
 
-        <View style={styles.insightPair}>
+        <View style={[styles.insightPair, compactPhone && styles.insightPairCompact]}>
           <SurfaceCard style={[styles.insightTile, styles.insightTilePrimary]}>
             <Text style={styles.insightTileLabel}>TOP PAYMENT</Text>
             <Text style={styles.insightTileValueLight}>{insightCards.topPayment}</Text>
@@ -952,6 +952,9 @@ const styles = StyleSheet.create({
   insightPair: {
     flexDirection: 'row',
     gap: layout.cardGap,
+  },
+  insightPairCompact: {
+    flexDirection: 'column',
   },
   insightTile: {
     flex: 1,

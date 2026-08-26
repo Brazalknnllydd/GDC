@@ -51,6 +51,7 @@ export function CashierInventorySection({
 
   return (
     <FlashList
+      key={`inventory-grid-${numColumns}`}
       data={filteredProducts}
       style={{ flex: 1 }}
       keyExtractor={(product) => String(product.id)}

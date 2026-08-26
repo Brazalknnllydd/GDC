@@ -1,3 +1,4 @@
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 import { colors, textSizes } from '../../constants/theme';
 import { AdminMetricCard } from '../ui/admin-metric-card';
 
@@ -14,6 +15,9 @@ export function SalesSummaryCard({
   title,
   value,
 }: SalesSummaryCardProps) {
+  const { isTablet, isWideTablet } = useResponsiveLayout();
+  const cardWidth = isWideTablet ? '23.5%' : isTablet ? '48%' : '48%';
+
   return (
     <AdminMetricCard
       detail={detail}
@@ -30,7 +34,7 @@ export function SalesSummaryCard({
       valueFontSize={21}
       valueLineHeight={26}
       valueMarginBottom={8}
-      width="47.5%"
+      width={cardWidth}
     />
   );
 }

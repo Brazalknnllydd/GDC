@@ -16,6 +16,7 @@ import { formatPeso } from '../../lib/product-utils';
 import { formatCashierTime, formatPaymentMethod } from '../../lib/cashier-formatters';
 import { apiClient } from '../../lib/api';
 import { useCashierStore } from '../../store/cashier-store';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type CashierHistorySectionProps = {
   dashboard: CashierDashboardResponse;
@@ -28,6 +29,7 @@ export function CashierHistorySection({
   onEditOpeningCash,
   onSelectSale,
 }: CashierHistorySectionProps) {
+  const { isTablet } = useResponsiveLayout();
   const [currentPage, setCurrentPage] = useState(1);
   const [payingSaleId, setPayingSaleId] = useState<number | null>(null);
   const { loadWorkspace, setToast } = useCashierStore();
@@ -83,16 +85,20 @@ export function CashierHistorySection({
 
       <SurfaceCard style={styles.recentSalesCard}>
         {/* Table Header */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ minWidth: 760, flex: 1 }}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>RECEIPT</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>DATE/TIME</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>CASHIER</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>CUSTOMER</Text>
-              <Text style={[styles.headerCell, { flex: 1 }]}>METHOD</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>CHANGE</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>TOTAL</Text>
+        <ScrollView
+          horizontal={!isTablet}
+          showsHorizontalScrollIndicator={!isTablet}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <View style={isTablet ? { flex: 1 } : { minWidth: 760, flex: 1 }}>
+            <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>RECEIPT</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>DATE/TIME</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>CASHIER</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>CUSTOMER</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1 }]}>METHOD</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1, textAlign: 'right' }]}>CHANGE</Text>
+              <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1, textAlign: 'right' }]}>TOTAL</Text>
             </View>
 
             {/* Table Rows */}
@@ -102,32 +108,33 @@ export function CashierHistorySection({
                   key={sale.id}
                   style={[
                     styles.tableRow,
+                    isTablet && styles.tableRowTablet,
                     index === paginatedSales.length - 1 && styles.tableRowLast,
                   ]}
                   onPress={() => onSelectSale?.(sale)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.rowCell, styles.receiptText, { flex: 1.5 }]}>
+                  <Text style={[styles.rowCell, styles.receiptText, isTablet && styles.rowCellTablet, { flex: 1.5 }]}>
                     #{sale.receiptNumber}
                   </Text>
-                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]}>
+                  <Text style={[styles.rowCell, styles.timeText, isTablet && styles.rowCellTablet, { flex: 1.5 }]}>
                     {new Date(sale.time).toLocaleDateString()} {formatCashierTime(new Date(sale.time))}
                   </Text>
-                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]} numberOfLines={1}>
+                  <Text style={[styles.rowCell, styles.timeText, isTablet && styles.rowCellTablet, { flex: 1.5 }]} numberOfLines={1}>
                     {sale.cashierName}
                   </Text>
-                  <Text style={[styles.rowCell, styles.timeText, { flex: 1.5 }]} numberOfLines={1}>
+                  <Text style={[styles.rowCell, styles.timeText, isTablet && styles.rowCellTablet, { flex: 1.5 }]} numberOfLines={1}>
                     {sale.customerName || 'Walk-in'}
                   </Text>
-                  <Text style={[styles.rowCell, styles.methodText, { flex: 1, color: sale.status === 'pending' || sale.status === 'voided' ? colors.danger : colors.textSecondary }]}>
+                  <Text style={[styles.rowCell, styles.methodText, isTablet && styles.rowCellTablet, { flex: 1, color: sale.status === 'pending' || sale.status === 'voided' ? colors.danger : colors.textSecondary }]}>
                     {formatPaymentMethod(sale.paymentMethod)}
                     {sale.status === 'pending' ? '\n(Pending)' : ''}
                     {sale.status === 'voided' ? '\n(Voided)' : ''}
                   </Text>
-                  <Text style={[styles.rowCell, styles.timeText, { flex: 1, textAlign: 'right' }]}>
+                  <Text style={[styles.rowCell, styles.timeText, isTablet && styles.rowCellTablet, { flex: 1, textAlign: 'right' }]}>
                     {formatPeso(sale.changeAmount || 0)}
                   </Text>
-                  <Text style={[styles.rowCell, styles.totalText, { flex: 1, textAlign: 'right', color: sale.status === 'voided' ? colors.textTertiary : colors.secondary, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
+                  <Text style={[styles.rowCell, styles.totalText, isTablet && styles.rowCellTablet, { flex: 1, textAlign: 'right', color: sale.status === 'voided' ? colors.textTertiary : colors.secondary, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                     {formatPeso(sale.totalAmount)}
                   </Text>
                 </TouchableOpacity>
@@ -196,11 +203,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
+  tableHeaderTablet: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
   headerCell: {
     fontFamily: fonts.bold,
     fontSize: textSizes.xsmall,
     color: colors.textSecondary,
     letterSpacing: 0.7,
+  },
+  headerCellTablet: {
+    fontSize: textSizes.small,
   },
   tableRow: {
     flexDirection: 'row',
@@ -210,6 +224,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
+  tableRowTablet: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
   tableRowLast: {
     borderBottomWidth: 0,
   },
@@ -217,6 +235,9 @@ const styles = StyleSheet.create({
     fontSize: textSizes.body,
     fontFamily: fonts.regular,
     color: colors.textStrong,
+  },
+  rowCellTablet: {
+    fontSize: textSizes.bodyLarge,
   },
   receiptText: {
     fontFamily: fonts.bold,

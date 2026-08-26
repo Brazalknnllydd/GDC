@@ -339,11 +339,12 @@ export default function CashierScreen() {
   }
 
   function renderRegisterSection() {
-    const registerNumColumns = isTablet ? 3 : 2;
+    const registerNumColumns = isWideTablet ? 4 : isTablet ? 3 : 2;
     return (
       <View style={[styles.registerLayout, showInlineCart && styles.registerLayoutWide]}>
         <View style={[styles.registerMain, showInlineCart && styles.registerMainWide, { flex: 1 }]}>
           <FlashList
+            key={`register-grid-${registerNumColumns}`}
             data={filteredProducts}
             numColumns={registerNumColumns}
             contentContainerStyle={{ paddingBottom: spacing.lg }}

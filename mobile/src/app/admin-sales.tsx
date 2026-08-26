@@ -236,7 +236,7 @@ const pdfColors = {
 };
 
 export default function AdminSalesScreen() {
-  const { compactPhone } = useResponsiveLayout();
+  const { compactPhone, isTablet } = useResponsiveLayout();
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState<HistoryFilter>('All');
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
   const [isExportVisible, setIsExportVisible] = useState(false);
@@ -1061,37 +1061,37 @@ export default function AdminSalesScreen() {
         >
           <View style={[styles.table, { minWidth: '100%' }]}>
             {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 82 }]}>RECEIPT NO</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 112 }]}>DATE SOLD</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 86 }]}>CASHIER</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 86 }]}>CUSTOMER</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1, minWidth: 64 }]}>PAYMENT</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 76, textAlign: 'right' }]}>TOTAL</Text>
+            <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1.2, minWidth: 82 }]}>RECEIPT NO</Text>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1.6, minWidth: 112 }]}>DATE SOLD</Text>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1.3, minWidth: 86 }]}>CASHIER</Text>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1.3, minWidth: 86 }]}>CUSTOMER</Text>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1, minWidth: 64 }]}>PAYMENT</Text>
+              <Text style={[styles.tableHeaderCell, isTablet && styles.tableHeaderCellTablet, { flex: 1.1, minWidth: 76, textAlign: 'right' }]}>TOTAL</Text>
             </View>
 
             {/* Table Rows */}
             <View style={styles.tableRows}>
               {paginatedHistoryTransactions.length > 0 ? (
                 paginatedHistoryTransactions.map((sale) => (
-                  <View key={sale.id} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, { flex: 1.2, minWidth: 82, fontFamily: fonts.semiBold, color: colors.textStrong }]}>
+                  <View key={sale.id} style={[styles.tableRow, isTablet && styles.tableRowTablet]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.2, minWidth: 82, fontFamily: fonts.semiBold, color: colors.textStrong }]}>
                       {sale.receiptNumber}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.6, minWidth: 112 }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.6, minWidth: 112 }]}>
                       {formatDateTime(sale.createdAt)}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 86 }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.3, minWidth: 86 }]}>
                       {sale.user?.name || 'Cashier'}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.3, minWidth: 86, color: sale.customer ? colors.textSecondary : colors.textSubtle }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.3, minWidth: 86, color: sale.customer ? colors.textSecondary : colors.textSubtle }]}>
                       {sale.customer?.name || 'Walk-in'}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1, minWidth: 64, color: sale.status === 'voided' ? colors.danger : undefined }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1, minWidth: 64, color: sale.status === 'voided' ? colors.danger : undefined }]}>
                       {sale.paymentMethod}
                       {sale.status === 'voided' ? '\n(Voided)' : ''}
                     </Text>
-                    <Text style={[styles.tableCell, { flex: 1.1, minWidth: 76, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : colors.textStrong, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.1, minWidth: 76, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : colors.textStrong, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                       {formatPeso(normalizeNumber(sale.totalAmount))}
                     </Text>
                   </View>
@@ -1513,11 +1513,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  tableHeaderTablet: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
   tableHeaderCell: {
     color: colors.textSecondary,
     fontFamily: fonts.bold,
     fontSize: textSizes.xsmall,
     letterSpacing: 0.7,
+  },
+  tableHeaderCellTablet: {
+    fontSize: textSizes.small,
   },
   tableRows: {
     backgroundColor: '#FFFFFF',
@@ -1532,10 +1540,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     gap: spacing.md,
   },
+  tableRowTablet: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
   tableCell: {
     color: '#475467',
     fontFamily: fonts.regular,
     fontSize: textSizes.small,
+  },
+  tableCellTablet: {
+    fontSize: textSizes.body,
   },
   emptyTableRow: {
     padding: 32,

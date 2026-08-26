@@ -14,6 +14,7 @@ import { IconButton, Portal } from 'react-native-paper';
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
 import { SurfaceCard } from './surface-card';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type MetricTone = 'default' | 'success' | 'danger' | 'positive' | 'negative' | 'neutral';
 type TonePalette = Record<MetricTone, { detail: string; value: string }>;
@@ -59,7 +60,7 @@ export function AdminMetricCard({
   titleColor = colors.textHeading,
   detailColor,
   minHeight = 134,
-  width = '47.5%',
+  width,
   paddingHorizontal = 18,
   paddingVertical = 18,
   titleMarginBottom = 18,
@@ -71,11 +72,14 @@ export function AdminMetricCard({
   infoDialogValue,
 }: AdminMetricCardProps) {
   const { width: screenWidth } = useWindowDimensions();
+  const { isTablet, isWideTablet } = useResponsiveLayout();
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const palette = toneStyles[tone];
   const isCompactPhone = screenWidth < 430;
   const isNarrowPhone = screenWidth < 390;
-  const resolvedWidth = width ?? '47.5%';
+  
+  const defaultWidth = isWideTablet ? '23.5%' : isTablet ? '31.5%' : '48%';
+  const resolvedWidth = width ?? defaultWidth;
   const resolvedTitleLetterSpacing = isNarrowPhone
     ? Math.min(titleLetterSpacing, 0.8)
     : isCompactPhone

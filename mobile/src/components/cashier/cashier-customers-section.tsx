@@ -22,6 +22,7 @@ import { colors, fonts, textSizes } from '../../constants/theme';
 import { apiClient } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-errors';
 import { useToastStore } from '../../store/toast-store';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type Customer = {
   id: number;
@@ -42,6 +43,7 @@ type FormState = {
 const EMPTY_FORM: FormState = { name: '', phoneNumber: '', address: '', notes: '' };
 
 export function CashierCustomersSection() {
+  const { isTablet } = useResponsiveLayout();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,12 +186,12 @@ export function CashierCustomersSection() {
       {/* Table */}
       <SurfaceCard style={styles.tableCard}>
         {/* Table header */}
-        <View style={styles.tableHeader}>
+        <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
           <View style={styles.headerDataArea}>
-            <Text style={[styles.headerCell, { flex: 2.5 }]}>CUSTOMER</Text>
-            <Text style={[styles.headerCell, { flex: 1.5 }]}>PHONE</Text>
-            <Text style={[styles.headerCell, { flex: 1.5 }]}>ADDRESS</Text>
-            <Text style={[styles.headerCell, { flex: 2 }]}>NOTES</Text>
+            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 2.5 }]}>CUSTOMER</Text>
+            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>PHONE</Text>
+            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>ADDRESS</Text>
+            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 2 }]}>NOTES</Text>
           </View>
           <View style={styles.headerCellActions} />
         </View>
@@ -429,6 +431,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  tableHeaderTablet: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
   headerDataArea: {
     alignItems: 'center',
     flex: 1,
@@ -442,6 +448,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     fontSize: 10,
     letterSpacing: 0.8,
+  },
+  headerCellTablet: {
+    fontSize: textSizes.small,
   },
   headerCellActions: {
     flex: 0,
