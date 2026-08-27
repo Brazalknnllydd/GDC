@@ -133,11 +133,12 @@ export default function AdminReportsScreen() {
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [reportMonthRange, setReportMonthRange] = useState<MonthRangeValue>(() => {
     const now = new Date();
-    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
     return {
-      endMonth: currentMonth,
-      startMonth: currentMonth,
+      endMonth,
+      startMonth,
     };
   });
 
@@ -675,17 +676,6 @@ export default function AdminReportsScreen() {
       </View>
 
       <SurfaceCard style={[styles.analyticsCard, compactPhone && styles.analyticsCardCompact]}>
-        <View style={styles.analyticsLegend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.legendRevenue]} />
-            <Text style={styles.legendText}>Revenue</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.legendDiscounts]} />
-            <Text style={styles.legendText}>Discounts</Text>
-          </View>
-        </View>
-
         {chartSeries.labels.length > 0 ? (
           <AdminLineChart
             datasets={[

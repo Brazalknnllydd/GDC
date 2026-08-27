@@ -1,6 +1,5 @@
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Bell } from 'lucide-react-native';
-import { Avatar, IconButton, Surface } from 'react-native-paper';
 
 import { controlHeights, layout, radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
@@ -20,10 +19,9 @@ export function AdminPageHeader({
   const isCompactPhone = width < 430;
 
   return (
-    <Surface elevation={1} style={styles.header}>
+    <View style={styles.header}>
       <View style={styles.headerIdentity}>
-        <Avatar.Image
-          size={46}
+        <Image
           source={require('../../../assets/images/logo.jpg')}
           style={styles.avatar}
         />
@@ -39,15 +37,14 @@ export function AdminPageHeader({
       </View>
 
       <View style={styles.headerIconWrap}>
-        <IconButton
-          icon={() => <Bell color={colors.textSecondary} size={20} strokeWidth={2.05} />}
+        <Pressable
           onPress={() => {}}
-          size={20}
-          style={styles.headerIconButton}
-        />
+          style={({ pressed }) => [styles.headerIconButton, pressed && styles.headerIconButtonPressed]}>
+          <Bell color={colors.textSecondary} size={20} strokeWidth={2.05} />
+        </Pressable>
         {showNotificationDot ? <View style={styles.notificationDot} /> : null}
       </View>
-    </Surface>
+    </View>
   );
 }
 
@@ -68,7 +65,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   avatar: {
+    borderRadius: radius.round,
+    height: 46,
     marginRight: spacing.md,
+    width: 46,
   },
   headerTitle: {
     color: colors.secondary,
@@ -94,13 +94,18 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerIconButton: {
+    alignItems: 'center',
     backgroundColor: colors.surfaceNeutral,
     borderColor: colors.borderSoft,
-    borderWidth: 1,
     borderRadius: radius.round,
+    borderWidth: 1,
     height: controlHeights.iconButton,
+    justifyContent: 'center',
     margin: 0,
     width: controlHeights.iconButton,
+  },
+  headerIconButtonPressed: {
+    opacity: 0.7,
   },
   notificationDot: {
     backgroundColor: colors.dangerDot,

@@ -1,8 +1,7 @@
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
-import { Card } from 'react-native-paper';
 
-import { radius, shadows } from '../../constants/design-system';
+import { radius } from '../../constants/design-system';
 import { colors } from '../../constants/theme';
 
 type SurfaceCardProps = {
@@ -12,11 +11,15 @@ type SurfaceCardProps = {
 };
 
 export function SurfaceCard({ children, onPress, style }: SurfaceCardProps) {
-  return (
-    <Card mode="contained" onPress={onPress} style={[styles.card, style]}>
-      {children}
-    </Card>
-  );
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.cardPressed, style]}>
+        {children}
+      </Pressable>
+    );
+  }
+
+  return <View style={[styles.card, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -26,6 +29,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     overflow: 'hidden',
-    ...shadows.card,
+    ...Platform.select({
+      web: {
+        // boxShadow avoids the deprecated shadow* prop warning on web
+        boxShadow: '0px 4px 10px rgba(19, 25, 39, 0.07)',
+      } as object,
+      default: {
+        shadowColor: colors.textStrong,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
+      },
+    }),
+  },
+  cardPressed: {
+    opacity: 0.88,
   },
 });

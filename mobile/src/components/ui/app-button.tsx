@@ -1,5 +1,7 @@
 import React, { type ReactNode, type ComponentType } from 'react';
 import {
+  ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -7,7 +9,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Button } from 'react-native-paper';
 
 import { controlHeights, radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
@@ -54,7 +55,6 @@ const variantStyles: Record<
     backgroundColor: string;
     borderColor: string;
     borderWidth: number;
-    mode: 'contained' | 'outlined';
     textColor: string;
   }
 > = {
@@ -62,42 +62,36 @@ const variantStyles: Record<
     backgroundColor: colors.dangerStrong,
     borderColor: colors.dangerStrong,
     borderWidth: 0,
-    mode: 'contained',
     textColor: colors.textInverse,
   },
   dangerOutline: {
     backgroundColor: colors.card,
     borderColor: colors.borderDangerSoft,
     borderWidth: 1.2,
-    mode: 'outlined',
     textColor: colors.dangerStrong,
   },
   primary: {
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
     borderWidth: 0,
-    mode: 'contained',
     textColor: colors.textInverse,
   },
   secondary: {
     backgroundColor: colors.card,
     borderColor: colors.borderInfoStrong,
     borderWidth: 1.2,
-    mode: 'outlined',
     textColor: colors.infoStrong,
   },
   success: {
     backgroundColor: colors.success,
     borderColor: colors.success,
     borderWidth: 0,
-    mode: 'contained',
     textColor: colors.textInverse,
   },
   successOutline: {
     backgroundColor: colors.surfaceSuccess,
     borderColor: colors.borderSuccess,
     borderWidth: 1.2,
-    mode: 'outlined',
     textColor: colors.successStrong,
   },
 };
@@ -116,35 +110,34 @@ export function AppButton({
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 430;
   const variantStyle = variantStyles[variant];
+  const isDisabled = disabled || loading;
 
   return (
-    <Button
-      buttonColor={variantStyle.backgroundColor}
-      contentStyle={[
-        styles.content,
-        {
-          justifyContent: 'center',
-          minHeight: sizeHeights[size],
-          paddingHorizontal: sizePaddings[size],
-        },
-      ]}
-      disabled={disabled}
-      loading={loading}
-      mode={variantStyle.mode}
+    <Pressable
+      disabled={isDisabled}
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.button,
         {
-          alignSelf: fullWidth ? 'stretch' : 'flex-start',
+          alignSelf: fullWidth ? 'stretch' : undefined,
+          backgroundColor: variantStyle.backgroundColor,
           borderColor: variantStyle.borderColor,
           borderWidth: variantStyle.borderWidth,
-          opacity: disabled ? 0.58 : 1,
+          minHeight: sizeHeights[size],
+          opacity: isDisabled ? 0.58 : pressed ? 0.82 : 1,
+          paddingHorizontal: sizePaddings[size],
         },
         style,
-      ]}
-      uppercase={false}>
+      ]}>
       <View style={styles.inner}>
-        {icon ? (
+        {loading ? (
+          <ActivityIndicator
+            color={variantStyle.textColor}
+            size="small"
+            style={styles.spinner}
+          />
+        ) : null}
+        {icon && !loading ? (
           <View style={styles.iconWrap}>
             {(() => {
               const IconCandidate = (icon as any)?.default ?? icon;
@@ -153,7 +146,7 @@ export function AppButton({
                 try {
                   const IconComp = IconCandidate as ComponentType<{ color?: string; size?: number }>;
                   return <IconComp color={variantStyle.textColor} size={16} />;
-                } catch (e) {
+                } catch {
                   return null;
                 }
               }
@@ -170,29 +163,32 @@ export function AppButton({
           {label}
         </Text>
       </View>
-    </Button>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
     borderRadius: radius.lg,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-  },
-  iconWrap: {
-    marginRight: spacing.sm,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   inner: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  iconWrap: {
+    marginRight: spacing.sm,
+  },
+  spinner: {
+    marginRight: spacing.sm,
   },
   label: {
-    includeFontPadding: false,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.bodyLarge,
+    includeFontPadding: false,
     lineHeight: 17,
     textAlign: 'center',
   },

@@ -1,27 +1,29 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { LogOut, Printer, Bluetooth } from 'lucide-react-native';
+import { LogOut, Printer, Bluetooth, UserRound } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { AddCashierModal } from '../components/admin-settings/add-cashier-modal';
-import { CashierAccessCard } from '../components/admin-settings/cashier-access-card';
 import { CashierAccessHero } from '../components/admin-settings/cashier-access-hero';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
+import { AppDataTable, AppDataTableHeader, AppDataTableRow, AppDataTableCell } from '../components/ui/app-data-table';
+import { PaginationControls } from '../components/ui/pagination-controls';
 import { useToastStore } from '../store/toast-store';
-import { spacing } from '../constants/design-system';
-import { colors, textRoles, textSizes } from '../constants/theme';
+import { spacing, radius } from '../constants/design-system';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useAdminSettingsData, type StaffCashier } from '../hooks/use-admin-settings-data';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { usePagination } from '../hooks/use-pagination';
 import { apiClient } from '../lib/api';
 import { clearAuthSession } from '../lib/auth-session';
 import type { AddCashierFormValues } from '../lib/form-schemas';
 import { usePrinterStore } from '../store/printer-store';
 
 export default function AdminSettingsScreen() {
-  const { compactPhone } = useResponsiveLayout();
+  const { compactPhone, isTablet } = useResponsiveLayout();
   const router = useRouter();
   const settingsTabs = productTabs.map((tab) =>
     tab.label === 'Settings'
@@ -40,6 +42,21 @@ export default function AdminSettingsScreen() {
     prependCashier,
     screenError,
   } = useAdminSettingsData();
+
+  // Cashiers list pagination
+  const {
+    endItem: cashierPageEnd,
+    page: cashierPage,
+    paginatedItems: paginatedCashiers,
+    setPage: setCashierPage,
+    startItem: cashierPageStart,
+    totalPages: totalCashierPages,
+    visiblePageNumbers: visibleCashierPageNumbers,
+  } = usePagination({
+    items: cashiers,
+    itemsPerPage: 10,
+    resetDependencies: [cashiers],
+  });
 
   const {
     printerName,
@@ -136,18 +153,58 @@ export default function AdminSettingsScreen() {
           <Text style={styles.emptyTitle}>Loading cashier access...</Text>
         </SurfaceCard>
       ) : cashiers.length > 0 ? (
-        <View style={styles.cashierList}>
-          {cashiers.map((cashier) => (
-            <CashierAccessCard
-              key={cashier.id}
-              allowedCategories={cashier.allowedCategories}
-              createdAt={cashier.createdAt}
-              name={cashier.name}
-              role={cashier.role}
-              username={cashier.username}
+        <SurfaceCard style={styles.tableCard}>
+          <AppDataTable>
+            <AppDataTableHeader>
+              <AppDataTableCell flex={isTablet ? 1.5 : undefined} width={isTablet ? undefined : 150} isHeader text="Name" />
+              <AppDataTableCell flex={isTablet ? 1 : undefined} width={isTablet ? undefined : 110} isHeader text="Cashier" />
+              <AppDataTableCell flex={isTablet ? 2.5 : undefined} width={isTablet ? undefined : 200} isHeader text="Categories" />
+            </AppDataTableHeader>
+            {paginatedCashiers.map((cashier) => (
+              <AppDataTableRow key={cashier.id}>
+                <AppDataTableCell flex={isTablet ? 1.5 : undefined} width={isTablet ? undefined : 150}>
+                  <View style={styles.nameCell}>
+                    <View style={styles.tableAvatar}>
+                      <UserRound color={colors.secondary} size={14} strokeWidth={2.1} />
+                    </View>
+                    <Text style={styles.tableNameText}>{cashier.name}</Text>
+                  </View>
+                </AppDataTableCell>
+                <AppDataTableCell flex={isTablet ? 1 : undefined} width={isTablet ? undefined : 110}>
+                  <View>
+                    <Text style={styles.tableUsernameText}>@{cashier.username}</Text>
+                    <Text style={styles.tableRoleText}>{cashier.role}</Text>
+                  </View>
+                </AppDataTableCell>
+                <AppDataTableCell flex={isTablet ? 2.5 : undefined} width={isTablet ? undefined : 200}>
+                  <View style={styles.tableCategoryWrap}>
+                    {cashier.allowedCategories.length > 0 ? (
+                      cashier.allowedCategories.map((category) => (
+                        <View key={category.id} style={styles.tableCategoryPill}>
+                          <Text style={styles.tableCategoryPillText}>{category.name}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <View style={styles.tableCategoryPillMuted}>
+                        <Text style={styles.tableCategoryPillMutedText}>All categories</Text>
+                      </View>
+                    )}
+                  </View>
+                </AppDataTableCell>
+              </AppDataTableRow>
+            ))}
+          </AppDataTable>
+
+          <View style={styles.paginationRow}>
+            <PaginationControls
+              borderless
+              currentPage={cashierPage}
+              onPageChange={setCashierPage}
+              totalPages={totalCashierPages}
+              visiblePageNumbers={visibleCashierPageNumbers}
             />
-          ))}
-        </View>
+          </View>
+        </SurfaceCard>
       ) : (
         <SurfaceCard style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>No cashier accounts added yet</Text>
@@ -255,8 +312,75 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     marginTop: spacing.section,
   },
-  cashierList: {
-    gap: spacing.md,
+  tableCard: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  nameCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tableAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.round,
+    height: 28,
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    width: 28,
+  },
+  tableNameText: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.body,
+  },
+  tableUsernameText: {
+    color: colors.textStrong,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+  },
+  tableRoleText: {
+    color: colors.textTertiary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.xsmall,
+  },
+  tableCategoryWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  tableCategoryPill: {
+    backgroundColor: colors.surfaceBrandSoft,
+    borderColor: colors.borderInfoStrong,
+    borderRadius: radius.round,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm + 1,
+    paddingVertical: 3,
+  },
+  tableCategoryPillText: {
+    color: colors.secondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.xsmall,
+  },
+  tableCategoryPillMuted: {
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderSoft,
+    borderRadius: radius.round,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm + 1,
+    paddingVertical: 3,
+  },
+  tableCategoryPillMutedText: {
+    color: colors.textTertiary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.xsmall,
+  },
+  paginationRow: {
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   emptyCard: {
     alignItems: 'center',

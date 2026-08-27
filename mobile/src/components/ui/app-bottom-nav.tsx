@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { Surface, TouchableRipple } from 'react-native-paper';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { layout, radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
@@ -35,13 +34,13 @@ export function AppBottomNav<T extends string>({
   stretchItems = true,
 }: AppBottomNavProps<T>) {
   return (
-    <Surface elevation={1} style={[styles.bottomNav, stylesByJustify[justify]]}>
+    <View style={[styles.bottomNav, stylesByJustify[justify]]}>
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = item.key === activeKey;
 
         return (
-          <TouchableRipple
+          <Pressable
             key={item.key}
             onPress={() => {
               if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -49,7 +48,11 @@ export function AppBottomNav<T extends string>({
               }
               onSelect(item.key);
             }}
-            style={[styles.tabItem, stretchItems && styles.tabItemStretch]}>
+            style={({ pressed }) => [
+              styles.tabItem,
+              stretchItems && styles.tabItemStretch,
+              pressed && styles.tabItemPressed,
+            ]}>
             <View style={styles.tabContent}>
               <Icon
                 color={isActive ? colors.secondary : colors.textHeading}
@@ -70,10 +73,10 @@ export function AppBottomNav<T extends string>({
                 />
               ) : null}
             </View>
-          </TouchableRipple>
+          </Pressable>
         );
       })}
-    </Surface>
+    </View>
   );
 }
 
@@ -101,6 +104,9 @@ const styles = StyleSheet.create({
   },
   tabItemStretch: {
     flex: 1,
+  },
+  tabItemPressed: {
+    opacity: 0.72,
   },
   tabContent: {
     alignItems: 'center',

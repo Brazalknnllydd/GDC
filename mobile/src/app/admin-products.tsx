@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, useWindowDimensions, StyleSheet } from 'react-native';
-import { Search, PackagePlus, Shapes, Tags } from 'lucide-react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, useWindowDimensions, StyleSheet } from 'react-native';
+import { Search, PackagePlus, Shapes, X } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
 
@@ -199,12 +199,30 @@ export default function AdminProductsScreen() {
         </View>
 
         <View style={styles.filtersSection}>
-          <View style={{ marginBottom: spacing.md }}>
-            <AppSelect
-              options={categoryChips}
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            />
+          <View style={[styles.filtersRow, compactPhone && styles.filtersRowCompact]}>
+            <View style={styles.searchBarWrap}>
+              <Search color={colors.textSecondary} size={18} style={styles.searchIcon} />
+              <RNTextInput
+                placeholder="Search products, category, barcode..."
+                placeholderTextColor={colors.textSubtle}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+              />
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+                  <X color={colors.textSecondary} size={16} />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={[styles.selectWrap, compactPhone && styles.selectWrapCompact]}>
+              <AppSelect
+                options={categoryChips}
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              />
+            </View>
           </View>
         </View>
 
@@ -303,5 +321,47 @@ const styles = StyleSheet.create({
   filtersSection: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  filtersRowCompact: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  searchBarWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderColor: colors.borderMuted,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    height: 44,
+    paddingHorizontal: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    color: colors.textStrong,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+    paddingVertical: 0,
+  },
+  clearSearchBtn: {
+    padding: spacing.xs,
+    marginRight: -spacing.xs,
+  },
+  selectWrap: {
+    minWidth: 180,
+  },
+  selectWrapCompact: {
+    width: '100%',
   },
 });

@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Info, X } from 'lucide-react-native';
-import { IconButton, Portal } from 'react-native-paper';
+import { Portal } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
@@ -134,12 +134,11 @@ export function AdminMetricCard({
           {title}
         </Text>
         {infoDialogValue ? (
-          <IconButton
-            icon={() => <Info color={colors.secondary} size={16} strokeWidth={2.1} />}
+          <Pressable
             onPress={() => setShowInfoDialog(true)}
-            size={18}
-            style={styles.infoButton}
-          />
+            style={styles.infoButton}>
+            <Info color={colors.secondary} size={16} strokeWidth={2.1} />
+          </Pressable>
         ) : (
           <View style={styles.infoSpacer} />
         )}
@@ -175,12 +174,11 @@ export function AdminMetricCard({
                     <View style={styles.dialogBadge}>
                       <Info color={colors.secondary} size={18} strokeWidth={2.2} />
                     </View>
-                    <IconButton
-                      icon={() => <X color={colors.textTertiary} size={18} strokeWidth={2.2} />}
+                    <Pressable
                       onPress={() => setShowInfoDialog(false)}
-                      size={18}
-                      style={styles.dialogCloseButton}
-                    />
+                      style={styles.dialogCloseButton}>
+                      <X color={colors.textTertiary} size={18} strokeWidth={2.2} />
+                    </Pressable>
                   </View>
 
                   <Text style={styles.dialogEyebrow}>Inventory Snapshot</Text>
@@ -218,10 +216,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   infoButton: {
+    alignItems: 'center',
     borderColor: colors.borderInfoStrong,
     borderRadius: radius.round,
     borderWidth: 1,
+    height: 28,
+    justifyContent: 'center',
     marginLeft: 10,
+    width: 28,
   },
   infoSpacer: {
     height: 0,
@@ -289,7 +291,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   dialogCloseButton: {
-    margin: -6,
+    alignItems: 'center',
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
   dialogValue: {
     color: colors.secondary,

@@ -152,9 +152,8 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
         <div class="header">
           <h1 class="title">GDC POS RECEIPT</h1>
           <p class="subtitle">GDC Store</p>
-          <p class="subtitle">New Sangi Rd, Lapu-Lapu</p>
+          <p class="subtitle">New Sangi Rd, Lapu-lapu City</p>
           <p class="subtitle">Date: ${formatReceiptDateTime(sale.createdAt)}</p>
-          <p class="subtitle">Receipt No: ${escapeHtml(sale.receiptNumber)}</p>
           <p class="subtitle">Cashier: ${escapeHtml(sale.cashierName)}</p>
           <p class="subtitle">Customer: ${escapeHtml(String(sale.customerName ?? sale.customerId ?? 'Walk-in'))}</p>
         </div>
@@ -202,7 +201,7 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
 
         <div class="footer">
           <p style="margin: 0 0 6px;">Thank you for shopping with us!</p>
-          <p style="margin: 0;">For feedback, contact 09399302457 or GDC store on FB</p>
+          <p style="margin: 0;">For feedback, contact 09399302457</p>
         </div>
       </body>
     </html>
@@ -245,9 +244,9 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
         let bill = '';
         bill += center('GDC POS RECEIPT');
         bill += center('GDC Store');
+        bill += center('New Sangi Rd, Lapu-lapu City');
         bill += '\n';
         bill += `Date: ${formatReceiptDateTime(sale.createdAt)}\n`;
-        bill += `Receipt No: ${printerText(sale.receiptNumber)}\n`;
         bill += `Cashier: ${printerText(sale.cashierName)}\n`;
         bill += `Customer: ${printerText(String(sale.customerName ?? sale.customerId ?? 'Walk-in'))}\n`;
         bill += '-'.repeat(lineLen) + '\n';
@@ -265,7 +264,8 @@ export async function handlePrintReceipt(sale: CompletedSale | null) {
           bill += row('Paid:', formatPrinterAmount(sale.amountPaid));
           bill += row('Change:', formatPrinterAmount(sale.changeAmount));
         bill += '\n';
-        bill += center('Thank you for shopping!');
+        bill += center('Thank you for shopping with us!');
+        bill += center('For feedback, contact 09399302457');
         bill += '\n\n\n';
 
         const rawPrinter = NativeModules.RNBLEPrinter;

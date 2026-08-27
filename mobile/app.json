@@ -7,9 +7,6 @@
     "icon": "./assets/images/logo.jpg",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -27,7 +24,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.mobile"
+      "package": "com.gdc.inventorypro"
     },
     "web": {
       "output": "static",
