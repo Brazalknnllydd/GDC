@@ -63,10 +63,11 @@
     },
     "extra": {
       "router": {},
+      "apiBaseUrl": "https://gdc-vyr4.onrender.com",
       "eas": {
-        "projectId": "f71a4a27-2840-4b13-aebe-63430d10ae0a"
-      },
-      "apiBaseUrl": "https://gdc-vyr4.onrender.com"
-    }
+        "projectId": "b9ae566a-b064-4ed3-8397-770dc438d1f4"
+      }
+    },
+    "owner": "ken67"
   }
 }

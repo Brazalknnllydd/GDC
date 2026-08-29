@@ -97,10 +97,14 @@ export function AiChatModal({ visible, onClose }: AiChatModalProps) {
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
       console.error("Chat error:", error);
+      const errorMessage =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "I encountered an error. Please try again later.";
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "model",
-        text: "I encountered an error. Please try again later.",
+        text: errorMessage,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMessage]);
