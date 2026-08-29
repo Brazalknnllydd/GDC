@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { LogOut, Printer, Bluetooth, UserRound } from 'lucide-react-native';
+import { LogOut, Printer, Bluetooth, UserRound, PencilLine, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { AddCashierModal } from '../components/admin-settings/add-cashier-modal';
 import { CashierAccessHero } from '../components/admin-settings/cashier-access-hero';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
+import { AdminModalShell } from '../components/ui/admin-modal-shell';
 import { AdminPageScreen } from '../components/ui/admin-page-screen';
 import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
+import { ModalActions } from '../components/ui/modal-actions';
 import { AppDataTable, AppDataTableHeader, AppDataTableRow, AppDataTableCell } from '../components/ui/app-data-table';
 import { PaginationControls } from '../components/ui/pagination-controls';
 import { useToastStore } from '../store/toast-store';
@@ -18,6 +21,7 @@ import { useAdminSettingsData, type StaffCashier } from '../hooks/use-admin-sett
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { usePagination } from '../hooks/use-pagination';
 import { apiClient } from '../lib/api';
+import { getApiErrorMessage } from '../lib/api-errors';
 import { clearAuthSession } from '../lib/auth-session';
 import type { AddCashierFormValues } from '../lib/form-schemas';
 import { usePrinterStore } from '../store/printer-store';
@@ -25,15 +29,25 @@ import { usePrinterStore } from '../store/printer-store';
 export default function AdminSettingsScreen() {
   const { compactPhone, isTablet } = useResponsiveLayout();
   const router = useRouter();
-  const settingsTabs = productTabs.map((tab) =>
-    tab.label === 'Settings'
-      ? { ...tab, active: true, route: '/admin-settings' as const }
-      : { ...tab, active: false }
+  const queryClient = useQueryClient();
+  const settingsTabs = useMemo(
+    () =>
+      productTabs.map((tab) =>
+        tab.label === 'Settings'
+          ? { ...tab, active: true, route: '/admin-settings' as const }
+          : { ...tab, active: false }
+      ),
+    []
   );
 
   const [showAddCashierModal, setShowAddCashierModal] = useState(false);
+  const [editingCashier, setEditingCashier] = useState<StaffCashier | null>(null);
+  const [cashierModalRevision, setCashierModalRevision] = useState(0);
+  const [cashierPendingDelete, setCashierPendingDelete] = useState<StaffCashier | null>(null);
   const [isSavingCashier, setIsSavingCashier] = useState(false);
+  const [isDeletingCashier, setIsDeletingCashier] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+  const [deleteMessage, setDeleteMessage] = useState('');
   const {
     assignedCategoryCount,
     cashiers,
@@ -57,6 +71,20 @@ export default function AdminSettingsScreen() {
     itemsPerPage: 10,
     resetDependencies: [cashiers],
   });
+
+  const cashierFormInitialValues = useMemo(
+    () =>
+      editingCashier
+        ? {
+            allowedCategoryIds: editingCashier.allowedCategories.map((category) => category.id),
+            name: editingCashier.name,
+            password: '',
+            username: editingCashier.username,
+          }
+        : undefined,
+    [editingCashier]
+  );
+  const cashierFormMode = editingCashier ? 'edit' : 'create';
 
   const {
     printerName,
@@ -97,7 +125,20 @@ export default function AdminSettingsScreen() {
 
 
   function openAddCashierModal() {
+    setEditingCashier(null);
+    setCashierPendingDelete(null);
     setFormMessage('');
+    setDeleteMessage('');
+    setCashierModalRevision((value) => value + 1);
+    setShowAddCashierModal(true);
+  }
+
+  function openEditCashierModal(cashier: StaffCashier) {
+    setCashierPendingDelete(null);
+    setEditingCashier(cashier);
+    setFormMessage('');
+    setDeleteMessage('');
+    setCashierModalRevision((value) => value + 1);
     setShowAddCashierModal(true);
   }
 
@@ -107,7 +148,24 @@ export default function AdminSettingsScreen() {
     }
 
     setShowAddCashierModal(false);
+    setEditingCashier(null);
+    setDeleteMessage('');
     setFormMessage('');
+  }
+
+  function openDeleteCashierModal(cashier: StaffCashier) {
+    setEditingCashier(null);
+    setDeleteMessage('');
+    setCashierPendingDelete(cashier);
+  }
+
+  function closeDeleteCashierModal() {
+    if (isDeletingCashier) {
+      return;
+    }
+
+    setCashierPendingDelete(null);
+    setDeleteMessage('');
   }
 
   async function handleSaveCashier(values: AddCashierFormValues) {
@@ -115,23 +173,56 @@ export default function AdminSettingsScreen() {
       setIsSavingCashier(true);
       setFormMessage('');
 
-      const response = await apiClient.post<StaffCashier>('/staff/cashiers', {
+      const payload = {
         allowedCategoryIds: values.allowedCategoryIds,
         name: values.name.trim(),
         password: values.password.trim(),
         username: values.username.trim(),
-      });
+      };
 
-      prependCashier(response.data);
+      if (editingCashier) {
+        await apiClient.put(`/staff/cashiers/${editingCashier.id}`, payload);
+        useToastStore.getState().showToast('Cashier updated successfully', 'success');
+      } else {
+        const response = await apiClient.post<StaffCashier>('/staff/cashiers', payload);
+        prependCashier(response.data);
+        useToastStore.getState().showToast('Cashier added successfully', 'success');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['staff', 'cashiers'] });
       setShowAddCashierModal(false);
+      setEditingCashier(null);
       setFormMessage('');
-      useToastStore.getState().showToast('Cashier added successfully', 'success');
-    } catch {
-      const msg = 'Could not create cashier right now.';
+    } catch (error) {
+      const msg = getApiErrorMessage(
+        error,
+        editingCashier ? 'Could not update cashier right now.' : 'Could not create cashier right now.'
+      );
       setFormMessage(msg);
       useToastStore.getState().showToast(msg, 'error');
     } finally {
       setIsSavingCashier(false);
+    }
+  }
+
+  async function handleDeleteCashier() {
+    if (!cashierPendingDelete) {
+      return;
+    }
+
+    try {
+      setIsDeletingCashier(true);
+      setDeleteMessage('');
+      await apiClient.delete(`/staff/cashiers/${cashierPendingDelete.id}`);
+      await queryClient.invalidateQueries({ queryKey: ['staff', 'cashiers'] });
+      setCashierPendingDelete(null);
+      useToastStore.getState().showToast('Cashier removed successfully', 'success');
+    } catch (error) {
+      const msg = getApiErrorMessage(error, 'Could not delete cashier right now.');
+      setDeleteMessage(msg);
+      useToastStore.getState().showToast(msg, 'error');
+    } finally {
+      setIsDeletingCashier(false);
     }
   }
 
@@ -159,6 +250,7 @@ export default function AdminSettingsScreen() {
               <AppDataTableCell flex={isTablet ? 1.5 : undefined} width={isTablet ? undefined : 150} isHeader text="Name" />
               <AppDataTableCell flex={isTablet ? 1 : undefined} width={isTablet ? undefined : 110} isHeader text="Cashier" />
               <AppDataTableCell flex={isTablet ? 2.5 : undefined} width={isTablet ? undefined : 200} isHeader text="Categories" />
+              <AppDataTableCell flex={isTablet ? 0.9 : undefined} width={isTablet ? undefined : 116} isHeader numeric text="Actions" />
             </AppDataTableHeader>
             {paginatedCashiers.map((cashier) => (
               <AppDataTableRow key={cashier.id}>
@@ -189,6 +281,24 @@ export default function AdminSettingsScreen() {
                         <Text style={styles.tableCategoryPillMutedText}>All categories</Text>
                       </View>
                     )}
+                  </View>
+                </AppDataTableCell>
+                <AppDataTableCell flex={isTablet ? 0.9 : undefined} width={isTablet ? undefined : 116} numeric>
+                  <View style={styles.rowActions}>
+                    <TouchableOpacity
+                      accessibilityLabel={`Edit cashier ${cashier.name}`}
+                      onPress={() => openEditCashierModal(cashier)}
+                      style={[styles.actionButton, styles.editActionButton]}
+                    >
+                      <PencilLine color={colors.secondary} size={14} strokeWidth={2.1} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityLabel={`Delete cashier ${cashier.name}`}
+                      onPress={() => openDeleteCashierModal(cashier)}
+                      style={[styles.actionButton, styles.deleteActionButton]}
+                    >
+                      <Trash2 color={colors.dangerStrong} size={14} strokeWidth={2.1} />
+                    </TouchableOpacity>
                   </View>
                 </AppDataTableCell>
               </AppDataTableRow>
@@ -293,13 +403,47 @@ export default function AdminSettingsScreen() {
       />
 
       <AddCashierModal
+        key={`${cashierModalRevision}-${cashierFormMode}-${editingCashier?.id ?? 'new'}`}
         cashiersSaving={isSavingCashier}
         categories={categories}
         formMessage={formMessage}
+        initialValues={cashierFormInitialValues}
+        mode={cashierFormMode}
         onClose={closeAddCashierModal}
         onSave={handleSaveCashier}
         visible={showAddCashierModal}
       />
+
+      <AdminModalShell
+        height={240}
+        onClose={closeDeleteCashierModal}
+        title="Delete Cashier"
+        visible={cashierPendingDelete !== null}
+        footer={
+          <ModalActions>
+            <AppButton
+              disabled={isDeletingCashier}
+              label="Cancel"
+              onPress={closeDeleteCashierModal}
+              variant="secondary"
+            />
+            <AppButton
+              disabled={isDeletingCashier}
+              label={isDeletingCashier ? 'Deleting...' : 'Delete'}
+              loading={isDeletingCashier}
+              onPress={() => { void handleDeleteCashier(); }}
+              variant="danger"
+            />
+          </ModalActions>
+        }
+      >
+        <Text style={styles.deleteConfirmText}>
+          Delete{' '}
+          <Text style={styles.deleteConfirmName}>{cashierPendingDelete?.name}</Text>
+          ? This will remove the cashier account. If they have sales or shifts on record, the server will archive the account instead of hard-deleting it.
+        </Text>
+        {deleteMessage ? <Text style={styles.deleteErrorText}>{deleteMessage}</Text> : null}
+      </AdminModalShell>
     </AdminPageScreen>
   );
 }
@@ -375,6 +519,27 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: textSizes.xsmall,
   },
+  rowActions: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'flex-end',
+  },
+  actionButton: {
+    alignItems: 'center',
+    borderRadius: radius.round,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  editActionButton: {
+    backgroundColor: colors.surfaceInfoMuted,
+    borderColor: colors.borderInfoStrong,
+  },
+  deleteActionButton: {
+    backgroundColor: colors.surfaceDangerMuted,
+    borderColor: colors.borderDangerSoft,
+  },
   paginationRow: {
     backgroundColor: colors.card,
     borderTopWidth: 1,
@@ -408,6 +573,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: spacing.lg,
     textAlign: 'center',
+  },
+  deleteConfirmText: {
+    color: colors.textSecondary,
+    ...textRoles.body,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  deleteConfirmName: {
+    color: colors.textStrong,
+    ...textRoles.value,
+  },
+  deleteErrorText: {
+    color: colors.dangerStrong,
+    ...textRoles.label,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.md,
   },
   logoutButton: {
     marginBottom: spacing.md,

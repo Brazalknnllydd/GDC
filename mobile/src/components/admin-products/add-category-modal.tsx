@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,17 +37,10 @@ export function AddCategoryModal({
     control,
     formState: { errors },
     handleSubmit,
-    reset,
   } = useForm<CategoryFormValues>({
     defaultValues: initialValues,
     resolver: zodResolver(categoryFormSchema),
   });
-
-  useEffect(() => {
-    if (visible) {
-      reset(initialValues);
-    }
-  }, [initialValues, reset, visible]);
 
   return (
     <AdminModalShell

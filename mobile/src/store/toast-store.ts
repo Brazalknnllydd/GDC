@@ -14,8 +14,29 @@ export type ToastStore = {
   hideToast: () => void;
 };
 
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useToastStore = create<ToastStore>((set) => ({
   toast: null,
-  showToast: (message, type = 'success') => set({ toast: { message, type, visible: true } }),
-  hideToast: () => set((state) => state.toast ? { toast: { ...state.toast, visible: false } } : state),
+  showToast: (message, type = 'success') => {
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+
+    set({ toast: { message, type, visible: true } });
+
+    toastTimer = setTimeout(() => {
+      set({ toast: null });
+      toastTimer = null;
+    }, 3000);
+  },
+  hideToast: () => {
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+
+    set({ toast: null });
+  },
 }));

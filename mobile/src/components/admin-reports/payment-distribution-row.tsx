@@ -26,23 +26,30 @@ export function PaymentDistributionRow({
   tone = 'primary',
 }: PaymentDistributionRowProps) {
   const iconColor =
-    tone === 'success' ? colors.successBright : tone === 'warning' ? colors.warning : colors.info;
+    tone === 'success' ? colors.successStrong : tone === 'warning' ? colors.warningStrong : colors.infoStrong;
 
   return (
-    <View style={styles.row}>
+    <View
+      style={[
+        styles.row,
+        tone === 'success' && styles.rowSuccess,
+        tone === 'warning' && styles.rowWarning,
+        tone === 'primary' && styles.rowPrimary,
+      ]}>
       <View style={styles.left}>
         <View
           style={[
             styles.iconWrap,
             tone === 'success' && styles.iconSuccess,
             tone === 'warning' && styles.iconWarning,
+            tone === 'primary' && styles.iconPrimary,
           ]}>
           <Icon color={iconColor} size={18} strokeWidth={2} />
         </View>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, tone === 'success' && styles.labelSuccess]}>{label}</Text>
       </View>
 
-      <Text style={styles.amount}>
+      <Text style={[styles.amount, tone === 'success' && styles.amountSuccess]}>
         {amount} {percentageText}
       </Text>
     </View>
@@ -54,7 +61,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderPanel,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  rowSuccess: {
+    backgroundColor: colors.surfaceSuccessMuted,
+    borderColor: colors.borderSuccess,
+  },
+  rowPrimary: {
+    backgroundColor: colors.surfaceInfoMuted,
+    borderColor: colors.borderInfo,
+  },
+  rowWarning: {
+    backgroundColor: colors.surfaceWarningSoft,
+    borderColor: colors.warning,
   },
   left: {
     alignItems: 'center',
@@ -69,8 +94,11 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
     width: 34,
   },
+  iconPrimary: {
+    backgroundColor: colors.surfaceInfoMuted,
+  },
   iconSuccess: {
-    backgroundColor: colors.surfaceSuccessMuted,
+    backgroundColor: colors.surfaceSuccessSoft,
   },
   iconWarning: {
     backgroundColor: colors.surfaceWarningSoft,
@@ -79,8 +107,14 @@ const styles = StyleSheet.create({
     color: colors.textStrong,
     ...textRoles.body,
   },
+  labelSuccess: {
+    color: colors.successStrong,
+  },
   amount: {
     color: colors.textHeading,
     ...textRoles.label,
+  },
+  amountSuccess: {
+    color: colors.successStrong,
   },
 });

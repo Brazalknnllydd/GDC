@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { UserRoundPlus } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
@@ -12,12 +11,20 @@ import { ModalActions } from '../ui/modal-actions';
 import { ProductFormInput } from '../ui/product-form-input';
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
-import { addCashierSchema, type AddCashierFormValues } from '../../lib/form-schemas';
+import {
+  addCashierSchema,
+  editCashierSchema,
+  type AddCashierFormValues,
+} from '../../lib/form-schemas';
+
+type CashierModalMode = 'create' | 'edit';
 
 type AddCashierModalProps = {
   cashiersSaving: boolean;
   categories: Category[];
   formMessage: string;
+  initialValues?: AddCashierFormValues;
+  mode: CashierModalMode;
   onClose: () => void;
   onSave: (values: AddCashierFormValues) => void;
   visible: boolean;
@@ -27,40 +34,33 @@ export function AddCashierModal({
   cashiersSaving,
   categories,
   formMessage,
+  initialValues,
+  mode,
   onClose,
   onSave,
   visible,
 }: AddCashierModalProps) {
   const { height: viewportHeight } = useWindowDimensions();
+  const isEditMode = mode === 'edit';
+  const activeSchema = isEditMode ? editCashierSchema : addCashierSchema;
   const {
     control,
     formState: { errors },
     handleSubmit,
-    reset,
     setValue,
     watch,
   } = useForm<AddCashierFormValues>({
-    defaultValues: {
-      allowedCategoryIds: [],
-      name: '',
-      password: '',
-      username: '',
-    },
-    resolver: zodResolver(addCashierSchema),
-  });
-
-  const selectedCategoryIds = watch('allowedCategoryIds');
-
-  useEffect(() => {
-    if (visible) {
-      reset({
+    defaultValues:
+      initialValues ?? {
         allowedCategoryIds: [],
         name: '',
         password: '',
         username: '',
-      });
-    }
-  }, [reset, visible]);
+      },
+    resolver: zodResolver(activeSchema) as never,
+  });
+
+  const selectedCategoryIds = watch('allowedCategoryIds');
 
   function toggleCategory(categoryId: number) {
     const nextIds = selectedCategoryIds.includes(categoryId)
@@ -81,7 +81,7 @@ export function AddCashierModal({
         <ModalActions stacked>
           <AppButton
             disabled={categories.length === 0}
-            label="Create Cashier"
+            label={isEditMode ? 'Save Changes' : 'Create Cashier'}
             loading={cashiersSaving}
             onPress={handleSubmit(onSave)}
             variant="primary"
@@ -101,7 +101,7 @@ export function AddCashierModal({
       }
       maxHeight="88%"
       onClose={onClose}
-      title="Add Cashier"
+      title={isEditMode ? 'Edit Cashier' : 'Add Cashier'}
       visible={visible}>
       <ScrollView
         contentContainerStyle={styles.formContent}
@@ -146,9 +146,9 @@ export function AddCashierModal({
             <ProductFormInput
               compact
               errorMessage={errors.password?.message}
-              label="PASSWORD"
+              label={isEditMode ? 'NEW PASSWORD (OPTIONAL)' : 'PASSWORD'}
               onChangeText={onChange}
-              placeholder="At least 6 characters"
+              placeholder={isEditMode ? 'Leave blank to keep the current password' : 'At least 6 characters'}
               secureTextEntry
               value={value}
             />

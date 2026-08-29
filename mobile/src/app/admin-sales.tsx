@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
+import { useQuery } from '@tanstack/react-query';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CalendarDays, Download, History, QrCode, WalletCards, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
@@ -241,6 +242,7 @@ export default function AdminSalesScreen() {
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
   const [isExportVisible, setIsExportVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [screenError, setScreenError] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const [showOverviewMonthRangePicker, setShowOverviewMonthRangePicker] = useState(false);
   const [overviewCalendarYear, setOverviewCalendarYear] = useState(new Date().getFullYear());
@@ -259,26 +261,17 @@ export default function AdminSalesScreen() {
     endMonth: null,
     startMonth: null,
   });
-  const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [screenError, setScreenError] = useState('');
+  const salesQuery = useQuery({
+    queryKey: ['sales'],
+    queryFn: async () => {
+      const response = await apiClient.get<SaleRecord[]>('/sales');
+      return response.data;
+    },
+  });
 
-  useEffect(() => {
-    setHistoryPage(1);
-  }, [selectedHistoryFilter, historyMonthRange]);
-
-  useEffect(() => {
-    async function loadSales() {
-      try {
-        setScreenError('');
-        const response = await apiClient.get<SaleRecord[]>('/sales');
-        setSales(response.data);
-      } catch {
-        setScreenError('Could not load sales right now.');
-      }
-    }
-
-    loadSales();
-  }, []);
+  const sales = salesQuery.data ?? [];
+  const queryError = salesQuery.error?.message || '';
+  const displayError = queryError || screenError;
 
   const filteredSales = useMemo(
     () => sales.filter((sale) => sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, overviewMonthRange)),
@@ -377,10 +370,11 @@ export default function AdminSalesScreen() {
 
   const itemsPerPage = 10;
   const totalHistoryPages = Math.ceil(historyTransactions.length / itemsPerPage) || 1;
+  const activeHistoryPage = Math.min(historyPage, totalHistoryPages);
   const paginatedHistoryTransactions = useMemo(() => {
-    const start = (historyPage - 1) * itemsPerPage;
+    const start = (activeHistoryPage - 1) * itemsPerPage;
     return historyTransactions.slice(start, start + itemsPerPage);
-  }, [historyTransactions, historyPage]);
+  }, [historyTransactions, activeHistoryPage]);
 
   const historyEntries = useMemo<HistoryEntry[]>(() => {
     return historyTransactions.flatMap((sale) =>
@@ -999,7 +993,10 @@ export default function AdminSalesScreen() {
           <View>
             <MonthRangePicker
               displayYear={historyCalendarYear}
-              onChangeRange={setHistoryMonthRange}
+              onChangeRange={(range) => {
+                setHistoryMonthRange(range);
+                setHistoryPage(1);
+              }}
               onChangeYear={setHistoryCalendarYear}
               range={historyMonthRange}
             />
@@ -1014,6 +1011,7 @@ export default function AdminSalesScreen() {
                     startMonth: currentMonth,
                   });
                   setHistoryCalendarYear(now.getFullYear());
+                  setHistoryPage(1);
                 }}
                 style={styles.historyRangeActionButton}>
                 <Text style={styles.historyRangeActionText}>This Month</Text>
@@ -1023,6 +1021,7 @@ export default function AdminSalesScreen() {
                 onPress={() => {
                   setHistoryMonthRange({ endMonth: null, startMonth: null });
                   setHistoryCalendarYear(new Date().getFullYear());
+                  setHistoryPage(1);
                 }}
                 style={styles.historyRangeActionButton}>
                 <Text style={styles.historyRangeActionText}>Clear</Text>
@@ -1038,7 +1037,10 @@ export default function AdminSalesScreen() {
           {(['All', 'Cash', 'GCash'] as const).map((filter) => (
             <Pressable
               key={filter}
-              onPress={() => setSelectedHistoryFilter(filter)}
+              onPress={() => {
+                setSelectedHistoryFilter(filter);
+                setHistoryPage(1);
+              }}
               style={[
                 styles.historyFilterChip,
                 selectedHistoryFilter === filter && styles.historyFilterChipActive,
@@ -1075,7 +1077,7 @@ export default function AdminSalesScreen() {
               {paginatedHistoryTransactions.length > 0 ? (
                 paginatedHistoryTransactions.map((sale) => (
                   <View key={sale.id} style={[styles.tableRow, isTablet && styles.tableRowTablet]}>
-                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.2, minWidth: 82, fontFamily: fonts.semiBold, color: colors.textStrong }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.2, minWidth: 82, ...textRoles.value, color: colors.textStrong }]}>
                       {sale.receiptNumber}
                     </Text>
                     <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.6, minWidth: 112 }]}>
@@ -1091,7 +1093,7 @@ export default function AdminSalesScreen() {
                       {sale.paymentMethod}
                       {sale.status === 'voided' ? '\n(Voided)' : ''}
                     </Text>
-                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.1, minWidth: 76, textAlign: 'right', fontFamily: fonts.semiBold, color: sale.status === 'voided' ? colors.textTertiary : colors.textStrong, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
+                    <Text style={[styles.tableCell, isTablet && styles.tableCellTablet, { flex: 1.1, minWidth: 76, textAlign: 'right', ...textRoles.value, color: sale.status === 'voided' ? colors.textTertiary : colors.textStrong, textDecorationLine: sale.status === 'voided' ? 'line-through' : 'none' }]}>
                       {formatPeso(normalizeNumber(sale.totalAmount))}
                     </Text>
                   </View>
@@ -1169,7 +1171,7 @@ export default function AdminSalesScreen() {
         </SurfaceCard>
       ) : null}
 
-      {screenError ? <Text style={styles.screenErrorText}>{screenError}</Text> : null}
+      {displayError ? <Text style={styles.screenErrorText}>{displayError}</Text> : null}
     </AdminPageScreen>
   );
 }
@@ -1183,7 +1185,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     color: colors.textTertiary,
-    fontFamily: fonts.medium,
+    ...textRoles.label,
     fontSize: 13,
     marginLeft: 6,
   },

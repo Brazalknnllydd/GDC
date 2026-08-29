@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CreditCard, Download } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -123,12 +124,10 @@ const pdfColors = {
 
 export default function AdminReportsScreen() {
   const { compactPhone } = useResponsiveLayout();
-  const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [screenError, setScreenError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [isExportVisible, setIsExportVisible] = useState(false);
   const [selectedExportFormat, setSelectedExportFormat] = useState<ReportExportFormat>('excel');
+  const [screenError, setScreenError] = useState('');
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [reportMonthRange, setReportMonthRange] = useState<MonthRangeValue>(() => {
@@ -141,30 +140,31 @@ export default function AdminReportsScreen() {
       startMonth,
     };
   });
+  const salesQuery = useQuery({
+    queryKey: ['sales'],
+    queryFn: async () => {
+      const response = await apiClient.get<SaleRecord[]>('/sales');
+      return response.data;
+    },
+  });
+  const productsQuery = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const response = await apiClient.get<Product[]>('/products');
+      return response.data;
+    },
+  });
+
+  const sales = salesQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+  const queryError = salesQuery.error?.message || productsQuery.error?.message || '';
+  const displayError = queryError || screenError;
 
   const reportTabs = productTabs.map((tab) =>
     tab.label === 'Reports'
       ? { ...tab, active: true, route: '/admin-reports' as const }
       : { ...tab, active: false }
   );
-
-  useEffect(() => {
-    async function loadReportsData() {
-      try {
-        setScreenError('');
-        const [salesResponse, productsResponse] = await Promise.all([
-          apiClient.get<SaleRecord[]>('/sales'),
-          apiClient.get<Product[]>('/products'),
-        ]);
-        setSales(salesResponse.data);
-        setProducts(productsResponse.data);
-      } catch {
-        setScreenError('Could not load report data right now.');
-      }
-    }
-
-    loadReportsData();
-  }, []);
 
   const { categoryPerformance, chartSeries, insightCards, paymentDistribution, reportMetrics, totals } =
     useReportsAnalytics({
@@ -734,7 +734,7 @@ export default function AdminReportsScreen() {
         ))}
       </SurfaceCard>
 
-      {screenError ? <Text style={styles.screenErrorText}>{screenError}</Text> : null}
+      {displayError ? <Text style={styles.screenErrorText}>{displayError}</Text> : null}
     </AdminPageScreen>
   );
 }

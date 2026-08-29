@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -143,6 +144,8 @@ export default function CashierScreen() {
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [scannerFeedback, setScannerFeedback] = useState('');
   const [scannerEnabled, setScannerEnabled] = useState(true);
+  const [cameraReady, setCameraReady] = useState(false);
+  const scannerRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { categories, dashboard, products, loadWorkspace: reloadWorkspace, screenError, isWorkspaceLoading } = useCashierStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -158,6 +161,14 @@ export default function CashierScreen() {
   useEffect(() => {
     reloadWorkspace();
   }, [reloadWorkspace]);
+
+  useEffect(() => {
+    return () => {
+      if (scannerRetryTimeoutRef.current) {
+        clearTimeout(scannerRetryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Shift states
   const [showOpeningCashModal, setShowOpeningCashModal] = useState(false);
@@ -258,30 +269,15 @@ export default function CashierScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    setActiveSection('register');
-  }, []);
-
-  useEffect(() => {
-    if (selectedCategory === 'All') {
-      return;
-    }
-
-    const categoryStillExists = categories.some((category) => category.name === selectedCategory);
-
-    if (!categoryStillExists) {
-      setSelectedCategory('All');
-    }
-  }, [categories, selectedCategory]);
-
   const categoryChips = useMemo(
     () => ['All', ...categories.map((category) => category.name)],
     [categories]
   );
+  const activeSelectedCategory = categoryChips.includes(selectedCategory) ? selectedCategory : 'All';
 
   const filteredProducts = useMemo(
-    () => filterProducts(products, selectedCategory, searchQuery),
-    [products, selectedCategory, searchQuery]
+    () => filterProducts(products, activeSelectedCategory, searchQuery),
+    [products, activeSelectedCategory, searchQuery]
   );
   // Calculate layout variables for responsive product grid
   const productCardWidth = isWideTablet ? '31.5%' : isTablet ? '48.2%' : '48%';
@@ -292,8 +288,15 @@ export default function CashierScreen() {
   async function openProductScanner() {
     triggerHaptic('medium');
     setScannerFeedback('');
+    setCameraReady(false);
 
     if (!cameraPermission?.granted) {
+      if (!requestCameraPermission) {
+        setScannerFeedback('Camera permission is unavailable on this build.');
+        setShowScannerModal(true);
+        return;
+      }
+
       const nextPermission = await requestCameraPermission();
 
       if (!nextPermission.granted) {
@@ -308,7 +311,7 @@ export default function CashierScreen() {
   }
 
   function handleBarcodeScanned(result: BarcodeScanningResult) {
-    if (!scannerEnabled) {
+    if (!scannerEnabled || !cameraPermission?.granted) {
       return;
     }
 
@@ -319,10 +322,14 @@ export default function CashierScreen() {
 
     setScannerEnabled(false);
 
+    if (scannerRetryTimeoutRef.current) {
+      clearTimeout(scannerRetryTimeoutRef.current);
+    }
+
     if (!matchedProduct) {
       setScannerFeedback(`No product found for barcode ${scannedBarcode}.`);
       setSearchQuery(scannedBarcode);
-      setTimeout(() => setScannerEnabled(true), 1400);
+      scannerRetryTimeoutRef.current = setTimeout(() => setScannerEnabled(true), 1400);
       return;
     }
 
@@ -330,6 +337,17 @@ export default function CashierScreen() {
     setSelectedCategory('All');
     setSearchQuery('');
     setScannerFeedback(`${matchedProduct.name} added to cart.`);
+    setShowScannerModal(false);
+  }
+
+  function closeScannerModal() {
+    if (scannerRetryTimeoutRef.current) {
+      clearTimeout(scannerRetryTimeoutRef.current);
+      scannerRetryTimeoutRef.current = null;
+    }
+
+    setCameraReady(false);
+    setScannerEnabled(true);
     setShowScannerModal(false);
   }
 
@@ -649,12 +667,12 @@ export default function CashierScreen() {
         footer={
           <AppButton
             label="Close Scanner"
-            onPress={() => setShowScannerModal(false)}
+            onPress={closeScannerModal}
             variant="secondary"
           />
         }
         height={Math.min(height * 0.74, 620)}
-        onClose={() => setShowScannerModal(false)}
+        onClose={closeScannerModal}
         title="Scan Product"
         visible={showScannerModal}>
         <View style={styles.scannerContent}>
@@ -666,11 +684,20 @@ export default function CashierScreen() {
                 barcodeScannerSettings={{
                   barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'itf14', 'code39', 'code128'],
                 }}
-                onBarcodeScanned={scannerEnabled ? handleBarcodeScanned : undefined}
+                onBarcodeScanned={scannerEnabled && cameraReady ? handleBarcodeScanned : undefined}
+                onCameraReady={() => setCameraReady(true)}
                 style={styles.cameraPreview}
               />
               <View style={styles.scanGuide} />
             </View>
+          ) : !cameraPermission ? (
+            <SurfaceCard style={styles.scannerPermissionCard}>
+              <ActivityIndicator color={colors.secondary} />
+              <Text style={styles.scannerTitle}>Preparing camera</Text>
+              <Text style={styles.scannerCopy}>
+                Waiting for the camera module to initialize.
+              </Text>
+            </SurfaceCard>
           ) : (
             <SurfaceCard style={styles.scannerPermissionCard}>
               <Text style={styles.scannerTitle}>Camera access needed</Text>

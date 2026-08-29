@@ -39,6 +39,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../lib/query-client';
 import { GlobalToast } from '../components/global-toast';
 
+const STACK_SCREEN_OPTIONS = { headerShown: false, animation: 'none' } as const;
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -75,16 +77,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <PaperProvider theme={paperTheme}>
-        <Stack screenOptions={{ headerShown: false, animation: 'none' }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="admin" />
-          <Stack.Screen name="admin-products" />
-          <Stack.Screen name="admin-customers" />
-          <Stack.Screen name="admin-sales" />
-          <Stack.Screen name="admin-reports" />
-          <Stack.Screen name="admin-settings" />
-          <Stack.Screen name="cashier" />
-        </Stack>
+        <Stack screenOptions={STACK_SCREEN_OPTIONS} />
         <GlobalToast />
       </PaperProvider>
     </QueryClientProvider>

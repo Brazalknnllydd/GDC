@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { Platform, PermissionsAndroid } from 'react-native';
-import { BLEPrinter } from 'react-native-thermal-receipt-printer';
 import { useToastStore } from './toast-store';
 
 export interface BluetoothDevice {
@@ -42,7 +41,19 @@ async function requestBluetoothPermissions() {
   }
 }
 
-export const usePrinterStore = create<PrinterState>((set, get) => ({
+function getBLEPrinter() {
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+
+  try {
+    return require('react-native-thermal-receipt-printer').BLEPrinter ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export const usePrinterStore = create<PrinterState>((set) => ({
   printerUrl: null,
   printerMacAddress: null,
   printerName: null,
@@ -54,14 +65,15 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
   loadPrinter: async () => {
     if (Platform.OS === 'web') return;
     try {
+      const BLEPrinter = getBLEPrinter();
       const mac = await SecureStore.getItemAsync('printer_mac');
       const name = await SecureStore.getItemAsync('printer_name');
       const url = await SecureStore.getItemAsync('printer_url');
       set({ printerMacAddress: mac, printerName: name, printerUrl: url });
 
-      if (mac && Platform.OS === 'android') {
+      if (mac && BLEPrinter?.init) {
         const hasPermission = await requestBluetoothPermissions();
-        if (hasPermission && BLEPrinter?.init) {
+        if (hasPermission) {
           try {
             await BLEPrinter.init();
             await BLEPrinter.connectPrinter(mac.trim());
@@ -82,7 +94,9 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
 
   scanForPrinters: async () => {
     if (Platform.OS !== 'android') return;
-    
+
+    const BLEPrinter = getBLEPrinter();
+
     // Check if the native module actually loaded (fails in Expo Go)
     if (!BLEPrinter || !BLEPrinter.init) {
       useToastStore.getState().showToast('Bluetooth printing needs the installed development build.', 'error');
@@ -129,6 +143,12 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
 
   connectPrinter: async (device: BluetoothDevice) => {
     if (Platform.OS !== 'android') return false;
+    const BLEPrinter = getBLEPrinter();
+    if (!BLEPrinter || !BLEPrinter.init) {
+      useToastStore.getState().showToast('Bluetooth printing needs the installed development build.', 'error');
+      return false;
+    }
+
     set({ isConnecting: true });
     useToastStore.getState().showToast(`Connecting to ${device.name || 'printer'}...`, 'info');
     try {
@@ -180,6 +200,7 @@ export const usePrinterStore = create<PrinterState>((set, get) => ({
   disconnectPrinter: async () => {
     if (Platform.OS === 'web') return;
     try {
+      const BLEPrinter = getBLEPrinter();
       try {
         await BLEPrinter?.closeConn?.();
       } catch {

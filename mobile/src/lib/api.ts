@@ -4,6 +4,13 @@ import { Platform } from 'react-native';
 import { getAuthToken, getPersistedAuthToken } from './auth-session';
 
 const DEV_API_PORT = '5001';
+function readApiBaseUrl(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+const configuredApiBaseUrl =
+  readApiBaseUrl(Constants.expoConfig?.extra?.apiBaseUrl) ||
+  readApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
 
 function extractHost(value?: string | null) {
   if (!value) {
@@ -46,8 +53,12 @@ function getDevHost() {
   return 'localhost';
 }
 
+if (!__DEV__ && !configuredApiBaseUrl) {
+  throw new Error('API base URL is not configured for production builds.');
+}
+
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL || `http://${getDevHost()}:${DEV_API_PORT}`;
+  configuredApiBaseUrl || `http://${getDevHost()}:${DEV_API_PORT}`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

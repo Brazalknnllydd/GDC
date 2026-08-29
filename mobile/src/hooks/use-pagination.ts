@@ -38,7 +38,8 @@ export function usePagination<T>({
   }, [page, totalPages]);
 
   useEffect(() => {
-    setPage(0);
+    const timeout = setTimeout(() => setPage(0), 0);
+    return () => clearTimeout(timeout);
   }, resetDependencies);
 
   useEffect(() => {
@@ -46,7 +47,8 @@ export function usePagination<T>({
       return;
     }
 
-    setPage(Math.max(totalPages - 1, 0));
+    const timeout = setTimeout(() => setPage(Math.max(totalPages - 1, 0)), 0);
+    return () => clearTimeout(timeout);
   }, [page, totalPages]);
 
   return {

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bot,
@@ -30,6 +31,7 @@ import { apiClient } from "../lib/api";
 import { formatPeso, normalizeNumber } from "../lib/product-utils";
 import { usePagination } from "../hooks/use-pagination";
 import { useResponsiveLayout } from "../hooks/use-responsive-layout";
+import type { SaleRecord } from "../lib/sales-types";
 
 type Product = {
   id: number;
@@ -39,14 +41,6 @@ type Product = {
 
 type Category = {
   id: number;
-};
-
-type SaleRecord = {
-  id: number;
-  receiptNumber: string;
-  totalAmount: number | string;
-  paymentMethod: string;
-  createdAt: string;
 };
 
 const dashboardTabs = baseTabs.map((tab) =>
@@ -98,11 +92,40 @@ function buildSevenDayRevenueSeries(sales: SaleRecord[]) {
 export default function AdminScreen() {
   const { compactPhone } = useResponsiveLayout();
   const params = useLocalSearchParams<{ name?: string }>();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [screenError, setScreenError] = useState("");
   const [showBot, setShowBot] = useState(false);
+  const productsQuery = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const response = await apiClient.get<Product[]>('/products');
+      return response.data;
+    },
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await apiClient.get<Category[]>('/categories');
+      return response.data;
+    },
+  });
+  const salesQuery = useQuery({
+    queryKey: ['sales'],
+    queryFn: async () => {
+      const response = await apiClient.get<SaleRecord[]>('/sales');
+      return response.data.slice().sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      );
+    },
+  });
+
+  const products = productsQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+  const sales = salesQuery.data ?? [];
+  const screenError =
+    productsQuery.error?.message ||
+    categoriesQuery.error?.message ||
+    salesQuery.error?.message ||
+    "";
 
   const displayName = useMemo(() => {
     if (typeof params.name === "string" && params.name.trim()) {
@@ -111,34 +134,6 @@ export default function AdminScreen() {
 
     return "Admin";
   }, [params.name]);
-
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        setScreenError("");
-        const [productsResponse, categoriesResponse, salesResponse] =
-          await Promise.all([
-            apiClient.get<Product[]>("/products"),
-            apiClient.get<Category[]>("/categories"),
-            apiClient.get<SaleRecord[]>("/sales"),
-          ]);
-
-        setProducts(productsResponse.data);
-        setCategories(categoriesResponse.data);
-        setSales(
-          salesResponse.data.sort(
-            (left, right) =>
-              new Date(right.createdAt).getTime() -
-              new Date(left.createdAt).getTime(),
-          ),
-        );
-      } catch {
-        setScreenError("Could not load dashboard data right now.");
-      }
-    }
-
-    loadDashboardData();
-  }, []);
 
   const todaySales = useMemo(
     () => sales.filter((sale) => isToday(sale.createdAt)),
@@ -319,7 +314,7 @@ export default function AdminScreen() {
                     <Text
                       style={[
                         styles.tableCell,
-                        { flex: 1.5, fontFamily: fonts.medium },
+                        { flex: 1.5, ...textRoles.value, color: colors.textStrong },
                       ]}
                     >
                       {transaction.receiptNumber}
@@ -489,7 +484,7 @@ const styles = StyleSheet.create({
   },
   tableCellAmount: {
     color: colors.secondary,
-    fontFamily: fonts.semiBold,
+    ...textRoles.value,
     fontSize: 16,
     textAlign: "right",
   },

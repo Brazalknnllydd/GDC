@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 
@@ -34,20 +34,15 @@ export function CashierInventorySection({
 
     return ['All', ...Array.from(names)];
   }, [products]);
+  const activeSelectedCategory = categories.includes(selectedCategory) ? selectedCategory : 'All';
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === 'All') {
+    if (activeSelectedCategory === 'All') {
       return products;
     }
 
-    return products.filter((product) => product.category?.name === selectedCategory);
-  }, [products, selectedCategory]);
-
-  useEffect(() => {
-    if (selectedCategory !== 'All' && !categories.includes(selectedCategory)) {
-      setSelectedCategory('All');
-    }
-  }, [categories, selectedCategory]);
+    return products.filter((product) => product.category?.name === activeSelectedCategory);
+  }, [products, activeSelectedCategory]);
 
   return (
     <FlashList
@@ -66,7 +61,7 @@ export function CashierInventorySection({
           <View style={styles.filterRow}>
             <AppSelect
               options={categories}
-              value={selectedCategory}
+              value={activeSelectedCategory}
               onValueChange={setSelectedCategory}
             />
           </View>

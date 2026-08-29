@@ -50,9 +50,11 @@ export function AiChatModal({ visible, onClose }: AiChatModalProps) {
 
   useEffect(() => {
     if (visible) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [visible, messages]);
 

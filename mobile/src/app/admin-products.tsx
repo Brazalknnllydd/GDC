@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, useWindowDimensions, StyleSheet } from 'react-native';
 import { Search, PackagePlus, Shapes, X } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -33,10 +33,14 @@ const productsPerPage = 10;
 
 export default function AdminProductsScreen() {
   const { compactPhone } = useResponsiveLayout();
-  const activeTabs = productTabs.map((tab) =>
-    tab.label === 'Products'
-      ? { ...tab, active: true, route: '/admin-products' as const }
-      : { ...tab, active: false }
+  const activeTabs = useMemo(
+    () =>
+      productTabs.map((tab) =>
+        tab.label === 'Products'
+          ? { ...tab, active: true, route: '/admin-products' as const }
+          : { ...tab, active: false }
+      ),
+    []
   );
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
@@ -56,6 +60,7 @@ export default function AdminProductsScreen() {
   const [showManageCategories, setShowManageCategories] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [categoryModalRevision, setCategoryModalRevision] = useState(0);
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<Category | null>(null);
 
   // Queries
@@ -76,6 +81,21 @@ export default function AdminProductsScreen() {
   });
 
   const isLoadingProducts = isLoadingCategories || isLoadingProductsList;
+  const addCategoryInitialValues = useMemo(() => {
+    if (editingCategoryId === null) {
+      return {
+        categoryDescription: '',
+        categoryName: '',
+      };
+    }
+
+    const editingCategory = categories.find((category) => category.id === editingCategoryId);
+
+    return {
+      categoryDescription: editingCategory?.description ?? '',
+      categoryName: editingCategory?.name ?? '',
+    };
+  }, [categories, editingCategoryId]);
 
   // Mutations for categories
   const deleteCategoryMutation = useMutation({
@@ -125,25 +145,20 @@ export default function AdminProductsScreen() {
     }
   });
 
-  useEffect(() => {
-    if (selectedCategory !== 'All' && !categories.some(c => c.name === selectedCategory)) {
-      setSelectedCategory('All');
-    }
-  }, [categories, selectedCategory]);
-
   const categoryChips = useMemo(() => ['All', ...categories.map(c => c.name)], [categories]);
+  const activeCategory = categoryChips.includes(selectedCategory) ? selectedCategory : 'All';
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     return products.filter((product) => {
-      const matchesCategory = selectedCategory === 'All' || product.category.name === selectedCategory;
+      const matchesCategory = activeCategory === 'All' || product.category.name === activeCategory;
       const matchesQuery = !normalizedQuery || 
         product.name.toLowerCase().includes(normalizedQuery) ||
         product.category.name.toLowerCase().includes(normalizedQuery) ||
         (product.barcode || '').toLowerCase().includes(normalizedQuery);
       return matchesCategory && matchesQuery;
     });
-  }, [products, searchQuery, selectedCategory]);
+  }, [products, searchQuery, activeCategory]);
 
   const {
     endItem: productPageEnd,
@@ -156,7 +171,7 @@ export default function AdminProductsScreen() {
   } = usePagination({
     items: filteredProducts,
     itemsPerPage: productsPerPage,
-    resetDependencies: [searchQuery, selectedCategory],
+    resetDependencies: [searchQuery, activeCategory],
   });
 
   const overviewCards = useMemo(() => {
@@ -264,23 +279,23 @@ export default function AdminProductsScreen() {
         onCreate={() => {
           setShowManageCategories(false);
           setEditingCategoryId(null);
+          setCategoryModalRevision((value) => value + 1);
           setShowAddCategory(true);
         }}
         onDelete={(category) => setCategoryPendingDelete(category as unknown as Category)}
         onEdit={(category) => {
           setShowManageCategories(false);
           setEditingCategoryId(category.id);
+          setCategoryModalRevision((value) => value + 1);
           setShowAddCategory(true);
         }}
         visible={showManageCategories}
       />
 
       <AddCategoryModal
+        key={`${categoryModalRevision}-${editingCategoryId ?? 'new'}`}
         isSavingCategory={saveCategoryMutation.isPending}
-        initialValues={{
-          categoryName: (editingCategoryId !== null ? categories.find(c => c.id === editingCategoryId)?.name : '') || '',
-          categoryDescription: (editingCategoryId !== null ? (categories.find(c => c.id === editingCategoryId) as any)?.description : '') || ''
-        }}
+        initialValues={addCategoryInitialValues}
         mode={editingCategoryId !== null ? 'edit' : 'create'}
         onClose={() => {
           setShowAddCategory(false);

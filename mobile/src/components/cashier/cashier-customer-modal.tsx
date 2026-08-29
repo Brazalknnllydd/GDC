@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -38,13 +38,7 @@ export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, vi
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      loadCustomers();
-    }
-  }, [visible, search]);
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await apiClient.get('/customers', {
@@ -56,7 +50,13 @@ export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, vi
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
+
+  useEffect(() => {
+    if (visible) {
+      void loadCustomers();
+    }
+  }, [visible, loadCustomers]);
 
   const handleSelect = (customer: Customer | null) => {
     triggerHaptic('medium');

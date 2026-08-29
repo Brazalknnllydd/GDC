@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,7 +17,7 @@ import { Eye, EyeClosed, LogIn, Lock, ShieldCheck, User } from 'lucide-react-nat
 
 import { controlHeights, radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textSizes } from '../constants/theme';
-import { API_BASE_URL } from '../lib/api';
+import { apiClient } from '../lib/api';
 import {
   clearAuthSession,
   saveAuthSession,
@@ -56,7 +55,7 @@ export default function LoginScreen() {
       setToken('');
       await clearAuthSession();
 
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+      const response = await apiClient.post('/auth/login', {
         username: trimmedUsername,
         password,
       });
@@ -77,11 +76,7 @@ export default function LoginScreen() {
       });
     } catch (error) {
       await clearAuthSession();
-      if (axios.isAxiosError(error)) {
-        setErrorMessage(error.response?.data?.message ?? 'Unable to sign in right now.');
-      } else {
-        setErrorMessage('Unable to sign in right now.');
-      }
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in right now.');
     } finally {
       setIsSubmitting(false);
     }

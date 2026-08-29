@@ -118,6 +118,7 @@ type CashierState = {
   categories: Category[];
   screenError: string;
   isWorkspaceLoading: boolean;
+  hasLoadedWorkspace: boolean;
 
   // Checkout state
   cart: CartItem[];
@@ -137,7 +138,7 @@ type CashierState = {
 };
 
 type CashierActions = {
-  loadWorkspace: () => Promise<void>;
+  loadWorkspace: (options?: { force?: boolean }) => Promise<void>;
   setScreenError: (error: string) => void;
 
   clearCart: () => void;
@@ -172,6 +173,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
   categories: [],
   screenError: '',
   isWorkspaceLoading: false,
+  hasLoadedWorkspace: false,
 
   // Checkout state
   cart: [],
@@ -191,7 +193,15 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
   // Actions
   setScreenError: (screenError) => set({ screenError }),
-  loadWorkspace: async () => {
+  loadWorkspace: async (options) => {
+    if (get().isWorkspaceLoading) {
+      return;
+    }
+
+    if (get().hasLoadedWorkspace && !options?.force) {
+      return;
+    }
+
     set({ isWorkspaceLoading: true, screenError: '' });
     try {
       const [dashboardResponse, productsResponse, categoriesResponse] =
@@ -219,6 +229,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
         dashboard,
         categories: visibleCategories,
         products: visibleProducts,
+        hasLoadedWorkspace: true,
       });
     } catch (error) {
       set({ screenError: getApiErrorMessage(error, 'Could not load cashier workspace right now.') });

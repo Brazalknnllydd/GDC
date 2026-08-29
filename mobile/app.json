@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "GDC POS",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -65,7 +65,8 @@
       "router": {},
       "eas": {
         "projectId": "f71a4a27-2840-4b13-aebe-63430d10ae0a"
-      }
+      },
+      "apiBaseUrl": "https://gdc-vyr4.onrender.com"
     }
   }
 }

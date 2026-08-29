@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Bell } from 'lucide-react-native';
 import { Avatar, IconButton, Surface } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
@@ -36,15 +35,6 @@ export function CashierDashboardHeader({
         <Text style={styles.timeText}>{formatCashierTime(currentDate)}</Text>
       </View>
 
-      <View style={styles.iconWrap}>
-        <IconButton
-          icon={() => <Bell color={colors.secondary} size={21} strokeWidth={2.1} />}
-          onPress={() => {}}
-          size={20}
-          style={styles.iconButton}
-        />
-        <View style={styles.notificationDot} />
-      </View>
     </Surface>
   );
 }
@@ -102,20 +92,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: textSizes.title,
     lineHeight: 22,
-  },
-  iconWrap: {
-    position: 'relative',
-  },
-  iconButton: {
-    margin: 0,
-  },
-  notificationDot: {
-    backgroundColor: colors.dangerDot,
-    borderRadius: radius.round,
-    height: 6,
-    position: 'absolute',
-    right: 1,
-    top: 2,
-    width: 6,
   },
 });

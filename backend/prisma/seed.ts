@@ -10,6 +10,11 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  // Keep deployment data clean: remove any seeded/demo product records first.
+  // This preserves users/roles while clearing catalog data for a fresh deploy.
+  await prisma.inventoryLog.deleteMany({});
+  await prisma.product.deleteMany({});
+
   const adminRole = await prisma.role.upsert({
     where: { name: "Admin" },
     update: {},
@@ -23,7 +28,7 @@ async function main() {
   });
 
   const [adminPassword, cashierPassword] = await Promise.all([
-    bcrypt.hash("admin123", 10),
+    bcrypt.hash("adminGDC2026@", 10),
     bcrypt.hash("cashier123", 10),
   ]);
 

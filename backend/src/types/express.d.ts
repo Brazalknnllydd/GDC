@@ -8,6 +8,7 @@ export type AuthenticatedUser = {
 declare module "express-serve-static-core" {
   interface Request {
     authUser?: AuthenticatedUser;
+    file?: Express.Multer.File;
   }
 }
 

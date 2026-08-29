@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, RefreshControl, Pressable } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { FileText, Unlock, Lock, Calendar as CalendarIcon, X, UserCircle2 } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import DateTimePicker from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
+import { useQuery } from '@tanstack/react-query';
 
 import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
@@ -41,11 +40,17 @@ type Shift = {
 };
 
 export default function AdminShiftsScreen() {
-  const router = useRouter();
   const { isTablet } = useResponsiveLayout();
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const shiftsQuery = useQuery({
+    queryKey: ['shifts'],
+    queryFn: async () => {
+      const res = await apiClient.get<Shift[]>('/shifts');
+      return res.data;
+    },
+  });
+  const shifts = shiftsQuery.data ?? [];
+  const isLoading = shiftsQuery.isLoading;
+  const screenError = shiftsQuery.error?.message || '';
 
   const shiftTabs = tabs.map((tab) =>
     tab.label === 'Shifts'
@@ -82,28 +87,6 @@ export default function AdminShiftsScreen() {
     resetDependencies: [filterDate, shifts],
   });
 
-  const fetchShifts = async () => {
-    try {
-      setIsLoading(true);
-      const res = await apiClient.get<Shift[]>('/shifts');
-      setShifts(res.data);
-    } catch (err) {
-      console.error('Failed to fetch shifts', err);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchShifts();
-  }, []);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchShifts();
-  };
-
   const openActionModal = (shift: Shift, type: 'FORCE_CLOSE' | 'REOPEN') => {
     setSelectedShift(shift);
     setActionType(type);
@@ -121,7 +104,7 @@ export default function AdminShiftsScreen() {
         await apiClient.put(`/shifts/${selectedShift.id}/reopen`, { notes });
       }
       setShowActionModal(false);
-      fetchShifts();
+      await shiftsQuery.refetch();
     } catch (err) {
       console.error('Failed to update shift', err);
       alert('Failed to update shift. Please try again.');
@@ -162,8 +145,15 @@ export default function AdminShiftsScreen() {
         </View>
       </View>
 
+      {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
+
       <SurfaceCard style={{ padding: 0, overflow: 'hidden', borderWidth: 0 }}>
-        <ScrollView horizontal={!isTablet} showsHorizontalScrollIndicator={false}>
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <Text style={styles.loadingText}>Loading shifts...</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal={!isTablet} showsHorizontalScrollIndicator={false}>
           <View style={[styles.tableContent, isTablet && styles.tableContentTablet]}>
             {/* Table Header */}
             <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
@@ -248,7 +238,8 @@ export default function AdminShiftsScreen() {
               );
             })}
           </View>
-        </ScrollView>
+          </ScrollView>
+        )}
 
         <View style={{ paddingVertical: 16, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: colors.borderPanel, backgroundColor: colors.surfaceSoft }}>
           <PaginationControls
@@ -456,6 +447,21 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     width: 32,
+  },
+  loadingState: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.body,
+  },
+  errorText: {
+    color: colors.danger,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+    marginBottom: spacing.sm,
   },
   modalContent: {
     paddingTop: spacing.md,

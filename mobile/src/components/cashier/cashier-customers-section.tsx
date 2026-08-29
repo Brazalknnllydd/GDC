@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Plus, Search, Users } from 'lucide-react-native';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TextInput as PaperTextInput } from 'react-native-paper';
 
 import { CashierCustomerListItem } from './cashier-customer-list-item';
@@ -44,16 +45,10 @@ const EMPTY_FORM: FormState = { name: '', phoneNumber: '', address: '', notes: '
 
 export function CashierCustomersSection() {
   const { isTablet } = useResponsiveLayout();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // Reset page to 1 when search query changes
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery]);
+  const queryClient = useQueryClient();
 
   // Create / Edit modal
   const [showFormModal, setShowFormModal] = useState(false);
@@ -67,27 +62,33 @@ export function CashierCustomersSection() {
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadCustomers = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const query = searchQuery.trim() ? `&search=${encodeURIComponent(searchQuery.trim())}` : '';
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+      setPage(1);
+    }, searchQuery.trim() ? 350 : 0);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const customersQuery = useQuery({
+    queryKey: ['customers', page, debouncedSearchQuery],
+    queryFn: async () => {
+      const query = debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : '';
       const res = await apiClient.get<{ data: Customer[]; totalPages: number }>(
         `/customers?page=${page}&limit=15${query}`
       );
-      setCustomers(res.data.data);
-      setTotalPages(res.data.totalPages);
-    } catch {
-      setCustomers([]);
-      setTotalPages(1);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery, page]);
+      return res.data;
+    },
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => { void loadCustomers(); }, searchQuery ? 350 : 0);
-    return () => clearTimeout(timer);
-  }, [loadCustomers, searchQuery]);
+  const customers = customersQuery.data?.data ?? [];
+  const totalPages = customersQuery.data?.totalPages ?? 1;
+  const isLoading = customersQuery.isLoading && !customersQuery.data;
+  const screenError = customersQuery.error
+    ? getApiErrorMessage(customersQuery.error, 'Could not load customers right now.')
+    : '';
 
   function openCreate() {
     setEditingCustomer(null);
@@ -130,7 +131,7 @@ export function CashierCustomersSection() {
         useToastStore.getState().showToast('Customer added successfully', 'success');
       }
       setShowFormModal(false);
-      void loadCustomers();
+      await queryClient.invalidateQueries({ queryKey: ['customers'] });
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Could not save customer.');
       setFormError(msg);
@@ -147,7 +148,7 @@ export function CashierCustomersSection() {
       await apiClient.delete(`/customers/${deletingCustomer.id}`);
       setDeletingCustomer(null);
       useToastStore.getState().showToast('Customer deleted successfully', 'success');
-      void loadCustomers();
+      await queryClient.invalidateQueries({ queryKey: ['customers'] });
     } catch (err) {
       useToastStore.getState().showToast('Failed to delete customer', 'error');
       console.error('Failed to delete customer:', err);
@@ -165,7 +166,10 @@ export function CashierCustomersSection() {
           <Search color={colors.textTertiary} size={16} strokeWidth={2} />
           <PaperTextInput
             mode="flat"
-            onChangeText={setSearchQuery}
+            onChangeText={(value) => {
+              setSearchQuery(value);
+              setPage(1);
+            }}
             placeholder="Search name or phone..."
             style={styles.searchInput}
             underlineColor="transparent"
@@ -182,6 +186,8 @@ export function CashierCustomersSection() {
           variant="primary"
         />
       </View>
+
+      {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
 
       {/* Table */}
       <SurfaceCard style={styles.tableCard}>
@@ -467,6 +473,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: textSizes.body,
     textAlign: 'center',
+  },
+  errorText: {
+    color: colors.danger,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+    marginBottom: spacing.sm,
   },
   formError: {
     backgroundColor: colors.surfaceDanger,

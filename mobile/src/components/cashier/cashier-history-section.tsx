@@ -81,7 +81,7 @@ export function CashierHistorySection({
         ))}
       </View>
 
-      <SectionHeading style={styles.sectionHeaderLabel}>TODAY'S RECENT SALES</SectionHeading>
+      <SectionHeading style={styles.sectionHeaderLabel}>{"TODAY'S RECENT SALES"}</SectionHeading>
 
       <SurfaceCard style={styles.recentSalesCard}>
         {/* Table Header */}
