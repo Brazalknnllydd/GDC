@@ -62,7 +62,7 @@ export const API_BASE_URL =
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 20000,
+  timeout: 60000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -89,6 +89,8 @@ apiClient.interceptors.response.use(
       } else {
         message = `Server Error (${error.response.status})`;
       }
+    } else if (error.code === 'ECONNABORTED') {
+      message = 'The server is taking too long to respond. Please try again.';
     } else if (error.request) {
       message = 'Network error. Please check your connection.';
     } else {

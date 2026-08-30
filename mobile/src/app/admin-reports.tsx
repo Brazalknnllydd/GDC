@@ -3,7 +3,6 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CreditCard, Download } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 
 import {
@@ -26,6 +25,7 @@ import { colors, textRoles, textSizes } from '../constants/theme';
 import { useReportsAnalytics } from '../hooks/use-reports-analytics';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { apiClient } from '../lib/api';
+import { getAssetDataUri } from '../lib/asset-data-uri';
 import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
 import { shareExportFile } from '../lib/export-file';
 import type { SaleRecord } from '../lib/sales-types';
@@ -176,22 +176,11 @@ export default function AdminReportsScreen() {
     });
 
   async function getLogoDataUri() {
-    const logoAsset = Asset.fromModule(require('../../assets/images/logo.jpg'));
-
-    if (!logoAsset.localUri && Platform.OS !== 'web') {
-      await logoAsset.downloadAsync();
-    }
-
     if (Platform.OS === 'web') {
-      return logoAsset.uri;
+      return Asset.fromModule(require('../../assets/images/logo.jpg')).uri;
     }
 
-    const logoUri = logoAsset.localUri || logoAsset.uri;
-    const base64 = await FileSystem.readAsStringAsync(logoUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    return `data:image/jpeg;base64,${base64}`;
+    return getAssetDataUri(require('../../assets/images/logo.jpg'));
   }
 
   function downloadWebFile(content: string, fileName: string, mimeType: string) {
