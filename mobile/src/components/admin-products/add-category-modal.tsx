@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 import { spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
@@ -33,6 +34,7 @@ export function AddCategoryModal({
   visible,
 }: AddCategoryModalProps) {
   const isEditing = mode === 'edit';
+  const { isTablet } = useResponsiveLayout();
   const {
     control,
     formState: { errors },
@@ -44,8 +46,9 @@ export function AddCategoryModal({
 
   return (
     <AdminModalShell
-      height="52%"
-      maxHeight="72%"
+      compact={!isTablet}
+      height={isTablet ? '44%' : '52%'}
+      maxHeight={isTablet ? '60%' : '72%'}
       onClose={onClose}
       title={isEditing ? 'Edit Category' : 'Add Category'}
       visible={visible}

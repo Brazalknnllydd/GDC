@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../../lib/api-errors';
 import { useToastStore } from '../../store/toast-store';
 import { AddProductModal } from './add-product-modal';
 import type { Category, Product } from './products-screen-data';
-import { normalizeNumber, parseWeight } from '../../lib/product-utils';
+import { formatWeightValue, normalizeNumber, parseWeight } from '../../lib/product-utils';
 import * as ImagePicker from 'expo-image-picker';
 
 type SelectedProductImage = {
@@ -63,7 +63,7 @@ export function ProductEditForm({
         setProductImageAsset(null);
         setWeightVolume(
           productToEdit.weight !== null && productToEdit.weight !== undefined
-            ? `${productToEdit.weight}${productToEdit.unit !== 'pcs' ? productToEdit.unit : ''}`
+            ? formatWeightValue(productToEdit.weight, productToEdit.unit)
             : ''
         );
       } else {
@@ -120,9 +120,9 @@ export function ProductEditForm({
     if (barcode.trim()) formData.append('barcode', barcode.trim());
     
     const parsedWeight = parseWeight(weightVolume);
-    if (parsedWeight) {
-      if (parsedWeight !== null) formData.append('weight', String(parsedWeight));
-      formData.append('unit', 'pcs'); // just a hack since unit logic was simplified
+    if (parsedWeight !== null) {
+      formData.append('weight', String(parsedWeight.weight));
+      formData.append('unit', parsedWeight.unit);
     }
 
     if (productImageUri === null) {
@@ -159,7 +159,9 @@ export function ProductEditForm({
     else if (Number(unitPrice) <= 0) nextFieldErrors.sellingPrice = 'Selling price must be greater than zero.';
     if (!initialStock) nextFieldErrors.stock = 'Initial stock is required.';
     if (!weightVolume.trim()) nextFieldErrors.weightVolume = 'Weight / volume is required.';
-    else if (parseWeight(weightVolume) === null) nextFieldErrors.weightVolume = 'Enter a valid weight / volume value.';
+    else if (parseWeight(weightVolume) === null) {
+      nextFieldErrors.weightVolume = 'Use a value like 1.0kg, 500g, or 250ml.';
+    }
 
     setProductFieldErrors(nextFieldErrors);
     if (Object.keys(nextFieldErrors).length > 0) {

@@ -10,6 +10,7 @@ import { spacing } from '../../constants/design-system';
 import { apiClient } from '../../lib/api';
 import { formatPeso } from '../../lib/product-utils';
 import { useToastStore } from '../../store/toast-store';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type ShiftCloseModalProps = {
   expectedCash: number | null | undefined;
@@ -23,6 +24,7 @@ export function ShiftCloseModal({ expectedCash, shiftId, visible, onClose, onSuc
   const [actualCash, setActualCash] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const { isTablet } = useResponsiveLayout();
 
   const handleCloseShift = async () => {
     if (!shiftId) return;
@@ -68,10 +70,12 @@ export function ShiftCloseModal({ expectedCash, shiftId, visible, onClose, onSuc
 
   return (
     <AdminModalShell
+      compact={!isTablet}
       title="Close Shift"
       visible={visible}
       onClose={onClose}
-      height={380}
+      height={isTablet ? 420 : 380}
+      maxHeight={isTablet ? '72%' : '68%'}
       footer={
         <ModalActions>
           <AppButton label="Cancel" variant="secondary" onPress={onClose} disabled={isLoading} />

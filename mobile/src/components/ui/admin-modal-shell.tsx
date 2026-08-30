@@ -12,6 +12,7 @@ import { IconButton, Portal, Surface } from 'react-native-paper';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type AdminModalShellProps = {
   children: ReactNode;
@@ -52,7 +53,12 @@ export function AdminModalShell({
   visible,
 }: AdminModalShellProps) {
   const { height: viewportHeight, width } = useWindowDimensions();
-  const modalWidth = Math.min(width - 48, width >= 900 ? 720 : width >= 640 ? 600 : 480);
+  const { isTablet, isWideTablet } = useResponsiveLayout();
+  const modalWidth = Math.min(
+    width - (isTablet ? 64 : 32),
+    isWideTablet ? 860 : isTablet ? 720 : 520,
+    isWideTablet ? width * 0.72 : isTablet ? width * 0.84 : width * 0.92
+  );
   const resolvedHeight = resolveViewportLength(height, viewportHeight);
   const resolvedMaxHeight = resolveViewportLength(maxHeight, viewportHeight);
 

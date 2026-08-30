@@ -6,7 +6,7 @@ import { IconButton } from 'react-native-paper';
 import type { Product } from './products-screen-data';
 import { PaginationControls } from '../ui/pagination-controls';
 import { resolveApiAssetUrl } from '../../lib/api';
-import { formatPeso, normalizeNumber } from '../../lib/product-utils';
+import { formatPeso, formatWeightValue, normalizeNumber } from '../../lib/product-utils';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { radius, spacing } from '../../constants/design-system';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
@@ -136,8 +136,7 @@ export function ProductTable({
                     <View style={[styles.metaRow, compactPhone && styles.metaRowCompact]}>
                       <Text style={[styles.metaLabel, compactPhone && styles.metaLabelCompact]}>Weight</Text>
                       <Text style={[styles.metaValue, compactPhone && styles.metaValueCompact]}>
-                        {product.weight}
-                        {product.unit !== 'pcs' ? product.unit : ''}
+                        {formatWeightValue(product.weight, product.unit)}
                       </Text>
                     </View>
                   ) : null}

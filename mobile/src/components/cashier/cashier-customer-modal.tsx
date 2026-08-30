@@ -32,7 +32,7 @@ type CashierCustomerModalProps = {
 };
 
 export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, visible }: CashierCustomerModalProps) {
-  const { compactPhone } = useResponsiveLayout();
+  const { compactPhone, isTablet } = useResponsiveLayout();
   const { height: viewportHeight } = useWindowDimensions();
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -69,7 +69,8 @@ export function CashierCustomerModal({ onClose, onSelect, selectedCustomerId, vi
   return (
     <AdminModalShell
       compact={compactPhone}
-      height={Math.min(viewportHeight * 0.76, 620)}
+      height={Math.min(viewportHeight * (isTablet ? 0.7 : 0.76), isTablet ? 680 : 620)}
+      maxHeight={isTablet ? '86%' : '84%'}
       onClose={onClose}
       title="Attach Customer"
       visible={visible}

@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-n
 import { UserRoundPlus } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 import type { Category } from '../admin-products/products-screen-data';
 import { AdminModalShell } from '../ui/admin-modal-shell';
@@ -41,6 +42,7 @@ export function AddCashierModal({
   visible,
 }: AddCashierModalProps) {
   const { height: viewportHeight } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
   const isEditMode = mode === 'edit';
   const activeSchema = isEditMode ? editCashierSchema : addCashierSchema;
   const {
@@ -76,7 +78,9 @@ export function AddCashierModal({
 
   return (
     <AdminModalShell
-      height={Math.min(viewportHeight * 0.84, 620)}
+      compact={!isTablet}
+      height={Math.min(viewportHeight * (isTablet ? 0.78 : 0.84), isTablet ? 700 : 620)}
+      maxHeight={isTablet ? '90%' : '88%'}
       footer={
         <ModalActions stacked>
           <AppButton

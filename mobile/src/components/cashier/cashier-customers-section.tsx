@@ -243,6 +243,7 @@ export function CashierCustomersSection() {
 
       {/* Create / Edit Modal */}
       <AdminModalShell
+        compact={!isTablet}
         footer={
           <ModalActions>
             <AppButton label="Cancel" onPress={() => setShowFormModal(false)} variant="secondary" />
@@ -255,7 +256,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={520}
+        height={isTablet ? 560 : 520}
+        maxHeight={isTablet ? '78%' : '72%'}
         onClose={() => setShowFormModal(false)}
         title={editingCustomer ? 'Edit Customer' : 'New Customer'}
         visible={showFormModal}
@@ -297,6 +299,7 @@ export function CashierCustomersSection() {
       </AdminModalShell>
 
       <AdminModalShell
+        compact={!isTablet}
         footer={
           <ModalActions>
             <AppButton
@@ -306,7 +309,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={420}
+        height={isTablet ? 480 : 420}
+        maxHeight={isTablet ? '70%' : '62%'}
         onClose={() => setViewingCustomer(null)}
         title="Customer Details"
         visible={viewingCustomer !== null}
@@ -368,6 +372,7 @@ export function CashierCustomersSection() {
 
       {/* Delete Confirm Modal */}
       <AdminModalShell
+        compact={!isTablet}
         footer={
           <ModalActions>
             <AppButton label="Cancel" onPress={() => setDeletingCustomer(null)} variant="secondary" />
@@ -380,7 +385,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={220}
+        height={isTablet ? 260 : 220}
+        maxHeight={isTablet ? '44%' : '36%'}
         onClose={() => setDeletingCustomer(null)}
         title="Delete Customer"
         visible={deletingCustomer !== null}

@@ -12,6 +12,7 @@ import { Check, ChevronDown } from 'lucide-react-native';
 
 import { radius, shadows, spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 export type AppSelectOption = {
   label: string;
@@ -35,6 +36,7 @@ export function AppSelect({
 }: AppSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { width } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
   const isCompactPhone = width < 430;
 
   const normalizedOptions: AppSelectOption[] = options.map((opt) =>
@@ -64,7 +66,12 @@ export function AppSelect({
         animationType="fade"
         onRequestClose={() => setIsOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setIsOpen(false)}>
-          <View style={[styles.dropdown, isCompactPhone && styles.dropdownCompact]}>
+          <View
+            style={[
+              styles.dropdown,
+              isCompactPhone && styles.dropdownCompact,
+              isTablet && styles.dropdownTablet,
+            ]}>
             <View style={styles.dropdownHeader}>
               <Text style={styles.dropdownTitle}>{placeholder}</Text>
             </View>
@@ -147,6 +154,9 @@ const styles = StyleSheet.create({
   },
   dropdownCompact: {
     maxWidth: '100%',
+  },
+  dropdownTablet: {
+    maxWidth: 520,
   },
   dropdownHeader: {
     borderBottomColor: colors.borderPanel,

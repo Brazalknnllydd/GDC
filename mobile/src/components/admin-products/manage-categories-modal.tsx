@@ -4,6 +4,7 @@ import { Pencil, Trash2 } from 'lucide-react-native';
 import type { Category } from './products-screen-data';
 import { spacing } from '../../constants/design-system';
 import { colors, textRoles } from '../../constants/theme';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
 import { ModalActions } from '../ui/modal-actions';
@@ -30,10 +31,12 @@ export function ManageCategoriesModal({
   onEdit,
   visible,
 }: ManageCategoriesModalProps) {
+  const { isTablet } = useResponsiveLayout();
   return (
     <AdminModalShell
-      height="72%"
-      maxHeight="72%"
+      compact={!isTablet}
+      height={isTablet ? '64%' : '72%'}
+      maxHeight={isTablet ? '80%' : '72%'}
       onClose={onClose}
       title="Manage Categories"
       visible={visible}

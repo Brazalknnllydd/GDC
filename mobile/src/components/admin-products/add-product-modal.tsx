@@ -7,6 +7,7 @@ import type { Category } from './products-screen-data';
 import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
 import { resolveApiAssetUrl } from '../../lib/api';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
 import { ProductFormInput } from '../ui/product-form-input';
@@ -81,9 +82,10 @@ export function AddProductModal({
   weightVolume,
 }: AddProductModalProps) {
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const { height, width } = useWindowDimensions();
-  const isSingleColumn = width < 680;
-  const isPhone = width < 680;
+  const { height } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
+  const isSingleColumn = !isTablet;
+  const isPhone = !isTablet;
   const resolvedImagePreviewUri = resolveApiAssetUrl(imagePreviewUri);
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export function AddProductModal({
 
   return (
     <AdminModalShell
-      compact
+      compact={isPhone}
       height={isPhone ? Math.min(height * 0.82, 720) : undefined}
       maxHeight="92%"
       onClose={onClose}
@@ -307,7 +309,7 @@ export function AddProductModal({
               errorMessage={fieldErrors.weightVolume}
               label="WEIGHT / VOLUME"
               onChangeText={onWeightVolumeChange}
-              placeholder="e.g. 500g"
+              placeholder="e.g. 1.0kg, 500g, 250ml"
               value={weightVolume}
             />
           </View>

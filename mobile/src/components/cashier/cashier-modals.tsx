@@ -22,9 +22,11 @@ import { formatPaymentMethod } from '../../lib/cashier-formatters';
 import { apiClient } from '../../lib/api';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { spacing, radius } from '../../constants/design-system';
+import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 export function CartModal() {
   const { height } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
   const {
     cart,
     showCartModal,
@@ -49,6 +51,7 @@ export function CartModal() {
 
   return (
     <AdminModalShell
+      compact={!isTablet}
       footer={
         <AppButton
           disabled={cart.length === 0}
@@ -60,7 +63,8 @@ export function CartModal() {
           variant="primary"
         />
       }
-      height={Math.min(height * 0.84, 720)}
+      height={Math.min(height * (isTablet ? 0.78 : 0.84), isTablet ? 760 : 720)}
+      maxHeight={isTablet ? '88%' : '84%'}
       onClose={() => setShowCartModal(false)}
       title="Cart Details"
       visible={showCartModal}
@@ -133,10 +137,12 @@ export function CartModal() {
 
 export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => void, onViewReceipt: () => void }) {
   const { height } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
   const { showSuccessModal, setShowSuccessModal, completedSale } = useCashierStore();
 
   return (
     <AdminModalShell
+      compact={!isTablet}
       footer={
         <ModalActions stacked>
           <AppButton
@@ -152,7 +158,8 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
           />
         </ModalActions>
       }
-      height={Math.min(height * 0.74, 620)}
+      height={Math.min(height * (isTablet ? 0.66 : 0.74), isTablet ? 680 : 620)}
+      maxHeight={isTablet ? '80%' : '74%'}
       onClose={() => setShowSuccessModal(false)}
       title="Payment Success"
       visible={showSuccessModal}
@@ -253,6 +260,7 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
 
 export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
   const { height } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
   const {
     showCheckoutModal,
     setShowCheckoutModal,
@@ -283,6 +291,7 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
 
   return (
     <AdminModalShell
+      compact={!isTablet}
       footer={
         <AppButton
           disabled={!canCompleteSale}
@@ -293,7 +302,8 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
           variant="success"
         />
       }
-      height={Math.min(height * 0.86, 760)}
+      height={Math.min(height * (isTablet ? 0.8 : 0.86), isTablet ? 820 : 760)}
+      maxHeight={isTablet ? '92%' : '86%'}
       onClose={() => setShowCheckoutModal(false)}
       title="Checkout"
       visible={showCheckoutModal}
