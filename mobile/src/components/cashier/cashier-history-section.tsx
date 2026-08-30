@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Download } from 'lucide-react-native';
 
 import type { CashierDashboardResponse } from './cashier-screen-data';
 import { cashierPerformanceCards } from './cashier-screen-data';
 import { CashierPaymentBreakdownCard } from './cashier-payment-breakdown-card';
 import { CashierPerformanceCard } from './cashier-performance-card';
 import { CashierShiftCard } from './cashier-shift-card';
+import { AppButton } from '../ui/app-button';
 import { PaginationControls } from '../ui/pagination-controls';
 import { SectionHeading } from '../ui/section-heading';
 import { SurfaceCard } from '../ui/surface-card';
@@ -14,44 +15,30 @@ import { spacing, radius } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { formatPeso } from '../../lib/product-utils';
 import { formatCashierTime, formatPaymentMethod } from '../../lib/cashier-formatters';
-import { apiClient } from '../../lib/api';
-import { useCashierStore } from '../../store/cashier-store';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 
 type CashierHistorySectionProps = {
   dashboard: CashierDashboardResponse;
+  isExportingDailyReport?: boolean;
   onEditOpeningCash?: () => void;
+  onExportDailyReport?: () => void;
   onSelectSale?: (sale: any) => void;
 };
 
 export function CashierHistorySection({
   dashboard,
+  isExportingDailyReport = false,
   onEditOpeningCash,
+  onExportDailyReport,
   onSelectSale,
 }: CashierHistorySectionProps) {
   const { isTablet } = useResponsiveLayout();
   const [currentPage, setCurrentPage] = useState(1);
-  const [payingSaleId, setPayingSaleId] = useState<number | null>(null);
-  const { loadWorkspace, setToast } = useCashierStore();
   const itemsPerPage = 15;
 
   const totalPages = Math.ceil(dashboard.recentSales.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedSales = dashboard.recentSales.slice(startIndex, startIndex + itemsPerPage);
-
-  const handleMarkAsPaid = async (saleId: number) => {
-    try {
-      setPayingSaleId(saleId);
-      await apiClient.patch(`/sales/${saleId}/pay`);
-      await loadWorkspace();
-      setToast({ message: 'Sale marked as paid', type: 'success' });
-    } catch (error) {
-      console.error('Failed to mark sale as paid', error);
-      setToast({ message: 'Failed to mark sale as paid', type: 'error' });
-    } finally {
-      setPayingSaleId(null);
-    }
-  };
 
   return (
     <>
@@ -80,6 +67,25 @@ export function CashierHistorySection({
           />
         ))}
       </View>
+
+      <SurfaceCard style={[styles.exportCard, isTablet && styles.exportCardTablet]}>
+        <View style={styles.exportTextBlock}>
+          <Text style={styles.exportTitle}>Daily cashier PDF</Text>
+          <Text style={styles.exportSubtitle}>
+            {"Export today's sales and the current remaining product inventory."}
+          </Text>
+        </View>
+        <AppButton
+          fullWidth={!isTablet}
+          icon={Download}
+          label="Export PDF"
+          loading={isExportingDailyReport}
+          onPress={onExportDailyReport}
+          size="md"
+          style={isTablet ? styles.exportButtonTablet : undefined}
+          variant="primary"
+        />
+      </SurfaceCard>
 
       <SectionHeading style={styles.sectionHeaderLabel}>{"TODAY'S RECENT SALES"}</SectionHeading>
 
@@ -177,6 +183,35 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.md,
     justifyContent: 'space-between',
+  },
+  exportCard: {
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  exportCardTablet: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  exportTextBlock: {
+    flex: 1,
+  },
+  exportTitle: {
+    color: colors.textStrong,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.title,
+  },
+  exportSubtitle: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.body,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+  },
+  exportButtonTablet: {
+    minWidth: 156,
   },
   sectionHeaderLabel: {
     marginBottom: spacing.lg,

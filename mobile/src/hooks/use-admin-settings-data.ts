@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { Category } from '../components/admin-products/products-screen-data';
@@ -50,6 +50,9 @@ export function useAdminSettingsData() {
       ...(current ?? []),
     ]);
   }
+  const reloadSettingsData = useCallback(async () => {
+    await Promise.all([cashiersQuery.refetch(), categoriesQuery.refetch()]);
+  }, [cashiersQuery, categoriesQuery]);
 
   return {
     assignedCategoryCount,
@@ -57,9 +60,7 @@ export function useAdminSettingsData() {
     categories: categoriesQuery.data ?? [],
     isLoading: cashiersQuery.isLoading || categoriesQuery.isLoading,
     prependCashier,
-    reloadSettingsData: async () => {
-      await Promise.all([cashiersQuery.refetch(), categoriesQuery.refetch()]);
-    },
+    reloadSettingsData,
     screenError:
       cashiersQuery.error?.message ||
       categoriesQuery.error?.message ||

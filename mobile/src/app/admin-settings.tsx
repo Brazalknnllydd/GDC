@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LogOut, Printer, Bluetooth, UserRound, PencilLine, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -20,6 +20,7 @@ import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useAdminSettingsData, type StaffCashier } from '../hooks/use-admin-settings-data';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { usePagination } from '../hooks/use-pagination';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { apiClient } from '../lib/api';
 import { getApiErrorMessage } from '../lib/api-errors';
 import { clearAuthSession } from '../lib/auth-session';
@@ -54,16 +55,17 @@ export default function AdminSettingsScreen() {
     categories,
     isLoading,
     prependCashier,
+    reloadSettingsData,
     screenError,
   } = useAdminSettingsData();
+  const refreshSettings = useCallback(() => reloadSettingsData(), [reloadSettingsData]);
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshSettings);
 
   // Cashiers list pagination
   const {
-    endItem: cashierPageEnd,
     page: cashierPage,
     paginatedItems: paginatedCashiers,
     setPage: setCashierPage,
-    startItem: cashierPageStart,
     totalPages: totalCashierPages,
     visiblePageNumbers: visibleCashierPageNumbers,
   } = usePagination({
@@ -230,7 +232,9 @@ export default function AdminSettingsScreen() {
     <AdminPageScreen
       title="Settings"
       introDescription="Control cashier access and decide which product categories each cashier is allowed to sell."
-      bottomNavItems={settingsTabs}>
+      bottomNavItems={settingsTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}>
       <CashierAccessHero
         assignedCategoryCount={assignedCategoryCount}
         cashierCount={cashiers.length}

@@ -1,34 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
-  Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import {
-  CheckCircle2,
-  LogOut,
-  QrCode,
   ScanLine,
   Search,
   ShoppingCart,
-  UserCircle2,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Print from 'expo-print';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
 import { FlashList } from '@shopify/flash-list';
 
 import {
-  cashierPaymentMethods,
   cashierSections,
 } from '../components/cashier/cashier-screen-data';
 import { CashierBottomNav, type CashierSection } from '../components/cashier/cashier-bottom-nav';
@@ -37,7 +29,6 @@ import { CashierCustomersSection } from '../components/cashier/cashier-customers
 import { CashierDashboardHeader } from '../components/cashier/cashier-dashboard-header';
 import { CashierHistorySection } from '../components/cashier/cashier-history-section';
 import { CashierInventorySection } from '../components/cashier/cashier-inventory-section';
-import { CashierKeypad } from '../components/cashier/cashier-keypad';
 import { CashierProductCard } from '../components/cashier/cashier-product-card';
 import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
 import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
@@ -45,14 +36,10 @@ import { CashierCustomerModal } from '../components/cashier/cashier-customer-mod
 import { CashierRegisterSkeleton } from '../components/cashier/cashier-register-skeleton';
 import { type Product } from '../components/admin-products/products-screen-data';
 import { AppButton } from '../components/ui/app-button';
-import { AppSegmentedControl } from '../components/ui/app-segmented-control';
 import { AppHeroAction } from '../components/ui/app-hero-action';
-import { AppTextAction } from '../components/ui/app-text-action';
 import { AppSelect } from '../components/ui/app-select';
-import { FilterChip } from '../components/ui/filter-chip';
 import { AdminModalShell } from '../components/ui/admin-modal-shell';
 import { ModalActions } from '../components/ui/modal-actions';
-import { SectionHeading } from '../components/ui/section-heading';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
@@ -60,12 +47,14 @@ import { useCashierStore } from '../store/cashier-store';
 import { CartModal, CheckoutModal, SuccessModal } from '../components/cashier/cashier-modals';
 import { handlePrintReceipt } from '../lib/receipt-template';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
 import { triggerHaptic } from '../lib/haptics';
 import { apiClient } from '../lib/api';
 import { AppToast } from '../components/ui/app-toast';
+import { exportCashierDailyPdfReport } from '../lib/cashier-daily-report';
 
 type CashierParams = {
   name?: string;
@@ -145,18 +134,14 @@ export default function CashierScreen() {
   const [scannerFeedback, setScannerFeedback] = useState('');
   const [scannerEnabled, setScannerEnabled] = useState(true);
   const [cameraReady, setCameraReady] = useState(false);
+  const [isExportingDailyReport, setIsExportingDailyReport] = useState(false);
   const scannerRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { categories, dashboard, products, loadWorkspace: reloadWorkspace, screenError, isWorkspaceLoading } = useCashierStore();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await reloadWorkspace();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  const refreshCashierWorkspace = useCallback(
+    () => reloadWorkspace({ force: true }),
+    [reloadWorkspace],
+  );
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshCashierWorkspace);
 
   useEffect(() => {
     reloadWorkspace();
@@ -279,9 +264,6 @@ export default function CashierScreen() {
     () => filterProducts(products, activeSelectedCategory, searchQuery),
     [products, activeSelectedCategory, searchQuery]
   );
-  // Calculate layout variables for responsive product grid
-  const productCardWidth = isWideTablet ? '31.5%' : isTablet ? '48.2%' : '48%';
-  const inventoryProductCardWidth = isWideTablet ? '18.5%' : isTablet ? '31.5%' : '48%';
   const showInlineCart = isWideTablet;
   const registerSummaryText = dashboard.currentShift ? 'Shift Active' : 'No active shift';
 
@@ -356,6 +338,31 @@ export default function CashierScreen() {
     addToCart(product);
   }
 
+  async function handleExportDailyReport() {
+    setIsExportingDailyReport(true);
+
+    try {
+      await reloadWorkspace({ force: true });
+      const latestState = useCashierStore.getState();
+
+      await exportCashierDailyPdfReport({
+        cashierName: cashierDisplayName,
+        dashboard: latestState.dashboard,
+        products: latestState.products,
+      });
+
+      setToast({ message: 'Daily cashier PDF is ready.', type: 'success' });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export the daily report right now.';
+
+      setToast({ message, type: 'error' });
+      Alert.alert('Export failed', message);
+    } finally {
+      setIsExportingDailyReport(false);
+    }
+  }
+
   function renderRegisterSection() {
     const registerNumColumns = isWideTablet ? 4 : isTablet ? 3 : 2;
     return (
@@ -367,7 +374,7 @@ export default function CashierScreen() {
             numColumns={registerNumColumns}
             contentContainerStyle={{ paddingBottom: spacing.lg }}
             refreshing={isRefreshing}
-            onRefresh={handleRefresh}
+            onRefresh={onRefresh}
             ListHeaderComponent={
               <>
                 <View style={[styles.registerHeaderRow, compactPhone && styles.registerHeaderRowCompact]}>
@@ -530,7 +537,9 @@ export default function CashierScreen() {
             ) : (
               <View style={{ flex: 1, paddingHorizontal: compactPhone ? spacing.md : isTablet ? spacing.xl : spacing.lg }}>
                 <CashierInventorySection
+                  isRefreshing={isRefreshing}
                   onAddProduct={addToCart}
+                  onRefresh={onRefresh}
                   numColumns={isWideTablet ? 5 : isTablet ? 3 : 2}
                   products={products}
                 />
@@ -544,6 +553,14 @@ export default function CashierScreen() {
               compactPhone ? styles.scrollContentCompact : undefined,
               isTablet ? styles.scrollContentTablet : undefined,
             ]}
+            refreshControl={
+              <RefreshControl
+                colors={[colors.secondary]}
+                onRefresh={onRefresh}
+                refreshing={isRefreshing}
+                tintColor={colors.secondary}
+              />
+            }
             showsVerticalScrollIndicator={false}>
             <CashierDashboardHeader
               cashierName={cashierDisplayName}
@@ -553,6 +570,7 @@ export default function CashierScreen() {
             {activeSection === 'history' ? (
               <CashierHistorySection
                 dashboard={dashboard}
+                isExportingDailyReport={isExportingDailyReport}
                 onEditOpeningCash={() => {
                   setOpeningCashInput(
                     dashboard.currentShift?.openingCash !== undefined
@@ -561,6 +579,7 @@ export default function CashierScreen() {
                   );
                   setShowOpeningCashModal(true);
                 }}
+                onExportDailyReport={handleExportDailyReport}
                 onSelectSale={(sale) => setSelectedSaleDetails(sale)}
               />
             ) : null}
@@ -633,7 +652,7 @@ export default function CashierScreen() {
       {/* Opening Cash Input Modal */}
       <AdminModalShell
         footer={
-          <ModalActions>
+          <ModalActions stacked={compactPhone}>
             <AppButton
               label="Cancel"
               onPress={() => setShowOpeningCashModal(false)}
@@ -651,6 +670,12 @@ export default function CashierScreen() {
         onClose={() => setShowOpeningCashModal(false)}
         title="Set Opening Cash"
         visible={showOpeningCashModal}>
+        <ScrollView
+          contentContainerStyle={styles.modalFormScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.modalFormScroll}
+        >
         <View style={styles.modalInputWrap}>
           <Text style={styles.modalInputLabel}>Opening Cash Amount (₱)</Text>
           <TextInput
@@ -661,6 +686,7 @@ export default function CashierScreen() {
             onChangeText={setOpeningCashInput}
           />
         </View>
+        </ScrollView>
       </AdminModalShell>
 
       <AdminModalShell
@@ -751,22 +777,29 @@ export default function CashierScreen() {
         onClose={() => setShowVoidModal(false)}
         title="Void Sale"
         visible={showVoidModal}>
+        <ScrollView
+          contentContainerStyle={styles.modalFormScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.modalFormScroll}
+        >
         <View style={styles.modalInputWrap}>
           <Text style={styles.modalInputLabel}>Reason for Voiding</Text>
           <TextInput
-            style={[styles.modalTextInput, { minHeight: 80 }]}
+            style={[styles.modalTextInput, styles.voidReasonInput]}
             multiline
             placeholder="E.g., Customer changed their mind..."
             value={voidReason}
             onChangeText={setVoidReason}
           />
         </View>
+        </ScrollView>
       </AdminModalShell>
 
       {/* Sale Details / Digital Receipt Modal */}
       <AdminModalShell
         footer={
-          <ModalActions>
+          <ModalActions stacked={compactPhone}>
             {selectedSaleDetails?.status === 'pending' && (
               <AppButton
                 label="Complete Payment"
@@ -776,7 +809,7 @@ export default function CashierScreen() {
                     setSelectedSaleDetails(null);
                     await reloadWorkspace();
                     setToast({ message: 'Payment completed successfully', type: 'success' });
-                  } catch (e) {
+                  } catch {
                     setToast({ message: 'Failed to complete payment', type: 'error' });
                   }
                 }}
@@ -1870,6 +1903,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
+  modalFormScroll: {
+    flex: 1,
+  },
+  modalFormScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.md,
+  },
   modalInputLabel: {
     color: colors.textSecondary,
     ...textRoles.label,
@@ -1883,5 +1923,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 46,
     paddingHorizontal: 16,
+  },
+  voidReasonInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
 });

@@ -1,5 +1,6 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -25,7 +26,9 @@ type AdminPageScreenProps = {
   introChildren?: ReactNode;
   floatingContent?: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  onRefresh?: () => void;
   pageStyle?: StyleProp<ViewStyle>;
+  refreshing?: boolean;
 };
 
 export function AdminPageScreen({
@@ -36,7 +39,9 @@ export function AdminPageScreen({
   introChildren,
   floatingContent,
   contentContainerStyle,
+  onRefresh,
   pageStyle,
+  refreshing = false,
 }: AdminPageScreenProps) {
   const { isTablet } = useResponsiveLayout();
   const { width } = useWindowDimensions();
@@ -54,6 +59,16 @@ export function AdminPageScreen({
             isTablet ? styles.scrollContentTablet : undefined,
             contentContainerStyle,
           ]}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                onRefresh={onRefresh}
+                refreshing={refreshing}
+                tintColor={colors.secondary}
+                colors={[colors.secondary]}
+              />
+            ) : undefined
+          }
           showsVerticalScrollIndicator={false}>
           <AdminPageIntro description={introDescription}>{introChildren}</AdminPageIntro>
           {children}

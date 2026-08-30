@@ -68,9 +68,7 @@ export function AdminModalShell({
     <Portal>
       <View style={styles.backdropOverlay}>
         <Pressable onPress={onClose} style={styles.backdropPressable} />
-        <View
-          onStartShouldSetResponder={() => true}
-          style={{ width: modalWidth }}>
+        <View style={{ width: modalWidth }}>
           <Surface
             style={[
               styles.card,

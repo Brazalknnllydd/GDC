@@ -13,6 +13,7 @@ import inventoryLogRoutes from "./routes/inventory-log.routes.js";
 import staffRoutes from "./routes/staff.routes.js";
 import chatbotRoutes from "./routes/chatbot.routes.js";
 import shiftRoutes from "./routes/shift.routes.js";
+import supplierRoutes from "./routes/supplier.routes.js";
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +44,7 @@ app.use("/inventory-logs", inventoryLogRoutes);
 app.use("/staff", staffRoutes);
 app.use("/chatbot", chatbotRoutes);
 app.use("/shifts", shiftRoutes);
+app.use("/suppliers", supplierRoutes);
 
 app.get("/", (_req, res) => {
   res.json({

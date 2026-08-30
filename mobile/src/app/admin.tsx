@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -31,6 +31,7 @@ import { apiClient } from "../lib/api";
 import { formatPeso, normalizeNumber } from "../lib/product-utils";
 import { usePagination } from "../hooks/use-pagination";
 import { useResponsiveLayout } from "../hooks/use-responsive-layout";
+import { useRefreshHandler } from "../hooks/use-refresh-handler";
 import type { SaleRecord } from "../lib/sales-types";
 
 type Product = {
@@ -126,6 +127,15 @@ export default function AdminScreen() {
     categoriesQuery.error?.message ||
     salesQuery.error?.message ||
     "";
+  const refreshDashboard = useCallback(
+    () => Promise.all([
+      productsQuery.refetch(),
+      categoriesQuery.refetch(),
+      salesQuery.refetch(),
+    ]),
+    [categoriesQuery, productsQuery, salesQuery],
+  );
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshDashboard);
 
   const displayName = useMemo(() => {
     if (typeof params.name === "string" && params.name.trim()) {
@@ -209,6 +219,8 @@ export default function AdminScreen() {
       title="Dashboard"
       introDescription={`Good morning, ${displayName}. Here's today's business snapshot.`}
       bottomNavItems={dashboardTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
       floatingContent={
         <AppFab
           icon={<Bot color="#FFFFFF" size={28} strokeWidth={2.2} />}

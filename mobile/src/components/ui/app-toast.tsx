@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react-native';
 
@@ -6,12 +6,30 @@ import { radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
 
 export type ToastProps = {
+  durationMs?: number;
   message: string;
+  onHide?: () => void;
   type?: 'success' | 'error' | 'info';
   visible: boolean;
 };
 
-export function AppToast({ message, type = 'success', visible }: ToastProps) {
+export function AppToast({
+  durationMs = 3000,
+  message,
+  onHide,
+  type = 'success',
+  visible,
+}: ToastProps) {
+  useEffect(() => {
+    if (!visible || !onHide) {
+      return;
+    }
+
+    const timer = setTimeout(onHide, durationMs);
+
+    return () => clearTimeout(timer);
+  }, [durationMs, onHide, visible]);
+
   if (!visible) {
     return null;
   }

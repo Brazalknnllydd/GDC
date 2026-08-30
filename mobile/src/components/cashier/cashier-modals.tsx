@@ -19,7 +19,6 @@ import { CashierKeypad } from './cashier-keypad';
 import { cashierPaymentMethods } from './cashier-screen-data';
 import { formatPeso } from '../../lib/product-utils';
 import { formatPaymentMethod } from '../../lib/cashier-formatters';
-import { apiClient } from '../../lib/api';
 import { colors, fonts, textSizes } from '../../constants/theme';
 import { spacing, radius } from '../../constants/design-system';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
@@ -34,7 +33,6 @@ export function CartModal() {
     setShowCheckoutModal,
     updateCartQuantity,
     removeFromCart,
-    activeCheckoutInput,
     selectedCustomerId,
     selectedCustomerName,
     setShowCustomerModal,
@@ -44,10 +42,6 @@ export function CartModal() {
   const cartDiscountTotal = cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const activeDiscountItem = activeCheckoutInput.type === 'discount'
-    ? cart.find((item) => item.id === activeCheckoutInput.productId) ?? null
-    : null;
 
   return (
     <AdminModalShell
@@ -76,61 +70,63 @@ export function CartModal() {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         style={styles.modalScroll}>
-        {cart.length > 0 ? (
-          cart.map((item) => (
-            <CashierCartItemRow
-              key={item.id}
-              imageUrl={item.imageUrl}
-              name={item.name}
-              onDecrease={() => updateCartQuantity(item.id, item.quantity - 1)}
-              onIncrease={() => updateCartQuantity(item.id, item.quantity + 1)}
-              onRemove={() => removeFromCart(item.id)}
-              priceText={formatPeso(item.price)}
-              quantity={item.quantity}
-              totalText={formatPeso(item.price * item.quantity)}
-            />
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Your cart is empty.</Text>
-        )}
+        <View style={styles.cartItemsBlock}>
+          {cart.length > 0 ? (
+            cart.map((item) => (
+              <CashierCartItemRow
+                key={item.id}
+                imageUrl={item.imageUrl}
+                name={item.name}
+                onDecrease={() => updateCartQuantity(item.id, item.quantity - 1)}
+                onIncrease={() => updateCartQuantity(item.id, item.quantity + 1)}
+                onRemove={() => removeFromCart(item.id)}
+                priceText={formatPeso(item.price)}
+                quantity={item.quantity}
+                totalText={formatPeso(item.price * item.quantity)}
+              />
+            ))
+          ) : (
+            <Text style={styles.emptyText}>Your cart is empty.</Text>
+          )}
+        </View>
+
+        <View style={styles.customerAttachRow}>
+          <View style={styles.customerAttachText}>
+            <Text style={styles.customerAttachLabel}>CUSTOMER</Text>
+            <Text style={styles.customerAttachValue} numberOfLines={2}>
+              {selectedCustomerName || 'Walk-in'}
+            </Text>
+          </View>
+          <AppButton
+            label={selectedCustomerId ? 'Change' : 'Attach'}
+            variant="secondary"
+            size="sm"
+            onPress={() => {
+              setShowCustomerModal(true);
+            }}
+            fullWidth={false}
+          />
+        </View>
+
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryValue}>{formatPeso(cartGrossSubtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Discount</Text>
+            <Text style={styles.summaryValue}>- {formatPeso(cartDiscountTotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Items</Text>
+            <Text style={styles.summaryValue}>{cartItemCount}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
+          </View>
+        </View>
       </ScrollView>
-
-      <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View>
-          <Text style={{ fontSize: textSizes.small, color: colors.textSecondary, fontFamily: fonts.medium }}>CUSTOMER</Text>
-          <Text style={{ fontSize: textSizes.body, color: colors.text, fontFamily: fonts.bold }}>
-            {selectedCustomerName || 'Walk-in'}
-          </Text>
-        </View>
-        <AppButton 
-          label={selectedCustomerId ? "Change" : "Attach"} 
-          variant="secondary" 
-          size="sm" 
-          onPress={() => {
-            setShowCustomerModal(true);
-          }}
-          fullWidth={false}
-        />
-      </View>
-
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Subtotal</Text>
-          <Text style={styles.summaryValue}>{formatPeso(cartGrossSubtotal)}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Discount</Text>
-          <Text style={styles.summaryValue}>- {formatPeso(cartDiscountTotal)}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Items</Text>
-          <Text style={styles.summaryValue}>{cartItemCount}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.totalLabel}>Total Amount</Text>
-          <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
-        </View>
-      </View>
     </AdminModalShell>
   );
 }
@@ -166,7 +162,9 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
     >
       <ScrollView
         contentContainerStyle={[styles.modalContent, styles.successModalScrollContent]}
+        keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator
         style={styles.successModalScroll}>
         <View style={{ alignItems: 'center', marginBottom: 20 }}>
@@ -278,7 +276,6 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
 
 
 
-  const cartGrossSubtotal = cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -286,7 +283,6 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
   const changeAmount = Math.max(amountReceived - cartSubtotal, 0);
   const remainingBalance = Math.max(cartSubtotal - amountReceived, 0);
   const hasEnoughPayment = cartSubtotal > 0 && amountReceived >= cartSubtotal;
-  const isUtangValid = paymentMethod === 'Utang';
   const canCompleteSale = !isSubmittingSale && cart.length > 0 && (paymentMethod === 'Utang' ? true : hasEnoughPayment);
 
   return (
@@ -308,7 +304,14 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
       title="Checkout"
       visible={showCheckoutModal}
     >
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.modalContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        style={styles.modalScroll}
+      >
         <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
           <Text style={styles.summaryLabel}>TOTAL PAYABLE</Text>
           <Text style={styles.totalValue}>{formatPeso(cartSubtotal)}</Text>
@@ -396,6 +399,34 @@ const styles = StyleSheet.create({
   successModalScrollContent: {
     flexGrow: 1,
     paddingBottom: spacing.lg,
+  },
+  cartItemsBlock: {
+    gap: spacing.sm,
+  },
+  customerAttachRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  customerAttachText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  customerAttachLabel: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: textSizes.small,
+  },
+  customerAttachValue: {
+    color: colors.text,
+    fontFamily: fonts.bold,
+    fontSize: textSizes.body,
+    marginTop: 2,
   },
   emptyText: {
     fontFamily: fonts.regular,

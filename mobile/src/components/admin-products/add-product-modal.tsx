@@ -269,7 +269,7 @@ export function AddProductModal({
               dense
               errorMessage={fieldErrors.costPrice}
               keyboardType="number-pad"
-              label="COST PRICE (P)"
+              label="UNIT PRICE (P)"
               onChangeText={onCostPriceChange}
               placeholder="0"
               value={costPrice}

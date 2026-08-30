@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CreditCard,
   LayoutDashboard,
   Package,
@@ -17,10 +16,10 @@ import type { CashierSection } from './cashier-bottom-nav';
 
 export type CashierDashboardResponse = {
   cashier: {
-    allowedCategories: Array<{
+    allowedCategories: {
       id: number;
       name: string;
-    }>;
+    }[];
     id: number;
     name: string;
     role: string;
@@ -34,17 +33,17 @@ export type CashierDashboardResponse = {
     startedAt: string;
     status: string;
   } | null;
-  paymentBreakdown: Array<{
+  paymentBreakdown: {
     method: string;
     total: number;
-  }>;
+  }[];
   performance: {
     itemsSold: number;
     salesToday: number;
     served: number;
     transactions: number;
   };
-  recentSales: Array<{
+  recentSales: {
     id: number;
     paymentMethod: string;
     status?: string;
@@ -55,9 +54,18 @@ export type CashierDashboardResponse = {
     customerName: string | null;
     changeAmount: number;
     cashierName: string;
+    discountAmount?: number;
     subtotal: number;
     amountPaid: number;
-  }>;
+    items?: {
+      price?: number | string;
+      product?: {
+        name: string;
+      };
+      quantity: number | string;
+      subtotal: number | string;
+    }[];
+  }[];
   totals: {
     drawerVariance: number;
     totalReportedSales: number;
@@ -81,7 +89,7 @@ export type CashierSaleRecord = {
     name: string;
     username: string;
   };
-  items: Array<{
+  items: {
     id?: number;
     quantity: number;
     subtotal: number | string;
@@ -90,7 +98,7 @@ export type CashierSaleRecord = {
       name: string;
       barcode?: string | null;
     };
-  }>;
+  }[];
 };
 
 export const cashierPerformanceCards = [

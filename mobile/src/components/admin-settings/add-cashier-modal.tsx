@@ -103,7 +103,6 @@ export function AddCashierModal({
           <UserRoundPlus color={colors.secondary} size={18} strokeWidth={2.1} />
         </View>
       }
-      maxHeight="88%"
       onClose={onClose}
       title={isEditMode ? 'Edit Cashier' : 'Add Cashier'}
       visible={visible}>

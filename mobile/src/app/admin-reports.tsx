@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CreditCard, Download } from 'lucide-react-native';
@@ -24,6 +24,7 @@ import { layout, radius, spacing } from '../constants/design-system';
 import { colors, textRoles, textSizes } from '../constants/theme';
 import { useReportsAnalytics } from '../hooks/use-reports-analytics';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { apiClient } from '../lib/api';
 import { getAssetDataUri } from '../lib/asset-data-uri';
 import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
@@ -159,6 +160,11 @@ export default function AdminReportsScreen() {
   const products = productsQuery.data ?? [];
   const queryError = salesQuery.error?.message || productsQuery.error?.message || '';
   const displayError = queryError || screenError;
+  const refreshReports = useCallback(
+    () => Promise.all([salesQuery.refetch(), productsQuery.refetch()]),
+    [productsQuery, salesQuery],
+  );
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshReports);
 
   const reportTabs = productTabs.map((tab) =>
     tab.label === 'Reports'
@@ -562,7 +568,9 @@ export default function AdminReportsScreen() {
     <AdminPageScreen
       title="Reports"
       introDescription="Review store insights, payment mix, category coverage, and export-ready summaries."
-      bottomNavItems={reportTabs}>
+      bottomNavItems={reportTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}>
       <SurfaceCard style={[styles.rangeCard, compactPhone && styles.rangeCardCompact]}>
         <View style={[styles.rangeCardHeader, compactPhone && styles.rangeCardHeaderCompact]}>
           <View style={styles.rangeTextBlock}>

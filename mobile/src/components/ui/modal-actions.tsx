@@ -13,7 +13,7 @@ export function ModalActions({ children, stacked = false }: ModalActionsProps) {
     if (!React.isValidElement(child)) return child;
     return React.cloneElement(child, {
       // @ts-ignore - assume children accept style array
-      style: [!stacked && { flex: 1 }, child.props.style],
+      style: [!stacked && styles.rowChild, child.props.style, stacked && styles.stackedChild],
     });
   });
 
@@ -26,8 +26,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     width: '100%',
   },
+  rowChild: {
+    flex: 1,
+  },
   stacked: {
     flexDirection: 'column',
     gap: spacing.sm,
+  },
+  stackedChild: {
+    flex: 0,
   },
 });

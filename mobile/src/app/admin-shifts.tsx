@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { FileText, Unlock, Lock, Calendar as CalendarIcon, X, UserCircle2 } from 'lucide-react-native';
 import DateTimePicker from 'react-native-ui-datepicker';
@@ -19,6 +19,7 @@ import { ProductFormInput } from '../components/ui/product-form-input';
 import { usePagination } from '../hooks/use-pagination';
 import { PaginationControls } from '../components/ui/pagination-controls';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 
 type Shift = {
   id: number;
@@ -51,6 +52,8 @@ export default function AdminShiftsScreen() {
   const shifts = shiftsQuery.data ?? [];
   const isLoading = shiftsQuery.isLoading;
   const screenError = shiftsQuery.error?.message || '';
+  const refreshShifts = useCallback(() => shiftsQuery.refetch(), [shiftsQuery]);
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshShifts);
 
   const shiftTabs = tabs.map((tab) =>
     tab.label === 'Shifts'
@@ -127,6 +130,8 @@ export default function AdminShiftsScreen() {
       title="Shift Management"
       introDescription="View and manage cashier shifts, shortages, and overages."
       bottomNavItems={shiftTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

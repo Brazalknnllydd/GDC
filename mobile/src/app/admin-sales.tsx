@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -22,6 +22,7 @@ import { PaginationControls } from '../components/ui/pagination-controls';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { apiClient } from '../lib/api';
 import { getAssetDataUri } from '../lib/asset-data-uri';
 import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
@@ -272,6 +273,8 @@ export default function AdminSalesScreen() {
   const sales = salesQuery.data ?? [];
   const queryError = salesQuery.error?.message || '';
   const displayError = queryError || screenError;
+  const refreshSales = useCallback(() => salesQuery.refetch(), [salesQuery]);
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshSales);
 
   const filteredSales = useMemo(
     () => sales.filter((sale) => sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, overviewMonthRange)),
@@ -826,6 +829,8 @@ export default function AdminSalesScreen() {
       title="Sales"
       introDescription="Monitor transactions, revenue, and business performance"
       bottomNavItems={salesTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
       introChildren={
         <View style={styles.dateRow}>
           <CalendarDays color={colors.textTertiary} size={15} strokeWidth={1.9} />

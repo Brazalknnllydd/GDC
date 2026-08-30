@@ -6,6 +6,7 @@ export type AppRoute =
   | '/admin-sales'
   | '/admin-reports'
   | '/admin-customers'
+  | '/admin-suppliers'
   | '/admin-settings'
   | '/admin-shifts'
   | '/cashier'

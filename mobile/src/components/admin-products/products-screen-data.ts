@@ -1,4 +1,4 @@
-import { BarChart3, FileText, LayoutDashboard, Package, ReceiptText, Settings, Users } from 'lucide-react-native';
+import { BarChart3, FileText, LayoutDashboard, Package, ReceiptText, Settings, Truck, Users } from 'lucide-react-native';
 
 export const baseOverviewCards = [
   { title: 'TOTAL PRODUCTS', value: '0', detail: 'Live inventory count', accent: 'success' as const },
@@ -11,6 +11,7 @@ export const tabs = [
   { label: 'Dashboard', icon: LayoutDashboard, active: false, route: '/admin' as const },
   { label: 'Products', icon: Package, active: true, route: '/admin-products' as const },
   { label: 'Customers', icon: Users, active: false, route: '/admin-customers' as const },
+  { label: 'Suppliers', icon: Truck, active: false, route: '/admin-suppliers' as const },
   { label: 'Sales', icon: ReceiptText, active: false, route: '/admin-sales' as const },
   { label: 'Shifts', icon: FileText, active: false, route: '/admin-shifts' as const },
   { label: 'Reports', icon: BarChart3, active: false, route: '/admin-reports' as const },

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, useWindowDimensions, StyleSheet } from 'react-native';
 import { Search, PackagePlus, Shapes, X } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import { AppSelect } from '../components/ui/app-select';
 
 import { usePagination } from '../hooks/use-pagination';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { normalizeNumber } from '../lib/product-utils';
 import { radius, shadows, spacing } from '../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
@@ -64,7 +65,7 @@ export default function AdminProductsScreen() {
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<Category | null>(null);
 
   // Queries
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
       const res = await apiClient.get<Category[]>('/categories');
@@ -72,7 +73,7 @@ export default function AdminProductsScreen() {
     },
   });
 
-  const { data: products = [], isLoading: isLoadingProductsList } = useQuery({
+  const productsQuery = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const res = await apiClient.get<Product[]>('/products');
@@ -80,7 +81,16 @@ export default function AdminProductsScreen() {
     },
   });
 
+  const categories = categoriesQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+  const isLoadingCategories = categoriesQuery.isLoading;
+  const isLoadingProductsList = productsQuery.isLoading;
   const isLoadingProducts = isLoadingCategories || isLoadingProductsList;
+  const refreshProductsPage = useCallback(
+    () => Promise.all([categoriesQuery.refetch(), productsQuery.refetch()]),
+    [categoriesQuery, productsQuery],
+  );
+  const { isRefreshing, onRefresh } = useRefreshHandler(refreshProductsPage);
   const addCategoryInitialValues = useMemo(() => {
     if (editingCategoryId === null) {
       return {
@@ -190,6 +200,8 @@ export default function AdminProductsScreen() {
       title="Products & Inventory"
       introDescription="Manage your product catalog, categories, and track inventory levels across your store."
       bottomNavItems={activeTabs}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
     >
       <AdminMetricGrid>
         {overviewCards.map((card) => (

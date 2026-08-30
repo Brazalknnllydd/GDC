@@ -11,13 +11,17 @@ import { CashierProductCard } from './cashier-product-card';
 import { formatPeso, normalizeNumber } from '../../lib/product-utils';
 
 type CashierInventorySectionProps = {
+  isRefreshing?: boolean;
   onAddProduct: (product: Product) => void;
+  onRefresh?: () => void;
   numColumns: number;
   products: Product[];
 };
 
 export function CashierInventorySection({
+  isRefreshing = false,
   onAddProduct,
+  onRefresh,
   numColumns,
   products,
 }: CashierInventorySectionProps) {
@@ -51,6 +55,8 @@ export function CashierInventorySection({
       style={{ flex: 1 }}
       keyExtractor={(product) => String(product.id)}
       numColumns={numColumns}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
       ListHeaderComponent={
         <>
           <SectionHeading style={styles.sectionLabel}>INVENTORY VIEW</SectionHeading>
