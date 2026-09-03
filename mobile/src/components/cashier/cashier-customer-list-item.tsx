@@ -1,8 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MapPin, Pencil, Phone, Trash2, UserCircle2 } from 'lucide-react-native';
 
-import { radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textSizes } from '../../constants/theme';
+import { ActionIconButton } from '../ui/action-icon-button';
+
+export const cashierCustomerTableColumns = {
+  actions: 82,
+  address: 150,
+  customer: 250,
+  notes: 200,
+  phone: 150,
+};
 
 type CashierCustomerListItemProps = {
   name: string;
@@ -69,12 +77,12 @@ export function CashierCustomerListItem({
 
       {/* Actions — fixed at right edge */}
       <View style={styles.actionsCol}>
-        <Pressable onPress={onEdit} style={styles.actionBtn}>
-          <Pencil color="#667085" size={16} strokeWidth={2} />
-        </Pressable>
-        <Pressable onPress={onDelete} style={styles.actionBtn}>
-          <Trash2 color="#667085" size={16} strokeWidth={2} />
-        </Pressable>
+        {onEdit ? (
+          <ActionIconButton accessibilityLabel={`Edit customer ${name}`} icon={Pencil} onPress={onEdit} />
+        ) : null}
+        {onDelete ? (
+          <ActionIconButton accessibilityLabel={`Delete customer ${name}`} icon={Trash2} onPress={onDelete} />
+        ) : null}
       </View>
     </Pressable>
   );
@@ -92,17 +100,16 @@ const styles = StyleSheet.create({
   },
   dataArea: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
-    gap: 8,
     minWidth: 0,
   },
   nameCol: {
     alignItems: 'center',
-    flex: 2.5,
     flexDirection: 'row',
     gap: 8,
     minWidth: 0,
+    paddingRight: 12,
+    width: cashierCustomerTableColumns.customer,
   },
   avatar: {
     alignItems: 'center',
@@ -119,12 +126,14 @@ const styles = StyleSheet.create({
     fontSize: textSizes.body,
   },
   col: {
-    flex: 1.5,
     minWidth: 0,
+    paddingRight: 12,
+    width: cashierCustomerTableColumns.phone,
   },
   descCol: {
-    flex: 2,
     minWidth: 0,
+    paddingRight: 12,
+    width: cashierCustomerTableColumns.notes,
   },
   metaRow: {
     alignItems: 'center',
@@ -146,13 +155,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
     justifyContent: 'flex-end',
-    width: 72,
-  },
-  actionBtn: {
-    alignItems: 'center',
-    borderRadius: radius.round,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
+    width: cashierCustomerTableColumns.actions,
   },
 });

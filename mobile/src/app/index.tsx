@@ -22,6 +22,7 @@ import {
   clearAuthSession,
   saveAuthSession,
 } from '../lib/auth-session';
+import { useCashierStore } from '../store/cashier-store';
 
 type AuthUser = {
   id: number;
@@ -54,6 +55,7 @@ export default function LoginScreen() {
       setAuthenticatedUser(null);
       setToken('');
       await clearAuthSession();
+      useCashierStore.getState().resetWorkspace();
 
       const response = await apiClient.post('/auth/login', {
         username: trimmedUsername,

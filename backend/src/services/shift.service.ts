@@ -1,6 +1,29 @@
 import { prisma } from '../lib/prisma.js';
 import { Prisma } from '@prisma/client';
 
+function sumCompletedCashSales(sales: Array<{ paymentMethod: string; status: string; totalAmount: Prisma.Decimal }>) {
+  return sales.reduce((total, sale) => {
+    if (sale.paymentMethod.toLowerCase() === 'cash' && sale.status === 'completed') {
+      return total.add(sale.totalAmount);
+    }
+
+    return total;
+  }, new Prisma.Decimal(0));
+}
+
+function sumExpenses(expenses: Array<{ amount: Prisma.Decimal }>) {
+  return expenses.reduce((total, expense) => total.add(expense.amount), new Prisma.Decimal(0));
+}
+
+function calculateExpectedCash(
+  shift: {
+    openingCash: Prisma.Decimal;
+    sales: Array<{ paymentMethod: string; status: string; totalAmount: Prisma.Decimal }>;
+    expenses: Array<{ amount: Prisma.Decimal }>;
+  }
+) {
+  return shift.openingCash.add(sumCompletedCashSales(shift.sales)).sub(sumExpenses(shift.expenses));
+}
 
 export const ShiftService = {
   async getAllShifts() {
@@ -17,8 +40,9 @@ export const ShiftService = {
         user: {
           select: { id: true, name: true, username: true },
         },
+        expenses: true,
         _count: {
-          select: { sales: true },
+          select: { expenses: true, sales: true },
         },
       },
     });
@@ -31,8 +55,9 @@ export const ShiftService = {
         status: 'OPEN',
       },
       include: {
+        expenses: true,
         _count: {
-          select: { sales: true },
+          select: { expenses: true, sales: true },
         },
       },
     });
@@ -57,23 +82,14 @@ export const ShiftService = {
   async closeShift(userId: number, shiftId: number, closingCash: number) {
     const shift = await prisma.shift.findFirst({
       where: { id: shiftId, userId, status: 'OPEN' },
-      include: { sales: true },
+      include: { expenses: true, sales: true },
     });
 
     if (!shift) {
       throw new Error('Active shift not found.');
     }
 
-    // Calculate expected cash
-    // Expected = openingCash + sum of cash sales
-    let cashSalesTotal = new Prisma.Decimal(0);
-    for (const sale of shift.sales) {
-      if (sale.paymentMethod.toLowerCase() === 'cash' && sale.status === 'completed') {
-        cashSalesTotal = cashSalesTotal.add(sale.totalAmount);
-      }
-    }
-    
-    const expectedClosingCash = shift.openingCash.add(cashSalesTotal);
+    const expectedClosingCash = calculateExpectedCash(shift);
 
     if (!expectedClosingCash.equals(new Prisma.Decimal(closingCash))) {
       throw new Error(`Closing cash must match the expected amount of ${expectedClosingCash.toFixed(2)}.`);
@@ -93,21 +109,14 @@ export const ShiftService = {
   async forceCloseShift(shiftId: number, notes?: string) {
     const shift = await prisma.shift.findUnique({
       where: { id: shiftId },
-      include: { sales: true },
+      include: { expenses: true, sales: true },
     });
 
     if (!shift) {
       throw new Error('Shift not found.');
     }
 
-    let cashSalesTotal = new Prisma.Decimal(0);
-    for (const sale of shift.sales) {
-      if (sale.paymentMethod.toLowerCase() === 'cash' && sale.status === 'completed') {
-        cashSalesTotal = cashSalesTotal.add(sale.totalAmount);
-      }
-    }
-    
-    const expectedClosingCash = shift.openingCash.add(cashSalesTotal);
+    const expectedClosingCash = calculateExpectedCash(shift);
 
     return prisma.shift.update({
       where: { id: shiftId },
@@ -149,6 +158,7 @@ export const ShiftService = {
             items: true,
           },
         },
+        expenses: true,
       },
     });
 

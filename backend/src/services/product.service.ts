@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "@prisma/client";
+import { applySupplierCashierStockDelta } from "./cashier-inventory.service.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const uploadsRootDir = path.resolve(currentDir, "../../uploads");
@@ -31,9 +32,15 @@ export async function removeStoredImage(imageUrl?: string | null) {
 
 export const ProductService = {
   async createProduct(data: Prisma.ProductUncheckedCreateInput) {
-    return await prisma.product.create({
-      data,
-      include: { category: true },
+    return prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data,
+        include: { category: true },
+      });
+
+      await applySupplierCashierStockDelta(tx, product.id, Number(data.stock ?? 0));
+
+      return product;
     });
   },
 
@@ -63,10 +70,26 @@ export const ProductService = {
   },
 
   async updateProduct(id: number, data: Prisma.ProductUncheckedUpdateInput) {
-    return await prisma.product.update({
-      where: { id },
-      data,
-      include: { category: true },
+    return prisma.$transaction(async (tx) => {
+      const existingProduct = await tx.product.findUniqueOrThrow({
+        where: { id },
+        select: { stock: true },
+      });
+      const nextStock = data.stock === undefined ? existingProduct.stock : Number(data.stock);
+
+      if (Number.isNaN(nextStock)) {
+        throw new Error("Stock must be a valid number");
+      }
+
+      const product = await tx.product.update({
+        where: { id },
+        data,
+        include: { category: true },
+      });
+
+      await applySupplierCashierStockDelta(tx, product.id, nextStock - existingProduct.stock);
+
+      return product;
     });
   },
 

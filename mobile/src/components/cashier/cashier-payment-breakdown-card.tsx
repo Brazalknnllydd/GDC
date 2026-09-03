@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { radius, spacing } from '../../constants/design-system';
+import { spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
 import { useResponsiveLayout } from '../../hooks/use-responsive-layout';
 import { formatDrawerStatus, formatPaymentMethod } from '../../lib/cashier-formatters';
@@ -18,6 +18,7 @@ type CashierPaymentBreakdownCardProps = {
   totalReportedSales: number;
   cashReceived?: number;
   changeGiven?: number;
+  expenses?: number;
 };
 
 export function CashierPaymentBreakdownCard({
@@ -26,6 +27,7 @@ export function CashierPaymentBreakdownCard({
   totalReportedSales,
   cashReceived,
   changeGiven,
+  expenses,
 }: CashierPaymentBreakdownCardProps) {
   const { compactPhone } = useResponsiveLayout();
 
@@ -64,6 +66,13 @@ export function CashierPaymentBreakdownCard({
         <View style={[styles.totalRow, compactPhone && styles.totalRowCompact]}>
           <Text style={styles.totalLabel}>Change Returned</Text>
           <Text style={[styles.totalValue, { color: colors.danger }]}>- {formatPeso(changeGiven)}</Text>
+        </View>
+      ) : null}
+
+      {expenses !== undefined && expenses > 0 ? (
+        <View style={[styles.totalRow, compactPhone && styles.totalRowCompact]}>
+          <Text style={styles.totalLabel}>Expenses</Text>
+          <Text style={[styles.totalValue, { color: colors.danger }]}>- {formatPeso(expenses)}</Text>
         </View>
       ) : null}
 

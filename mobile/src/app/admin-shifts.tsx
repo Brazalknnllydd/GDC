@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
-import { FileText, Unlock, Lock, Calendar as CalendarIcon, X, UserCircle2 } from 'lucide-react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Unlock, Lock, Calendar as CalendarIcon, X, UserCircle2, ChevronLeft, ChevronRight, Download } from 'lucide-react-native';
 import DateTimePicker from 'react-native-ui-datepicker';
+import type { DateType } from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
 import { useQuery } from '@tanstack/react-query';
+import * as Print from 'expo-print';
 
 import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
@@ -14,12 +16,14 @@ import { tabs } from '../components/admin-products/products-screen-data';
 import { colors, fonts, textSizes } from '../constants/theme';
 import { spacing } from '../constants/design-system';
 import { apiClient } from '../lib/api';
-import { formatPeso } from '../lib/product-utils';
+import { formatExportAmount, formatPeso, normalizeNumber } from '../lib/product-utils';
 import { ProductFormInput } from '../components/ui/product-form-input';
 import { usePagination } from '../hooks/use-pagination';
 import { PaginationControls } from '../components/ui/pagination-controls';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { useRefreshHandler } from '../hooks/use-refresh-handler';
+import { shareExportFile } from '../lib/export-file';
+import { downloadWebPdfReport } from '../lib/web-pdf-export';
 
 type Shift = {
   id: number;
@@ -39,6 +43,166 @@ type Shift = {
     sales: number;
   };
 };
+
+type CashierInventoryRow = {
+  cashierPrice: number | string | null;
+  cashier: {
+    id: number;
+    name: string;
+    username: string;
+  };
+  product: {
+    id: number;
+    name: string;
+    barcode: string | null;
+    price: number | string;
+    unit: string;
+    category?: {
+      name: string;
+    } | null;
+  };
+  quantity: number;
+  sourceCashier: {
+    id: number;
+    name: string;
+    username: string;
+  };
+};
+
+function escapeHtml(value: string | number) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatFileDate(value: Date) {
+  return dayjs(value).format('YYYY-MM-DD');
+}
+
+function getCashierInventoryPrice(row: CashierInventoryRow) {
+  return row.cashierPrice === null || row.cashierPrice === undefined
+    ? normalizeNumber(row.product.price)
+    : normalizeNumber(row.cashierPrice);
+}
+
+function buildCashierInventoryRows(rows: CashierInventoryRow[]) {
+  if (rows.length === 0) {
+    return '<tr><td colspan="7">No cashier inventory available.</td></tr>';
+  }
+
+  return rows
+    .slice()
+    .sort((left, right) => {
+      const cashierCompare = left.cashier.name.localeCompare(right.cashier.name);
+      if (cashierCompare !== 0) return cashierCompare;
+      return left.product.name.localeCompare(right.product.name);
+    })
+    .map((row) => {
+      const price = getCashierInventoryPrice(row);
+      return `
+        <tr>
+          <td>${escapeHtml(row.cashier.name)}</td>
+          <td>${escapeHtml(row.product.name)}</td>
+          <td>${escapeHtml(row.product.category?.name || 'Uncategorized')}</td>
+          <td>${escapeHtml(row.sourceCashier.name)}</td>
+          <td class="amount">${escapeHtml(formatExportAmount(price))}</td>
+          <td class="amount">${escapeHtml(row.quantity)}</td>
+          <td>${escapeHtml(row.product.unit || 'pcs')}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+function buildCashierInventoryHtml(rows: CashierInventoryRow[]) {
+  const generatedAt = new Date().toLocaleString('en-PH', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>GDC Per-Cashier Inventory</title>
+        <style>
+          body {
+            color: #131927;
+            font-family: Arial, sans-serif;
+            padding: 24px;
+          }
+          h1 {
+            color: #1A237E;
+            font-size: 24px;
+            margin: 0;
+          }
+          .subtitle {
+            color: #667085;
+            font-size: 12px;
+            letter-spacing: 1.6px;
+            margin: 4px 0 18px;
+            text-transform: uppercase;
+          }
+          .meta {
+            border-bottom: 2px solid #DDE4F3;
+            color: #475467;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+          }
+          table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+          th, td {
+            border: 1px solid #DDE4F3;
+            font-size: 10px;
+            padding: 7px 8px;
+            text-align: left;
+            vertical-align: top;
+          }
+          th {
+            background: #EEF2FF;
+            color: #1A237E;
+            font-size: 9px;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+          }
+          .amount {
+            text-align: right;
+            white-space: nowrap;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Per-Cashier Products Remaining</h1>
+        <p class="subtitle">GDC Inventory Pro</p>
+        <div class="meta">
+          <strong>Generated:</strong> ${escapeHtml(generatedAt)}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cashier</th>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Source</th>
+              <th>Price</th>
+              <th>Qty Left</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>${buildCashierInventoryRows(rows)}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+}
 
 export default function AdminShiftsScreen() {
   const { isTablet } = useResponsiveLayout();
@@ -67,10 +231,13 @@ export default function AdminShiftsScreen() {
   const [actionType, setActionType] = useState<'FORCE_CLOSE' | 'REOPEN'>('FORCE_CLOSE');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExportingInventory, setIsExportingInventory] = useState(false);
 
   // Date Filter State
   const [filterDate, setFilterDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(dayjs().month());
+  const [pickerYear, setPickerYear] = useState(dayjs().year());
 
   const filteredShifts = shifts.filter(shift => {
     if (!filterDate) return true;
@@ -97,6 +264,46 @@ export default function AdminShiftsScreen() {
     setShowActionModal(true);
   };
 
+  const openDatePicker = () => {
+    const activeDate = dayjs(filterDate ?? new Date());
+    setPickerMonth(activeDate.month());
+    setPickerYear(activeDate.year());
+    setShowDatePicker(true);
+  };
+
+  const clearFilterDate = () => {
+    const today = dayjs();
+    setFilterDate(null);
+    setPickerMonth(today.month());
+    setPickerYear(today.year());
+  };
+
+  const handleDatePickerChange = (params: { date: DateType }) => {
+    if (!params.date) return;
+    const selectedDate = dayjs(params.date);
+    setFilterDate(selectedDate.toDate());
+    setPickerMonth(selectedDate.month());
+    setPickerYear(selectedDate.year());
+    setShowDatePicker(false);
+  };
+
+  const changePickerMonth = (amount: number) => {
+    const nextDate = dayjs()
+      .year(pickerYear)
+      .month(pickerMonth)
+      .date(1)
+      .add(amount, 'month');
+
+    setPickerMonth(nextDate.month());
+    setPickerYear(nextDate.year());
+  };
+
+  const pickerMonthLabel = dayjs()
+    .year(pickerYear)
+    .month(pickerMonth)
+    .date(1)
+    .format('MMMM YYYY');
+
   const handleActionSubmit = async () => {
     if (!selectedShift) return;
     setIsSubmitting(true);
@@ -113,6 +320,86 @@ export default function AdminShiftsScreen() {
       alert('Failed to update shift. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleExportCashierInventoryPdf = async () => {
+    try {
+      setIsExportingInventory(true);
+      const response = await apiClient.get<CashierInventoryRow[]>('/cashier/inventory');
+      const rows = response.data;
+      const fileName = `gdc-cashier-products-remaining-${formatFileDate(new Date())}.pdf`;
+
+      if (Platform.OS === 'web') {
+        await downloadWebPdfReport({
+          fileName,
+          title: 'Per-Cashier Products Remaining',
+          subtitle: 'GDC Inventory Pro',
+          metadata: [
+            {
+              label: 'Generated',
+              value: new Date().toLocaleString('en-PH', {
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              }),
+            },
+          ],
+          summary: [
+            { label: 'Cashier Inventory Rows', value: String(rows.length) },
+            {
+              label: 'Total Qty Left',
+              value: String(rows.reduce((sum, row) => sum + normalizeNumber(row.quantity), 0)),
+            },
+            {
+              label: 'Total Inventory Worth',
+              value: formatExportAmount(
+                rows.reduce(
+                  (sum, row) => sum + getCashierInventoryPrice(row) * normalizeNumber(row.quantity),
+                  0
+                )
+              ),
+            },
+          ],
+          tables: [
+            {
+              emptyText: 'No cashier inventory available.',
+              headers: ['Cashier', 'Product', 'Category', 'Source', 'Price', 'Qty Left', 'Unit'],
+              rows: rows.map((row) => [
+                row.cashier.name,
+                row.product.name,
+                row.product.category?.name || 'Uncategorized',
+                row.sourceCashier.name,
+                formatExportAmount(getCashierInventoryPrice(row)),
+                String(row.quantity),
+                row.product.unit || 'pcs',
+              ]),
+              title: 'Products Remaining',
+            },
+          ],
+          footer: 'Prepared by GDC Inventory Pro',
+        });
+        return;
+      }
+
+      const { uri } = await Print.printToFileAsync({
+        html: buildCashierInventoryHtml(rows),
+      });
+
+      await shareExportFile(uri, {
+        dialogTitle: 'Save Cashier Products Remaining',
+        fileName,
+        mimeType: 'application/pdf',
+        uti: 'com.adobe.pdf',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export cashier inventory right now.';
+      Alert.alert('Export failed', message);
+    } finally {
+      setIsExportingInventory(false);
     }
   };
 
@@ -133,10 +420,18 @@ export default function AdminShiftsScreen() {
       onRefresh={onRefresh}
       refreshing={isRefreshing}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+      <View style={styles.toolbar}>
+        <View style={styles.toolbarActions}>
+          <AppButton
+            fullWidth={false}
+            icon={Download}
+            label="Export PDF"
+            loading={isExportingInventory}
+            onPress={handleExportCashierInventoryPdf}
+            variant="primary"
+          />
           {filterDate && (
-            <Pressable onPress={() => setFilterDate(null)} style={{ padding: spacing.xs }}>
+            <Pressable onPress={clearFilterDate} style={{ padding: spacing.xs }}>
               <X size={16} color={colors.textSecondary} />
             </Pressable>
           )}
@@ -144,7 +439,7 @@ export default function AdminShiftsScreen() {
             variant="secondary"
             icon={CalendarIcon}
             label={filterDate ? dayjs(filterDate).format('MMM DD, YYYY') : 'Filter Date'}
-            onPress={() => setShowDatePicker(true)}
+            onPress={openDatePicker}
             fullWidth={false}
           />
         </View>
@@ -264,16 +559,33 @@ export default function AdminShiftsScreen() {
         onClose={() => setShowDatePicker(false)}
         height={500}
       >
-        <View style={{ padding: spacing.xl, backgroundColor: '#fff', borderRadius: 12 }}>
+        <View style={styles.datePickerContent}>
+          <View style={styles.datePickerNav}>
+            <Pressable
+              accessibilityLabel="Previous month"
+              onPress={() => changePickerMonth(-1)}
+              style={styles.datePickerNavButton}
+            >
+              <ChevronLeft color={colors.secondary} size={20} strokeWidth={2.4} />
+            </Pressable>
+            <Text style={styles.datePickerNavLabel}>{pickerMonthLabel}</Text>
+            <Pressable
+              accessibilityLabel="Next month"
+              onPress={() => changePickerMonth(1)}
+              style={styles.datePickerNavButton}
+            >
+              <ChevronRight color={colors.secondary} size={20} strokeWidth={2.4} />
+            </Pressable>
+          </View>
           <DateTimePicker
             mode="single"
-            date={filterDate || new Date()}
-            onChange={(params: any) => {
-              if (params.date) {
-                setFilterDate(dayjs(params.date).toDate());
-                setShowDatePicker(false);
-              }
-            }}
+            date={filterDate ?? undefined}
+            month={pickerMonth}
+            year={pickerYear}
+            hideHeader
+            onMonthChange={setPickerMonth}
+            onYearChange={setPickerYear}
+            onChange={handleDatePickerChange}
           />
         </View>
       </AdminModalShell>
@@ -315,6 +627,17 @@ export default function AdminShiftsScreen() {
 }
 
 const styles = StyleSheet.create({
+  toolbar: {
+    alignItems: 'flex-end',
+    marginBottom: spacing.md,
+  },
+  toolbarActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+  },
   tableHeader: {
     backgroundColor: colors.surfaceNeutral,
     borderBottomColor: '#EAECF0',
@@ -470,6 +793,32 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     paddingTop: spacing.md,
+  },
+  datePickerContent: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.lg,
+  },
+  datePickerNav: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  datePickerNavButton: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  datePickerNavLabel: {
+    color: colors.textStrong,
+    fontFamily: fonts.semiBold,
+    fontSize: textSizes.bodyLarge,
+    textAlign: 'center',
   },
   modalDesc: {
     color: colors.textSecondary,

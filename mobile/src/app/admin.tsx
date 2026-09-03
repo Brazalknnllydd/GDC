@@ -225,7 +225,7 @@ export default function AdminScreen() {
         <AppFab
           icon={<Bot color="#FFFFFF" size={28} strokeWidth={2.2} />}
           onPress={() => setShowBot(true)}
-          style={{ position: 'absolute', bottom: 95, right: 20, zIndex: 10 }}
+          style={[styles.botFab, compactPhone && styles.botFabCompact]}
         />
       }
     >
@@ -296,11 +296,11 @@ export default function AdminScreen() {
       >
         {sales.length > 0 ? (
           <ScrollView
+            contentContainerStyle={styles.tableScrollerContent}
             horizontal
-            showsHorizontalScrollIndicator={true}
-            contentContainerStyle={{ minWidth: "100%" }}
+            showsHorizontalScrollIndicator
           >
-            <View style={[styles.table, { minWidth: "100%" }]}>
+            <View style={[styles.table, compactPhone ? styles.tablePhone : styles.tableWide]}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>
                   RECEIPT NO.
@@ -454,7 +454,17 @@ const styles = StyleSheet.create({
   },
   table: {
     backgroundColor: colors.card,
-    minWidth: 800,
+  },
+  tableWide: {
+    flex: 1,
+    minWidth: '100%',
+  },
+  tablePhone: {
+    minWidth: 760,
+  },
+  tableScrollerContent: {
+    flexGrow: 1,
+    minWidth: '100%',
   },
   tableHeader: {
     backgroundColor: colors.surfaceSoft,
@@ -522,5 +532,15 @@ const styles = StyleSheet.create({
     ...textRoles.label,
     fontSize: 13,
     marginTop: spacing.lg,
+  },
+  botFab: {
+    bottom: 95,
+    position: 'absolute',
+    right: 20,
+    zIndex: 10,
+  },
+  botFabCompact: {
+    bottom: 88,
+    right: 16,
   },
 });

@@ -85,7 +85,7 @@ function formatSaleItems(sale: ReportSale) {
 }
 
 function getCompletedSales(sales: ReportSale[]) {
-  return sales.filter((sale) => sale.status !== 'voided');
+  return sales.filter((sale) => sale.status !== 'voided' && sale.saleType !== 'INTERNAL_CASHIER');
 }
 
 function getLowStockCount(products: Product[]) {

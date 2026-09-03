@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Package, Pencil, Trash2 } from 'lucide-react-native';
-import { IconButton } from 'react-native-paper';
 
 import type { Product } from './products-screen-data';
+import { ActionIconButton } from '../ui/action-icon-button';
 import { PaginationControls } from '../ui/pagination-controls';
 import { resolveApiAssetUrl } from '../../lib/api';
 import { formatPeso, formatWeightValue, normalizeNumber } from '../../lib/product-utils';
@@ -30,7 +30,7 @@ export function ProductTable({
   onDelete: (product: Product) => void;
   isLoading: boolean;
 }) {
-  const { compactPhone, isTablet, isWideTablet } = useResponsiveLayout();
+  const { compactPhone, isWideTablet } = useResponsiveLayout();
   const { width } = useWindowDimensions();
   const isNarrowPhone = width < 430;
   const numColumns = isNarrowPhone ? 1 : isWideTablet ? 3 : 2;
@@ -128,7 +128,7 @@ export function ProductTable({
                         isLowStock && product.stock > 0 && styles.warningText,
                       ]}
                     >
-                      {product.stock} {product.unit}
+                      {product.stock}
                     </Text>
                   </View>
 
@@ -143,17 +143,15 @@ export function ProductTable({
                 </View>
 
                 <View style={[styles.actionsRow, compactPhone && styles.actionsRowCompact]}>
-                  <IconButton
-                    icon={() => <Pencil color={colors.secondary} size={18} strokeWidth={2.5} />}
+                  <ActionIconButton
+                    accessibilityLabel={`Edit ${product.name}`}
+                    icon={Pencil}
                     onPress={() => onEdit(product)}
-                    size={22}
-                    style={styles.actionButton}
                   />
-                  <IconButton
-                    icon={() => <Trash2 color={colors.danger} size={18} strokeWidth={2.5} />}
+                  <ActionIconButton
+                    accessibilityLabel={`Delete ${product.name}`}
+                    icon={Trash2}
                     onPress={() => onDelete(product)}
-                    size={22}
-                    style={[styles.actionButton, styles.deleteButton]}
                   />
                 </View>
               </View>
@@ -338,13 +336,6 @@ const styles = StyleSheet.create({
   actionsRowCompact: {
     paddingBottom: spacing.xs,
     paddingTop: spacing.xs,
-  },
-  actionButton: {
-    backgroundColor: colors.surfaceSoft,
-    margin: 0,
-  },
-  deleteButton: {
-    backgroundColor: colors.surfaceDanger,
   },
   paginationRow: {
     backgroundColor: colors.surfaceSoft,

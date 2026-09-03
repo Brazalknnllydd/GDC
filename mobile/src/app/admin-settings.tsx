@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Platform, Alert, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { LogOut, Printer, Bluetooth, UserRound, PencilLine, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { AppButton } from '../components/ui/app-button';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { ModalActions } from '../components/ui/modal-actions';
 import { AppDataTable, AppDataTableHeader, AppDataTableRow, AppDataTableCell } from '../components/ui/app-data-table';
+import { ActionIconButton } from '../components/ui/action-icon-button';
 import { PaginationControls } from '../components/ui/pagination-controls';
 import { useToastStore } from '../store/toast-store';
 import { spacing, radius } from '../constants/design-system';
@@ -289,20 +290,16 @@ export default function AdminSettingsScreen() {
                 </AppDataTableCell>
                 <AppDataTableCell flex={isTablet ? 0.9 : undefined} width={isTablet ? undefined : 116} numeric>
                   <View style={styles.rowActions}>
-                    <TouchableOpacity
+                    <ActionIconButton
                       accessibilityLabel={`Edit cashier ${cashier.name}`}
+                      icon={PencilLine}
                       onPress={() => openEditCashierModal(cashier)}
-                      style={[styles.actionButton, styles.editActionButton]}
-                    >
-                      <PencilLine color={colors.secondary} size={14} strokeWidth={2.1} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                    />
+                    <ActionIconButton
                       accessibilityLabel={`Delete cashier ${cashier.name}`}
+                      icon={Trash2}
                       onPress={() => openDeleteCashierModal(cashier)}
-                      style={[styles.actionButton, styles.deleteActionButton]}
-                    >
-                      <Trash2 color={colors.dangerStrong} size={14} strokeWidth={2.1} />
-                    </TouchableOpacity>
+                    />
                   </View>
                 </AppDataTableCell>
               </AppDataTableRow>
@@ -419,7 +416,8 @@ export default function AdminSettingsScreen() {
       />
 
       <AdminModalShell
-        height={240}
+        height={compactPhone ? 300 : 260}
+        maxHeight={compactPhone ? '72%' : '56%'}
         onClose={closeDeleteCashierModal}
         title="Delete Cashier"
         visible={cashierPendingDelete !== null}
@@ -441,12 +439,14 @@ export default function AdminSettingsScreen() {
           </ModalActions>
         }
       >
-        <Text style={styles.deleteConfirmText}>
-          Delete{' '}
-          <Text style={styles.deleteConfirmName}>{cashierPendingDelete?.name}</Text>
-          ? This will remove the cashier account. If they have sales or shifts on record, the server will archive the account instead of hard-deleting it.
-        </Text>
-        {deleteMessage ? <Text style={styles.deleteErrorText}>{deleteMessage}</Text> : null}
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text style={styles.deleteConfirmText}>
+            Delete{' '}
+            <Text style={styles.deleteConfirmName}>{cashierPendingDelete?.name}</Text>
+            ? This will remove the cashier account. If they have sales or shifts on record, the server will archive the account instead of hard-deleting it.
+          </Text>
+          {deleteMessage ? <Text style={styles.deleteErrorText}>{deleteMessage}</Text> : null}
+        </ScrollView>
       </AdminModalShell>
     </AdminPageScreen>
   );
@@ -527,22 +527,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     justifyContent: 'flex-end',
-  },
-  actionButton: {
-    alignItems: 'center',
-    borderRadius: radius.round,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
-  editActionButton: {
-    backgroundColor: colors.surfaceInfoMuted,
-    borderColor: colors.borderInfoStrong,
-  },
-  deleteActionButton: {
-    backgroundColor: colors.surfaceDangerMuted,
-    borderColor: colors.borderDangerSoft,
   },
   paginationRow: {
     backgroundColor: colors.card,

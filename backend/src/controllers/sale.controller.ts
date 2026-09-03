@@ -21,7 +21,10 @@ export const getSales = async (
         ? {}
         : {
             where: {
-              userId: authReq.authUser.id,
+              OR: [
+                { userId: authReq.authUser.id },
+                { recipientUserId: authReq.authUser.id },
+              ],
             },
           }),
       include: {
@@ -39,6 +42,13 @@ export const getSales = async (
           },
         },
         shift: true,
+        recipientUser: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -95,6 +105,13 @@ export const getSaleById = async (
           },
         },
         shift: true,
+        recipientUser: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -113,7 +130,11 @@ export const getSaleById = async (
 
     const isAdmin = authReq.authUser.role.toLowerCase() === "admin";
 
-    if (!isAdmin && sale.user.id !== authReq.authUser.id) {
+    if (
+      !isAdmin &&
+      sale.user.id !== authReq.authUser.id &&
+      sale.recipientUserId !== authReq.authUser.id
+    ) {
       return res.status(403).json({
         message: "Cashiers can only access their own sales",
       });
@@ -151,6 +172,8 @@ export const createSale = async (
       notes,
       isPrinted,
       customerId,
+      recipientUserId,
+      saleType,
       userId: requestedUserId,
       shiftId,
       items,
@@ -169,6 +192,8 @@ export const createSale = async (
       notes?: string | null;
       isPrinted?: boolean;
       customerId?: number | null;
+      recipientUserId?: number | null;
+      saleType?: string;
       userId?: number;
       shiftId?: number | null;
       items?: unknown[];
@@ -242,6 +267,8 @@ export const createSale = async (
       userId: saleUserId,
       items,
       ...(paymentReference !== undefined ? { paymentReference } : {}),
+      ...(recipientUserId !== undefined ? { recipientUserId } : {}),
+      ...(saleType !== undefined ? { saleType } : {}),
       ...(status !== undefined ? { status } : {}),
       ...(approvedByUserId !== undefined ? { approvedByUserId } : {}),
       ...(notes !== undefined ? { notes } : {}),
@@ -262,7 +289,11 @@ export const createSale = async (
     const statusCode =
       message.includes("not found") ||
       message.includes("Insufficient stock") ||
-      message.includes("valid positive numbers")
+      message.includes("valid positive numbers") ||
+      message.includes("Only Cashier") ||
+      message.includes("Recipient") ||
+      message.includes("cashier inventory") ||
+      message.includes("Price has changed")
         ? 400
         : 500;
 

@@ -90,6 +90,11 @@ export function CashierInventorySection({
       }
       contentContainerStyle={styles.listContent}
       renderItem={({ item: product }) => {
+        const sourceSummary = product.sourceCashiers
+          ?.filter((source) => source.quantity > 0)
+          .map((source) => `${source.name}: ${source.quantity}`)
+          .join(' | ');
+
         return (
           <View style={{ padding: spacing.xs, flex: 1 }}>
             <CashierProductCard
@@ -97,6 +102,9 @@ export function CashierInventorySection({
               name={
                 <Text numberOfLines={2}>
                   {product.name}
+                  {sourceSummary ? (
+                    <Text style={styles.sourceSummary}>{`\n${sourceSummary}`}</Text>
+                  ) : null}
                 </Text>
               }
               onAdd={() => onAddProduct(product)}
@@ -155,5 +163,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: textSizes.body,
     textAlign: 'center',
+  },
+  sourceSummary: {
+    color: colors.textTertiary,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.xsmall,
   },
 });

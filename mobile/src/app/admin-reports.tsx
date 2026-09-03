@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CreditCard, Download } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 
 import {
@@ -21,7 +22,7 @@ import {
 } from '../components/ui/report-export-options';
 import { SurfaceCard } from '../components/ui/surface-card';
 import { layout, radius, spacing } from '../constants/design-system';
-import { colors, textRoles, textSizes } from '../constants/theme';
+import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { useReportsAnalytics } from '../hooks/use-reports-analytics';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { useRefreshHandler } from '../hooks/use-refresh-handler';
@@ -34,11 +35,55 @@ import { downloadWebPdfReport } from '../lib/web-pdf-export';
 import { tabs as productTabs } from '../components/admin-products/products-screen-data';
 
 type Product = {
+  barcode?: string | null;
+  categoryId?: number;
   id: number;
+  name: string;
+  price?: number | string;
+  stock: number;
+  unit?: string | null;
   category: {
     name: string;
   };
 };
+
+type CashierReportRow = {
+  beginning: number;
+  cash: number;
+  cashierId: number;
+  cashierName: string;
+  credit: number;
+  date: {
+    endDate: string | null;
+    startDate: string | null;
+  };
+  expenses: number;
+  gcash: number;
+  leftOver: number;
+  lessPriceDiscount: number;
+  payments: number;
+  payables: number;
+  total: number;
+  username: string;
+};
+
+const cashierReportColumns = [
+  { key: 'date', label: 'DATE', width: 132 },
+  { key: 'cashier', label: 'CASHIER', width: 150 },
+  { key: 'beginning', label: 'BEGINNING', width: 128, numeric: true },
+  { key: 'cash', label: 'CASH', width: 112, numeric: true },
+  { key: 'gcash', label: 'GCASH', width: 112, numeric: true },
+  { key: 'expenses', label: 'EXPENSES', width: 118, numeric: true },
+  { key: 'payables', label: 'PAYABLES', width: 118, numeric: true },
+  { key: 'lessPriceDiscount', label: 'LESS PRICE DISC.', width: 148, numeric: true },
+  { key: 'credit', label: 'CREDIT', width: 112, numeric: true },
+  { key: 'total', label: 'TOTAL', width: 120, numeric: true },
+] as const;
+
+const cashierReportTableWidth = cashierReportColumns.reduce(
+  (sum, column) => sum + column.width,
+  0
+);
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-PH', {
@@ -101,6 +146,29 @@ function formatMonthRangeForFilename(range: MonthRangeValue) {
   return [...new Set(months)].join('-to-');
 }
 
+function getReportRangeQuery(range: MonthRangeValue) {
+  const params: string[] = [];
+
+  if (range.startMonth) {
+    params.push(
+      `startDate=${encodeURIComponent(
+        new Date(range.startMonth.getFullYear(), range.startMonth.getMonth(), 1).toISOString()
+      )}`
+    );
+  }
+
+  if (range.endMonth) {
+    params.push(
+      `endDate=${encodeURIComponent(
+        new Date(range.endMonth.getFullYear(), range.endMonth.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+      )}`
+    );
+  }
+
+  const query = params.join('&');
+  return query ? `?${query}` : '';
+}
+
 function escapeCsvValue(value: string | number) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
@@ -112,6 +180,44 @@ function escapeHtml(value: string | number) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function isWithinReportRange(dateValue: string, range: MonthRangeValue) {
+  if (!range.startMonth || !range.endMonth) {
+    return true;
+  }
+
+  const date = new Date(dateValue);
+  return date >= startOfMonth(range.startMonth) && date <= endOfMonth(range.endMonth);
+}
+
+function formatSaleBuyer(sale: SaleRecord) {
+  if (sale.saleType === 'INTERNAL_CASHIER') {
+    return sale.recipientUser?.name || 'Cashier';
+  }
+
+  return sale.customer?.name || 'Walk-in';
+}
+
+function formatSaleItems(sale: SaleRecord) {
+  if (!sale.items?.length) {
+    return 'No item details';
+  }
+
+  return sale.items
+    .map((item, index) => {
+      const productName = item.product?.name || `Item ${index + 1}`;
+      return `${productName} x ${normalizeNumber(item.quantity)}`;
+    })
+    .join(', ');
 }
 
 const pdfColors = {
@@ -155,14 +261,25 @@ export default function AdminReportsScreen() {
       return response.data;
     },
   });
+  const cashierReportQuery = useQuery({
+    queryKey: ['cashier-report-summary', reportMonthRange],
+    queryFn: async () => {
+      const response = await apiClient.get<CashierReportRow[]>(
+        `/cashier/reports/summary${getReportRangeQuery(reportMonthRange)}`
+      );
+      return response.data;
+    },
+  });
 
   const sales = salesQuery.data ?? [];
   const products = productsQuery.data ?? [];
-  const queryError = salesQuery.error?.message || productsQuery.error?.message || '';
+  const cashierReportRows = cashierReportQuery.data ?? [];
+  const queryError =
+    salesQuery.error?.message || productsQuery.error?.message || cashierReportQuery.error?.message || '';
   const displayError = queryError || screenError;
   const refreshReports = useCallback(
-    () => Promise.all([salesQuery.refetch(), productsQuery.refetch()]),
-    [productsQuery, salesQuery],
+    () => Promise.all([salesQuery.refetch(), productsQuery.refetch(), cashierReportQuery.refetch()]),
+    [cashierReportQuery, productsQuery, salesQuery],
   );
   const { isRefreshing, onRefresh } = useRefreshHandler(refreshReports);
 
@@ -172,7 +289,7 @@ export default function AdminReportsScreen() {
       : { ...tab, active: false }
   );
 
-  const { categoryPerformance, chartSeries, insightCards, paymentDistribution, reportMetrics, totals } =
+  const { categoryPerformance, chartSeries, filteredSales, insightCards, paymentDistribution, reportMetrics, totals } =
     useReportsAnalytics({
       formatPeso,
       normalizeNumber,
@@ -289,6 +406,71 @@ export default function AdminReportsScreen() {
       const rangeLabel = formatMonthRangeLabel(reportMonthRange);
       const generatedAt = formatDateTime(new Date().toISOString());
       const fileName = `gdc-reports-summary-${formatMonthRangeForFilename(reportMonthRange)}.pdf`;
+      const allTransactionsInRange = sales
+        .filter((sale) => isWithinReportRange(sale.createdAt, reportMonthRange))
+        .slice()
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+      const productRows =
+        products.length > 0
+          ? products
+              .slice()
+              .sort((left, right) => left.name.localeCompare(right.name))
+              .map(
+                (product) => `
+                  <tr>
+                    <td>${escapeHtml(product.name)}</td>
+                    <td>${escapeHtml(product.category?.name || 'Uncategorized')}</td>
+                    <td>${escapeHtml(product.barcode || '-')}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(product.price))}</td>
+                    <td class="amount">${escapeHtml(product.stock)}</td>
+                    <td>${escapeHtml(product.unit || 'pcs')}</td>
+                  </tr>
+                `
+              )
+              .join('')
+          : '<tr><td colspan="6">No products available.</td></tr>';
+      const cashierRows =
+        cashierReportRows.length > 0
+          ? cashierReportRows
+              .map(
+                (row) => `
+                  <tr>
+                    <td>${escapeHtml(row.cashierName)}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.beginning))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.cash))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.gcash))}</td>
+                    <td class="amount danger">${escapeHtml(formatExportAmount(row.expenses))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.payables))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.lessPriceDiscount))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(row.credit))}</td>
+                    <td class="amount strong">${escapeHtml(formatExportAmount(row.total))}</td>
+                  </tr>
+                `
+              )
+              .join('')
+          : '<tr><td colspan="9">No cashier report data available.</td></tr>';
+      const transactionRows =
+        allTransactionsInRange.length > 0
+          ? allTransactionsInRange
+              .map(
+                (sale) => `
+                  <tr class="${sale.status === 'voided' ? 'muted-row' : ''}">
+                    <td>${escapeHtml(sale.receiptNumber)}</td>
+                    <td>${escapeHtml(formatDateTime(sale.createdAt))}</td>
+                    <td>${escapeHtml(sale.user?.name || 'Unknown')}</td>
+                    <td>${escapeHtml(formatSaleBuyer(sale))}</td>
+                    <td>${escapeHtml(sale.saleType === 'INTERNAL_CASHIER' ? 'Internal Cashier' : 'Customer')}</td>
+                    <td>${escapeHtml(sale.paymentMethod)}</td>
+                    <td>${escapeHtml(sale.status || 'completed')}</td>
+                    <td>${escapeHtml(formatSaleItems(sale))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(sale.subtotal))}</td>
+                    <td class="amount">${escapeHtml(formatExportAmount(sale.discountAmount))}</td>
+                    <td class="amount strong">${escapeHtml(formatExportAmount(sale.totalAmount))}</td>
+                  </tr>
+                `
+              )
+              .join('')
+          : '<tr><td colspan="11">No transactions available for this range.</td></tr>';
       const categoryRows =
         categoryPerformance.length > 0
           ? categoryPerformance
@@ -402,10 +584,26 @@ export default function AdminReportsScreen() {
                 font-size: 11px;
                 padding: 8px 10px;
                 text-align: left;
+                vertical-align: top;
               }
               th {
                 background: ${pdfColors.thBackground};
                 color: ${pdfColors.title};
+              }
+              .amount {
+                text-align: right;
+                white-space: nowrap;
+              }
+              .strong {
+                font-weight: 700;
+              }
+              .danger {
+                color: ${colors.dangerStrong};
+                font-weight: 700;
+              }
+              .muted-row {
+                color: ${colors.textTertiary};
+                text-decoration: line-through;
               }
               .insight-grid {
                 display: flex;
@@ -458,6 +656,14 @@ export default function AdminReportsScreen() {
                 <p class="summary-value">${escapeHtml(totals.itemsSold)}</p>
               </div>
               <div class="summary-card">
+                <p class="summary-label">Transactions</p>
+                <p class="summary-value">${escapeHtml(filteredSales.length)}</p>
+              </div>
+              <div class="summary-card">
+                <p class="summary-label">Products Left</p>
+                <p class="summary-value">${escapeHtml(products.length)}</p>
+              </div>
+              <div class="summary-card">
                 <p class="summary-label">Average Basket</p>
                 <p class="summary-value">${escapeHtml(totals.averageBasket.toFixed(1))}</p>
               </div>
@@ -496,6 +702,65 @@ export default function AdminReportsScreen() {
               </tbody>
             </table>
 
+            <h2>Cashier Sales Report</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cashier</th>
+                  <th>Beginning</th>
+                  <th>Cash</th>
+                  <th>GCash</th>
+                  <th>Expenses</th>
+                  <th>Payables</th>
+                  <th>Less Price Disc.</th>
+                  <th>Credit</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cashierRows}
+              </tbody>
+            </table>
+
+            <h2>Sales Transaction Details</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Receipt</th>
+                  <th>Date</th>
+                  <th>Cashier</th>
+                  <th>Buyer</th>
+                  <th>Type</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Items</th>
+                  <th>Subtotal</th>
+                  <th>Discount</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${transactionRows}
+              </tbody>
+            </table>
+
+            <h2>Products Remaining</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Barcode</th>
+                  <th>Price</th>
+                  <th>Stock Left</th>
+                  <th>Unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${productRows}
+              </tbody>
+            </table>
+
             <h2>Catalog Category Coverage</h2>
             <table>
               <thead>
@@ -524,6 +789,8 @@ export default function AdminReportsScreen() {
           summary: [
             { label: 'Discounts Given', value: formatExportAmount(totals.discounts) },
             { label: 'Items Sold', value: String(totals.itemsSold) },
+            { label: 'Transactions', value: String(filteredSales.length) },
+            { label: 'Products Left', value: String(products.length) },
             { label: 'Average Basket', value: totals.averageBasket.toFixed(1) },
             { label: 'Active Categories', value: String(totals.activeCategories) },
           ],
@@ -536,6 +803,75 @@ export default function AdminReportsScreen() {
                 payment.percentageText,
               ]),
               title: 'Payment Distribution',
+            },
+            {
+              emptyText: 'No cashier report data available.',
+              headers: [
+                'Cashier',
+                'Beginning',
+                'Cash',
+                'GCash',
+                'Expenses',
+                'Payables',
+                'Less Price Disc.',
+                'Credit',
+                'Total',
+              ],
+              rows: cashierReportRows.map((row) => [
+                row.cashierName,
+                formatExportAmount(row.beginning),
+                formatExportAmount(row.cash),
+                formatExportAmount(row.gcash),
+                formatExportAmount(row.expenses),
+                formatExportAmount(row.payables),
+                formatExportAmount(row.lessPriceDiscount),
+                formatExportAmount(row.credit),
+                formatExportAmount(row.total),
+              ]),
+              title: 'Cashier Sales Report',
+            },
+            {
+              emptyText: 'No transactions available for this range.',
+              headers: [
+                'Receipt',
+                'Date',
+                'Cashier',
+                'Buyer',
+                'Type',
+                'Payment',
+                'Status',
+                'Items',
+                'Subtotal',
+                'Discount',
+                'Total',
+              ],
+              rows: allTransactionsInRange.map((sale) => [
+                sale.receiptNumber,
+                formatDateTime(sale.createdAt),
+                sale.user?.name || 'Unknown',
+                formatSaleBuyer(sale),
+                sale.saleType === 'INTERNAL_CASHIER' ? 'Internal Cashier' : 'Customer',
+                sale.paymentMethod,
+                sale.status || 'completed',
+                formatSaleItems(sale),
+                formatExportAmount(sale.subtotal),
+                formatExportAmount(sale.discountAmount),
+                formatExportAmount(sale.totalAmount),
+              ]),
+              title: 'Sales Transaction Details',
+            },
+            {
+              emptyText: 'No products available.',
+              headers: ['Product', 'Category', 'Barcode', 'Price', 'Stock Left', 'Unit'],
+              rows: products.map((product) => [
+                product.name,
+                product.category?.name || 'Uncategorized',
+                product.barcode || '-',
+                formatExportAmount(product.price),
+                String(product.stock),
+                product.unit || 'pcs',
+              ]),
+              title: 'Products Remaining',
             },
             {
               emptyText: 'No category coverage data available.',
@@ -689,22 +1025,22 @@ export default function AdminReportsScreen() {
 
       <Text style={styles.sectionEyebrow}>Admin Highlights</Text>
       <View style={styles.insightsStack}>
-        <SurfaceCard style={styles.heroInsightCard}>
-          <Text style={styles.heroInsightLabel}>PEAK SALES DAY</Text>
-          <Text style={styles.heroInsightValue}>{insightCards.peakSalesDay}</Text>
-          <Text style={styles.heroInsightCopy}>
+        <SurfaceCard style={styles.insightCard}>
+          <Text style={styles.insightLabel}>PEAK SALES DAY</Text>
+          <Text style={styles.insightValueGood}>{insightCards.peakSalesDay}</Text>
+          <Text style={styles.insightCopy}>
             Strongest day within the selected reporting range.
           </Text>
         </SurfaceCard>
 
         <View style={[styles.insightPair, compactPhone && styles.insightPairCompact]}>
-          <SurfaceCard style={[styles.insightTile, styles.insightTilePrimary]}>
-            <Text style={styles.insightTileLabel}>TOP PAYMENT</Text>
-            <Text style={styles.insightTileValueLight}>{insightCards.topPayment}</Text>
+          <SurfaceCard style={styles.insightTile}>
+            <Text style={styles.insightLabel}>TOP PAYMENT</Text>
+            <Text style={styles.insightValueGood}>{insightCards.topPayment}</Text>
           </SurfaceCard>
-          <SurfaceCard style={[styles.insightTile, styles.insightTileSoft]}>
-            <Text style={styles.insightTileLabelSoft}>BEST CATEGORY</Text>
-            <Text style={styles.insightTileValueDark}>{insightCards.bestCategory}</Text>
+          <SurfaceCard style={styles.insightTile}>
+            <Text style={styles.insightLabel}>BEST CATEGORY</Text>
+            <Text style={styles.insightValueGood}>{insightCards.bestCategory}</Text>
           </SurfaceCard>
         </View>
       </View>
@@ -729,6 +1065,70 @@ export default function AdminReportsScreen() {
         {paymentDistribution.map((payment) => (
           <PaymentDistributionRow key={payment.label} {...payment} icon={CreditCard} />
         ))}
+      </SurfaceCard>
+
+      <Text style={styles.sectionTitle}>Cashier Sales Report</Text>
+      <SurfaceCard style={styles.cashierReportCard}>
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.cashierReportScroller}
+          showsHorizontalScrollIndicator>
+          <View style={[styles.cashierReportTable, { minWidth: cashierReportTableWidth }]}>
+            <View style={styles.cashierReportHeader}>
+              {cashierReportColumns.map((column) => (
+                <Text
+                  key={column.key}
+                  style={[
+                    styles.cashierReportHeaderCell,
+                    styles.cashierReportCell,
+                    'numeric' in column && column.numeric && styles.cashierReportAmountCell,
+                    { width: column.width },
+                  ]}>
+                  {column.label}
+                </Text>
+              ))}
+            </View>
+
+            {cashierReportRows.length > 0 ? (
+              cashierReportRows.map((row) => (
+                <View key={row.cashierId} style={styles.cashierReportRow}>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, { width: 132 }]}>
+                    {formatMonthRangeLabel(reportMonthRange)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, { width: 150 }]} numberOfLines={1}>
+                    {row.cashierName}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, { width: 128 }]}>
+                    {formatPeso(row.beginning)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, { width: 112 }]}>
+                    {formatPeso(row.cash)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, { width: 112 }]}>
+                    {formatPeso(row.gcash)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, styles.cashierReportDanger, { width: 118 }]}>
+                    {formatPeso(row.expenses)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, { width: 118 }]}>
+                    {formatPeso(row.payables)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, styles.cashierReportGood, { width: 148 }]}>
+                    {formatPeso(row.lessPriceDiscount)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, { width: 112 }]}>
+                    {formatPeso(row.credit)}
+                  </Text>
+                  <Text style={[styles.cashierReportBodyCell, styles.cashierReportCell, styles.cashierReportAmountCell, styles.cashierReportTotal, { width: 120 }]}>
+                    {formatPeso(row.total)}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyStateText}>No cashier report data for the selected period.</Text>
+            )}
+          </View>
+        </ScrollView>
       </SurfaceCard>
 
       {displayError ? <Text style={styles.screenErrorText}>{displayError}</Text> : null}
@@ -911,28 +1311,28 @@ const styles = StyleSheet.create({
   insightsStack: {
     marginBottom: spacing.section,
   },
-  heroInsightCard: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
-    borderRadius: radius.xl,
+  insightCard: {
+    backgroundColor: colors.card,
+    borderColor: colors.borderPanel,
+    borderRadius: radius.lg,
     marginBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
-  heroInsightLabel: {
-    color: colors.textOnSecondaryMuted,
+  insightLabel: {
+    color: colors.textStrong,
     ...textRoles.label,
     letterSpacing: 1.1,
     marginBottom: 6,
   },
-  heroInsightValue: {
-    color: colors.textInverse,
+  insightValueGood: {
+    color: colors.successStrong,
     ...textRoles.heading,
-    fontSize: 30,
+    fontSize: textSizes.large,
     marginBottom: 6,
   },
-  heroInsightCopy: {
-    color: colors.textOnSecondaryMuted,
+  insightCopy: {
+    color: colors.textStrong,
     ...textRoles.body,
     fontSize: 14,
   },
@@ -944,40 +1344,13 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   insightTile: {
+    backgroundColor: colors.card,
+    borderColor: colors.borderPanel,
+    borderRadius: radius.lg,
     flex: 1,
     minHeight: 110,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-  },
-  insightTilePrimary: {
-    backgroundColor: colors.tertiary,
-    borderColor: colors.dangerAccent,
-  },
-  insightTileSoft: {
-    backgroundColor: colors.surfaceNeutral,
-    borderColor: colors.borderMuted,
-  },
-  insightTileLabel: {
-    color: colors.borderDanger,
-    ...textRoles.label,
-    marginBottom: 8,
-  },
-  insightTileLabelSoft: {
-    color: colors.textSubtle,
-    ...textRoles.label,
-    marginBottom: 8,
-  },
-  insightTileValueLight: {
-    color: colors.textInverse,
-    ...textRoles.value,
-    fontSize: textSizes.large - 1,
-    lineHeight: 30,
-  },
-  insightTileValueDark: {
-    color: colors.secondary,
-    ...textRoles.value,
-    fontSize: textSizes.large - 1,
-    lineHeight: 30,
   },
   performanceCard: {
     marginBottom: spacing.section,
@@ -988,6 +1361,64 @@ const styles = StyleSheet.create({
     marginBottom: spacing.section,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+  },
+  cashierReportCard: {
+    marginBottom: spacing.section,
+    overflow: 'hidden',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  cashierReportScroller: {
+    flexGrow: 1,
+  },
+  cashierReportTable: {
+    width: '100%',
+  },
+  cashierReportHeader: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceNeutral,
+    borderBottomColor: colors.borderPanel,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  cashierReportRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.borderPanel,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 54,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  cashierReportCell: {
+    paddingHorizontal: spacing.sm,
+  },
+  cashierReportAmountCell: {
+    textAlign: 'right',
+  },
+  cashierReportHeaderCell: {
+    color: colors.textSecondary,
+    ...textRoles.label,
+    fontSize: textSizes.smallCaps,
+  },
+  cashierReportBodyCell: {
+    color: colors.textSoft,
+    fontFamily: fonts.regular,
+    fontSize: textSizes.small + 1,
+  },
+  cashierReportDanger: {
+    color: colors.dangerStrong,
+    fontFamily: fonts.semiBold,
+  },
+  cashierReportGood: {
+    color: colors.successStrong,
+    fontFamily: fonts.semiBold,
+  },
+  cashierReportTotal: {
+    color: colors.secondary,
+    fontFamily: fonts.bold,
   },
   emptyStateText: {
     color: colors.textSecondary,

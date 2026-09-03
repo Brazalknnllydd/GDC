@@ -20,10 +20,12 @@ type AdminModalShellProps = {
   footer?: ReactNode;
   headerLead?: ReactNode;
   height?: ViewStyle['height'];
+  maxWidth?: number;
   maxHeight?: ViewStyle['maxHeight'];
   onClose: () => void;
   title: string;
   visible: boolean;
+  widthRatio?: number;
 };
 
 function resolveViewportLength(
@@ -43,24 +45,29 @@ function resolveViewportLength(
 
 export function AdminModalShell({
   children,
-  compact = false,
+  compact,
   footer,
   headerLead,
   height,
-  maxHeight = '92%',
+  maxWidth,
+  maxHeight,
   onClose,
   title,
   visible,
+  widthRatio,
 }: AdminModalShellProps) {
   const { height: viewportHeight, width } = useWindowDimensions();
   const { isTablet, isWideTablet } = useResponsiveLayout();
+  const resolvedCompact = compact ?? !isTablet;
+  const resolvedMaxWidth = maxWidth ?? (isWideTablet ? 740 : isTablet ? 580 : 450);
+  const resolvedWidthRatio = widthRatio ?? (isWideTablet ? 0.6 : isTablet ? 0.68 : 0.9);
   const modalWidth = Math.min(
-    width - (isTablet ? 64 : 32),
-    isWideTablet ? 860 : isTablet ? 720 : 520,
-    isWideTablet ? width * 0.72 : isTablet ? width * 0.84 : width * 0.92
+    width - (isTablet ? 160 : 40),
+    resolvedMaxWidth,
+    width * resolvedWidthRatio
   );
   const resolvedHeight = resolveViewportLength(height, viewportHeight);
-  const resolvedMaxHeight = resolveViewportLength(maxHeight, viewportHeight);
+  const resolvedMaxHeight = resolveViewportLength(maxHeight ?? (isTablet ? '86%' : '86%'), viewportHeight);
 
   if (!visible) return null;
 
@@ -72,16 +79,19 @@ export function AdminModalShell({
           <Surface
             style={[
               styles.card,
+              resolvedCompact ? styles.cardCompact : undefined,
               {
                 height: resolvedHeight,
                 maxHeight: resolvedMaxHeight,
                 width: modalWidth,
               },
             ]}>
-            <View style={[styles.header, compact ? styles.headerCompact : undefined]}>
+            <View style={[styles.header, resolvedCompact ? styles.headerCompact : undefined]}>
               <View style={styles.titleRow}>
                 {headerLead}
-                <Text style={[styles.title, compact ? styles.titleCompact : undefined]}>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.title, resolvedCompact ? styles.titleCompact : undefined]}>
                   {title}
                 </Text>
               </View>
@@ -93,10 +103,10 @@ export function AdminModalShell({
               />
             </View>
 
-            <View style={[styles.body, compact ? styles.bodyCompact : undefined]}>{children}</View>
+            <View style={[styles.body, resolvedCompact ? styles.bodyCompact : undefined]}>{children}</View>
 
             {footer ? (
-              <View style={[styles.footer, compact ? styles.footerCompact : undefined]}>
+              <View style={[styles.footer, resolvedCompact ? styles.footerCompact : undefined]}>
                 {footer}
               </View>
             ) : null}
@@ -134,16 +144,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     overflow: 'hidden',
   },
+  cardCompact: {
+    borderRadius: radius.lg,
+  },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   headerCompact: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   titleRow: {
     alignItems: 'center',
@@ -153,11 +166,12 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textHeading,
+    flexShrink: 1,
     ...textRoles.value,
-    fontSize: 17,
+    fontSize: 16,
   },
   titleCompact: {
-    fontSize: 16,
+    fontSize: 15,
   },
   closeButton: {
     margin: 0,
@@ -165,19 +179,21 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     minHeight: 0,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm + 2,
   },
   bodyCompact: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
   footer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    borderTopColor: colors.borderPanel,
+    borderTopWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   footerCompact: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });

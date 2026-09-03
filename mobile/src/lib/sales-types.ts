@@ -13,6 +13,7 @@ export type SaleItem = {
     costPrice?: number | string;
     name: string;
   };
+  sourceCashierId?: number | null;
 };
 
 export type SaleRecord = {
@@ -34,6 +35,13 @@ export type SaleRecord = {
     name: string;
     username?: string;
   } | null;
+  recipientUser?: {
+    id?: number;
+    name: string;
+    username?: string;
+  } | null;
+  recipientUserId?: number | null;
+  saleType?: string;
   customer?: CustomerRef;
   createdAt: string;
   updatedAt?: string;

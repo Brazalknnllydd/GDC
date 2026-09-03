@@ -33,6 +33,8 @@ export type Product = {
   imageUrl: string | null;
   barcode: string | null;
   price: number | string;
+  defaultPrice?: number | string;
+  cashierPrice?: number | string | null;
   costPrice: number | string;
   stock: number;
   weight: number | null;
@@ -41,4 +43,10 @@ export type Product = {
   createdAt: string;
   updatedAt: string;
   category: Category;
+  sourceCashiers?: {
+    id: number;
+    name: string;
+    quantity: number;
+    username: string;
+  }[];
 };

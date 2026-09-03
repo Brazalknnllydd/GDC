@@ -9,82 +9,71 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
+const cashierSeeds = [
+  { name: "Cashier A", username: "cashier-a" },
+  { name: "Cashier B", username: "cashier-b" },
+  { name: "Cashier C", username: "cashier-c" },
+  { name: "Cashier D", username: "cashier-d" },
+];
+
+async function clearApplicationData() {
+  await prisma.$transaction([
+    prisma.saleItem.deleteMany(),
+    prisma.sale.deleteMany(),
+    prisma.cashierExpense.deleteMany(),
+    prisma.shift.deleteMany(),
+    prisma.inventoryLog.deleteMany(),
+    prisma.supplierPurchaseItem.deleteMany(),
+    prisma.supplierPurchase.deleteMany(),
+    prisma.cashierInventory.deleteMany(),
+    prisma.cashierProductPrice.deleteMany(),
+    prisma.cashierCategoryAccess.deleteMany(),
+    prisma.product.deleteMany(),
+    prisma.category.deleteMany(),
+    prisma.customer.deleteMany(),
+    prisma.supplier.deleteMany(),
+    prisma.user.deleteMany(),
+    prisma.role.deleteMany(),
+  ]);
+}
+
 async function main() {
-  // Keep deployment data clean: remove any seeded/demo product records first.
-  // This preserves users/roles while clearing catalog data for a fresh deploy.
-  await prisma.inventoryLog.deleteMany({});
-  await prisma.product.deleteMany({});
+  await clearApplicationData();
 
-  const adminRole = await prisma.role.upsert({
-    where: { name: "Admin" },
-    update: {},
-    create: { name: "Admin" },
-  });
-
-  const cashierRole = await prisma.role.upsert({
-    where: { name: "Cashier" },
-    update: {},
-    create: { name: "Cashier" },
-  });
+  const [adminRole, cashierRole] = await Promise.all([
+    prisma.role.create({ data: { name: "Admin" } }),
+    prisma.role.create({ data: { name: "Cashier" } }),
+  ]);
 
   const [adminPassword, cashierPassword] = await Promise.all([
     bcrypt.hash("adminGDC2026@", 10),
-    bcrypt.hash("cashier123", 10),
+    bcrypt.hash("cashier2026@", 10),
   ]);
 
-  await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {
+  await prisma.user.create({
+    data: {
       name: "GDC Admin",
       password: adminPassword,
       roleId: adminRole.id,
-    },
-    create: {
-      name: "GDC Admin",
       username: "admin",
-      password: adminPassword,
-      roleId: adminRole.id,
     },
   });
 
-  const cashierUser = await prisma.user.upsert({
-    where: { username: "cashier" },
-    update: {
-      name: "Juan Dela Cruz",
+  await prisma.user.createMany({
+    data: cashierSeeds.map((cashier) => ({
+      name: cashier.name,
       password: cashierPassword,
       roleId: cashierRole.id,
-    },
-    create: {
-      name: "Juan Dela Cruz",
-      username: "cashier",
-      password: cashierPassword,
-      roleId: cashierRole.id,
-    },
+      username: cashier.username,
+    })),
   });
 
-  const shiftStartedAt = new Date();
-  shiftStartedAt.setHours(8, 0, 0, 0);
-
-  const existingOpenShift = await prisma.shift.findFirst({
-    where: {
-      endedAt: null,
-      userId: cashierUser.id,
-    },
-  });
-
-  if (!existingOpenShift) {
-    await prisma.shift.create({
-      data: {
-        openingCash: 2000,
-        startedAt: shiftStartedAt,
-        userId: cashierUser.id,
-      },
-    });
-  }
-
-  console.log("Seed completed.");
+  console.log("Deployment seed completed: database reset and default accounts created.");
 }
 
 main()
-  .catch(console.error)
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
   .finally(() => prisma.$disconnect());

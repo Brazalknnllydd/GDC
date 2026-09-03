@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing } from '../../constants/design-system';
 import { colors, fonts, textRoles, textSizes } from '../../constants/theme';
@@ -10,7 +10,6 @@ type CashierShiftCardProps = {
   status: string;
   openingCash?: number;
   expectedCashOnHand?: number;
-  onEditOpeningCash?: () => void;
 };
 
 export function CashierShiftCard({
@@ -18,7 +17,6 @@ export function CashierShiftCard({
   status,
   openingCash,
   expectedCashOnHand,
-  onEditOpeningCash,
 }: CashierShiftCardProps) {
   const startedAtDate = new Date(startedAt);
 
@@ -53,12 +51,6 @@ export function CashierShiftCard({
           </Text>
         </View>
       </View>
-
-      {onEditOpeningCash ? (
-        <TouchableOpacity style={styles.editButton} onPress={onEditOpeningCash} activeOpacity={0.8}>
-          <Text style={styles.editButtonText}>Update Opening Cash</Text>
-        </TouchableOpacity>
-      ) : null}
     </View>
   );
 }
@@ -123,18 +115,5 @@ const styles = StyleSheet.create({
     ...textRoles.value,
     fontSize: textSizes.medium,
     marginTop: 6,
-  },
-  editButton: {
-    alignItems: 'center',
-    backgroundColor: colors.overlayInverse12,
-    borderRadius: radius.md,
-    marginTop: spacing.lg,
-    paddingVertical: 10,
-    width: '100%',
-  },
-  editButtonText: {
-    color: colors.textInverse,
-    fontFamily: fonts.medium,
-    fontSize: textSizes.body,
   },
 });

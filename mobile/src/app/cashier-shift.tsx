@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogOut, Wallet } from 'lucide-react-native';
@@ -10,10 +10,11 @@ import { spacing, radius } from '../constants/design-system';
 import { apiClient } from '../lib/api';
 import { clearAuthSession } from '../lib/auth-session';
 import { useResponsiveLayout } from '../hooks/use-responsive-layout';
+import { useCashierStore } from '../store/cashier-store';
 
 export default function CashierShiftScreen() {
   const router = useRouter();
-  const { width, isTablet } = useResponsiveLayout();
+  const { isTablet } = useResponsiveLayout();
   const [openingCash, setOpeningCash] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,7 @@ export default function CashierShiftScreen() {
         if (response.data) {
           router.replace('/cashier');
         }
-      } catch (err) {
+      } catch {
         // No active shift, continue to show the screen
       } finally {
         setIsChecking(false);
@@ -57,6 +58,7 @@ export default function CashierShiftScreen() {
 
   const handleLogout = async () => {
     await clearAuthSession();
+    useCashierStore.getState().resetWorkspace();
     router.replace('/');
   };
 

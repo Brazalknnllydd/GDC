@@ -23,8 +23,14 @@ model User {
   role                    Role                    @relation(fields: [roleId], references: [id])
   shifts                  Shift[]
   sales                   Sale[]                  @relation("CashierSales")
+  expenses                CashierExpense[]
   approvedSales           Sale[]                  @relation("ApprovedSales")
+  receivedSales           Sale[]                  @relation("RecipientCashierSales")
   cashierCategoryAccesses CashierCategoryAccess[]
+  cashierInventories      CashierInventory[]      @relation("CashierInventoryOwner")
+  sourcedInventories      CashierInventory[]      @relation("CashierInventorySource")
+  sourcedSaleItems        SaleItem[]              @relation("SaleItemSourceCashier")
+  cashierProductPrices    CashierProductPrice[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -51,23 +57,55 @@ model CashierCategoryAccess {
 }
 
 model Product {
-  id            Int            @id @default(autoincrement())
-  name          String
-  description   String?
-  imageUrl      String?
-  barcode       String?        @unique
-  price         Decimal        @db.Decimal(10, 2)
-  costPrice     Decimal        @db.Decimal(10, 2)
-  stock         Int            @default(0)
-  weight        Float?
-  unit          String         @default("pcs")
-  categoryId    Int
-  category      Category       @relation(fields: [categoryId], references: [id])
-  saleItems     SaleItem[]
+  id                    Int                    @id @default(autoincrement())
+  name                  String
+  description           String?
+  imageUrl              String?
+  barcode               String?                @unique
+  price                 Decimal                @db.Decimal(10, 2)
+  costPrice             Decimal                @db.Decimal(10, 2)
+  stock                 Int                    @default(0)
+  weight                Float?
+  unit                  String                 @default("pcs")
+  categoryId            Int
+  category              Category               @relation(fields: [categoryId], references: [id])
+  saleItems             SaleItem[]
   supplierPurchaseItems SupplierPurchaseItem[]
-  inventoryLogs InventoryLog[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  inventoryLogs         InventoryLog[]
+  cashierInventories    CashierInventory[]
+  cashierProductPrices  CashierProductPrice[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
+model CashierInventory {
+  id              Int      @id @default(autoincrement())
+  cashierId       Int
+  cashier         User     @relation("CashierInventoryOwner", fields: [cashierId], references: [id], onDelete: Cascade)
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sourceCashierId Int
+  sourceCashier   User     @relation("CashierInventorySource", fields: [sourceCashierId], references: [id])
+  quantity        Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([cashierId, productId, sourceCashierId])
+  @@index([cashierId, productId])
+}
+
+model CashierProductPrice {
+  id        Int      @id @default(autoincrement())
+  cashierId Int
+  cashier   User     @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cashierId, productId])
+  @@index([productId])
 }
 
 model Supplier {
@@ -131,46 +169,68 @@ model Shift {
   userId              Int
   user                User      @relation(fields: [userId], references: [id])
   sales               Sale[]
+  expenses            CashierExpense[]
+}
+
+model CashierExpense {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftId     Int?
+  shift       Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  amount      Decimal  @db.Decimal(10, 2)
+  description String
+  expenseDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, expenseDate])
+  @@index([shiftId])
 }
 
 model Sale {
-  id               Int       @id @default(autoincrement())
-  receiptNumber    String    @unique
+  id               Int        @id @default(autoincrement())
+  receiptNumber    String     @unique
   userId           Int
-  user             User      @relation("CashierSales", fields: [userId], references: [id])
+  user             User       @relation("CashierSales", fields: [userId], references: [id])
+  recipientUserId  Int?
+  recipientUser    User?      @relation("RecipientCashierSales", fields: [recipientUserId], references: [id])
   customerId       Int?
-  customer         Customer? @relation(fields: [customerId], references: [id])
+  customer         Customer?  @relation(fields: [customerId], references: [id])
   shiftId          Int?
-  shift            Shift?    @relation(fields: [shiftId], references: [id])
-  subtotal         Decimal   @db.Decimal(10, 2)
+  shift            Shift?     @relation(fields: [shiftId], references: [id])
+  subtotal         Decimal    @db.Decimal(10, 2)
   discountType     String?
-  discountValue    Decimal?  @db.Decimal(10, 2)
-  discountAmount   Decimal   @default(0) @db.Decimal(10, 2)
-  taxAmount        Decimal   @default(0) @db.Decimal(10, 2)
-  totalAmount      Decimal   @db.Decimal(10, 2)
-  amountPaid       Decimal   @db.Decimal(10, 2)
-  changeAmount     Decimal   @db.Decimal(10, 2)
-  paymentMethod    String    @default("Cash")
+  discountValue    Decimal?   @db.Decimal(10, 2)
+  discountAmount   Decimal    @default(0) @db.Decimal(10, 2)
+  taxAmount        Decimal    @default(0) @db.Decimal(10, 2)
+  totalAmount      Decimal    @db.Decimal(10, 2)
+  amountPaid       Decimal    @db.Decimal(10, 2)
+  changeAmount     Decimal    @db.Decimal(10, 2)
+  paymentMethod    String     @default("Cash")
   paymentReference String?
-  status           String    @default("completed")
+  saleType         String     @default("CUSTOMER")
+  status           String     @default("completed")
   approvedByUserId Int?
-  approvedBy       User?     @relation("ApprovedSales", fields: [approvedByUserId], references: [id])
+  approvedBy       User?      @relation("ApprovedSales", fields: [approvedByUserId], references: [id])
   notes            String?
-  isPrinted        Boolean   @default(false)
+  isPrinted        Boolean    @default(false)
   items            SaleItem[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model SaleItem {
-  id        Int     @id @default(autoincrement())
-  quantity  Float
-  price     Decimal @db.Decimal(10, 2)
-  subtotal  Decimal @db.Decimal(10, 2)
-  saleId    Int
-  sale      Sale    @relation(fields: [saleId], references: [id])
-  productId  Int?
-  product    Product? @relation(fields: [productId], references: [id])
+  id              Int      @id @default(autoincrement())
+  quantity        Float
+  price           Decimal  @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  saleId          Int
+  sale            Sale     @relation(fields: [saleId], references: [id])
+  productId       Int?
+  product         Product? @relation(fields: [productId], references: [id])
+  sourceCashierId Int?
+  sourceCashier   User?    @relation("SaleItemSourceCashier", fields: [sourceCashierId], references: [id])
 }
 
 model InventoryLog {

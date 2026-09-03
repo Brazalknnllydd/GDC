@@ -47,8 +47,8 @@ export function AddCategoryModal({
   return (
     <AdminModalShell
       compact={!isTablet}
-      height={isTablet ? '44%' : '52%'}
-      maxHeight={isTablet ? '60%' : '72%'}
+      height={isTablet ? '38%' : '48%'}
+      maxHeight={isTablet ? '52%' : '66%'}
       onClose={onClose}
       title={isEditing ? 'Edit Category' : 'Add Category'}
       visible={visible}

@@ -3,7 +3,7 @@
     "name": "GDC POS",
     "slug": "mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/logo.jpg",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
@@ -24,6 +24,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.gdc.inventorypro"
     },
     "web": {

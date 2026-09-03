@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { Bot, Send, X } from "lucide-react-native";
 import { colors, fonts, textRoles } from "../../constants/theme";
@@ -36,6 +37,8 @@ function normalizeAssistantText(text: string) {
 }
 
 export function AiChatModal({ visible, onClose }: AiChatModalProps) {
+  const { height, width } = useWindowDimensions();
+  const isLandscape = width > height;
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "1",
@@ -126,10 +129,16 @@ export function AiChatModal({ visible, onClose }: AiChatModalProps) {
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+        style={[styles.modalOverlay, isLandscape && styles.modalOverlayLandscape]}
       >
-        <View style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            isLandscape && styles.modalContainerLandscape,
+            { maxHeight: height * 0.92, width: isLandscape ? Math.min(width * 0.72, 760) : "100%" },
+          ]}>
           <View style={styles.modalHeader}>
             <View style={styles.botTitleRow}>
               <View style={styles.botIconBadge}>
@@ -207,6 +216,9 @@ export function AiChatModal({ visible, onClose }: AiChatModalProps) {
               placeholderTextColor={colors.textSubtle}
               value={input}
               onChangeText={setInput}
+              onFocus={() => {
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+              }}
               onSubmitEditing={handleSend}
               returnKeyType="send"
             />
@@ -233,6 +245,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(19, 25, 39, 0.45)",
     justifyContent: "flex-end",
   },
+  modalOverlayLandscape: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
   modalContainer: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 24,
@@ -243,6 +260,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
+  },
+  modalContainerLandscape: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    height: "88%",
   },
   modalHeader: {
     alignItems: "center",

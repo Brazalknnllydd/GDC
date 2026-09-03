@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Camera, ChevronDown, ImagePlus, ScanLine, Trash2 } from 'lucide-react-native';
 import { Image } from 'expo-image';
@@ -87,19 +87,17 @@ export function AddProductModal({
   const isSingleColumn = !isTablet;
   const isPhone = !isTablet;
   const resolvedImagePreviewUri = resolveApiAssetUrl(imagePreviewUri);
-
-  useEffect(() => {
-    if (!visible) {
-      setCategoryDropdownOpen(false);
-    }
-  }, [visible]);
+  const handleClose = useCallback(() => {
+    setCategoryDropdownOpen(false);
+    onClose();
+  }, [onClose]);
 
   return (
     <AdminModalShell
-      compact={isPhone}
-      height={isPhone ? Math.min(height * 0.82, 720) : undefined}
-      maxHeight="92%"
-      onClose={onClose}
+      compact={height < 720 || isPhone}
+      height={isPhone ? Math.min(height * 0.78, 660) : undefined}
+      maxHeight="86%"
+      onClose={handleClose}
       title={productActionLabel}
       visible={visible}
       footer={

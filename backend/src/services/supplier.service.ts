@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { applySupplierCashierStockDelta } from "./cashier-inventory.service.js";
 
 type SupplierPayload = {
   name: string;
@@ -194,6 +195,8 @@ async function applyStockDelta(
       type: quantityDelta > 0 ? "SUPPLIER_RECEIVE" : "SUPPLIER_PURCHASE_EDIT",
     },
   });
+
+  await applySupplierCashierStockDelta(tx, productId, quantityDelta);
 }
 
 async function createPurchaseItem(

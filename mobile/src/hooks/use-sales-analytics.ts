@@ -2,15 +2,12 @@ import { useMemo } from 'react';
 
 import type { MonthRangeValue } from '../components/admin-sales/month-range-picker';
 import type { SaleRecord } from '../lib/sales-types';
+import {
+  buildMonthlyChartSeries,
+  isWithinMonthRange,
+} from '../components/admin-sales/sales-history-utils';
+import { formatPeso, normalizeNumber } from '../lib/product-utils';
 
-export type HistoryFilter = 'All' | 'Cash' | 'GCash';
-export type HistoryEntry = {
-  id: string;
-  cashierName: string;
-  dateSold: string;
-  price: string;
-  productName: string;
-};
 export type ExportRow = {
   cashierName: string;
   customerName: string;
@@ -23,94 +20,41 @@ export type ExportRow = {
   totalSaleAmount: number;
   unitPrice: number;
 };
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-function isWithinMonthRange(dateValue: string, range: MonthRangeValue) {
-  if (!range.startMonth || !range.endMonth) {
-    return true;
-  }
-
-  const date = new Date(dateValue);
-  const rangeStart = startOfMonth(range.startMonth);
-  const rangeEnd = endOfMonth(range.endMonth);
-
-  return date >= rangeStart && date <= rangeEnd;
-}
-
-function buildMonthlyChartSeries(
-  sales: SaleRecord[],
-  range: MonthRangeValue,
-  normalizeNumber: (value: number | string | undefined) => number
-) {
-  if (!range.startMonth || !range.endMonth) {
-    return {
-      labels: [],
-      values: [],
-    };
-  }
-
-  const labels: string[] = [];
-  const values: number[] = [];
-  const cursor = startOfMonth(range.startMonth);
-  const endCursor = startOfMonth(range.endMonth);
-
-  while (cursor.getTime() <= endCursor.getTime()) {
-    const year = cursor.getFullYear();
-    const month = cursor.getMonth();
-    const label = cursor.toLocaleDateString('en-PH', {
-      month: 'short',
-      year: range.startMonth.getFullYear() === range.endMonth.getFullYear() ? undefined : '2-digit',
-    });
-
-    labels.push(label);
-    values.push(
-      sales.reduce((sum, sale) => {
-        const saleDate = new Date(sale.createdAt);
-        return saleDate.getFullYear() === year && saleDate.getMonth() === month
-          ? sum + normalizeNumber(sale.totalAmount)
-          : sum;
-      }, 0)
-    );
-
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  return { labels, values };
-}
+export type PaymentSummary = {
+  cash: number;
+  gcash: number;
+};
+export type SalesTotals = {
+  averageSale: number;
+  profit: number;
+  totalSales: number;
+  transactions: number;
+};
+export type TopProduct = {
+  emoji: string;
+  name: string;
+  soldText: string;
+  total: string;
+};
 
 type UseSalesAnalyticsParams = {
-  formatDateTime: (value: string) => string;
   formatExportDate: (value: string) => string;
-  formatPeso: (value: number) => string;
-  historyMonthRange: MonthRangeValue;
-  normalizeNumber: (value: number | string | undefined) => number;
   overviewMonthRange: MonthRangeValue;
   sales: SaleRecord[];
-  selectedHistoryFilter: HistoryFilter;
 };
 
 export function useSalesAnalytics({
-  formatDateTime,
   formatExportDate,
-  formatPeso,
-  historyMonthRange,
-  normalizeNumber,
   overviewMonthRange,
   sales,
-  selectedHistoryFilter,
 }: UseSalesAnalyticsParams) {
   const filteredSales = useMemo(
     () =>
       sales.filter(
         (sale) =>
-          sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, overviewMonthRange)
+          sale.status !== 'voided' &&
+          sale.saleType !== 'INTERNAL_CASHIER' &&
+          isWithinMonthRange(sale.createdAt, overviewMonthRange)
       ),
     [overviewMonthRange, sales]
   );
@@ -140,12 +84,12 @@ export function useSalesAnalytics({
       profit,
       totalSales,
       transactions,
-    };
-  }, [filteredSales, normalizeNumber]);
+    } satisfies SalesTotals;
+  }, [filteredSales]);
 
   const chartBars = useMemo(
-    () => buildMonthlyChartSeries(filteredSales, overviewMonthRange, normalizeNumber),
-    [filteredSales, overviewMonthRange, normalizeNumber]
+    () => buildMonthlyChartSeries(filteredSales, overviewMonthRange),
+    [filteredSales, overviewMonthRange]
   );
 
   const paymentMethodCards = useMemo(() => {
@@ -162,9 +106,9 @@ export function useSalesAnalytics({
           .reduce((sum, sale) => sum + normalizeNumber(sale.totalAmount), 0)
       ),
     }));
-  }, [filteredSales, formatPeso, normalizeNumber]);
+  }, [filteredSales]);
 
-  const topProducts = useMemo(() => {
+  const topProducts = useMemo<TopProduct[]>(() => {
     const aggregated = new Map<string, { quantity: number; total: number }>();
 
     filteredSales.forEach((sale) => {
@@ -190,33 +134,7 @@ export function useSalesAnalytics({
           Number(right.total.replace(/[^\d.]/g, '')) - Number(left.total.replace(/[^\d.]/g, ''))
       )
       .slice(0, 5);
-  }, [filteredSales, formatPeso, normalizeNumber]);
-
-  const historyTransactions = useMemo(() => {
-    const filteredByMethod =
-      selectedHistoryFilter === 'All'
-        ? sales
-        : sales.filter((sale) => sale.paymentMethod === selectedHistoryFilter);
-
-    return filteredByMethod
-      .filter((sale) => sale.status !== 'voided' && isWithinMonthRange(sale.createdAt, historyMonthRange))
-      .slice()
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-  }, [historyMonthRange, sales, selectedHistoryFilter]);
-
-  const historyEntries = useMemo<HistoryEntry[]>(
-    () =>
-      historyTransactions.flatMap((sale) =>
-        sale.items.map((item, index) => ({
-          id: `${sale.id}-${item.id ?? index}`,
-          cashierName: sale.user?.name || 'Cashier',
-          dateSold: formatDateTime(sale.createdAt),
-          price: formatPeso(normalizeNumber(item.price ?? item.subtotal)),
-          productName: item.product?.name || 'Unnamed Product',
-        }))
-      ),
-    [formatDateTime, formatPeso, historyTransactions, normalizeNumber]
-  );
+  }, [filteredSales]);
 
   const exportRows = useMemo<ExportRow[]>(
     () =>
@@ -234,10 +152,10 @@ export function useSalesAnalytics({
           unitPrice: normalizeNumber(item.price ?? item.subtotal),
         }))
       ),
-    [filteredSales, formatExportDate, normalizeNumber]
+    [filteredSales, formatExportDate]
   );
 
-  const paymentSummary = useMemo(
+  const paymentSummary = useMemo<PaymentSummary>(
     () => ({
       cash: filteredSales
         .filter((sale) => sale.paymentMethod === 'Cash')
@@ -246,18 +164,17 @@ export function useSalesAnalytics({
         .filter((sale) => sale.paymentMethod === 'GCash')
         .reduce((sum, sale) => sum + normalizeNumber(sale.totalAmount), 0),
     }),
-    [filteredSales, normalizeNumber]
+    [filteredSales]
   );
 
   return {
     chartBars,
     exportRows,
     filteredSales,
-    historyEntries,
-    historyTransactions,
     paymentMethodCards,
     paymentSummary,
     topProducts,
     totals,
   };
 }
+

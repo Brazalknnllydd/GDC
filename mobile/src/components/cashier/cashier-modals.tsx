@@ -13,6 +13,7 @@ import { AdminModalShell } from '../ui/admin-modal-shell';
 import { ModalActions } from '../ui/modal-actions';
 import { AppButton } from '../ui/app-button';
 import { SurfaceCard } from '../ui/surface-card';
+import { AppSelect } from '../ui/app-select';
 import { AppSegmentedControl } from '../ui/app-segmented-control';
 import { CashierCartItemRow } from './cashier-cart-item-row';
 import { CashierKeypad } from './cashier-keypad';
@@ -28,6 +29,8 @@ export function CartModal() {
   const { isTablet } = useResponsiveLayout();
   const {
     cart,
+    buyerMode,
+    dashboard,
     showCartModal,
     setShowCartModal,
     setShowCheckoutModal,
@@ -35,13 +38,27 @@ export function CartModal() {
     removeFromCart,
     selectedCustomerId,
     selectedCustomerName,
+    selectedRecipientCashierId,
+    selectedRecipientCashierName,
+    setBuyerMode,
     setShowCustomerModal,
+    setRecipientCashier,
   } = useCashierStore();
 
   const cartGrossSubtotal = cart.reduce((sum, item) => sum + getCartItemGrossTotal(item), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => sum + getCartItemDiscount(item), 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + getCartItemNetTotal(item), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const recipientCashiers = dashboard.internalRecipientCashiers ?? [];
+  const recipientCashierOptions = recipientCashiers.map((cashier) => cashier.name);
+  const selectedRecipientCashier = recipientCashiers.find(
+    (cashier) => cashier.id === selectedRecipientCashierId
+  );
+
+  function handleRecipientCashierChange(name: string) {
+    const recipient = recipientCashiers.find((cashier) => cashier.name === name);
+    setRecipientCashier(recipient?.id ?? null, recipient?.name ?? null);
+  }
 
   return (
     <AdminModalShell
@@ -90,7 +107,27 @@ export function CartModal() {
           )}
         </View>
 
-        <View style={styles.customerAttachRow}>
+        {dashboard.cashier.canSupplyCashiers ? (
+          <View style={styles.buyerBlock}>
+            <Text style={styles.customerAttachLabel}>BUYER</Text>
+            <AppSelect
+              onValueChange={(value) => setBuyerMode(value === 'Cashier' ? 'cashier' : 'customer')}
+              options={['Customer', 'Cashier']}
+              value={buyerMode === 'cashier' ? 'Cashier' : 'Customer'}
+            />
+            {buyerMode === 'cashier' ? (
+              <AppSelect
+                onValueChange={handleRecipientCashierChange}
+                options={recipientCashierOptions}
+                placeholder="Choose cashier"
+                value={selectedRecipientCashier?.name ?? selectedRecipientCashierName ?? ''}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
+        {buyerMode === 'customer' ? (
+          <View style={styles.customerAttachRow}>
           <View style={styles.customerAttachText}>
             <Text style={styles.customerAttachLabel}>CUSTOMER</Text>
             <Text style={styles.customerAttachValue} numberOfLines={2}>
@@ -107,6 +144,7 @@ export function CartModal() {
             fullWidth={false}
           />
         </View>
+        ) : null}
 
         <View style={styles.summaryContainer}>
           <View style={styles.summaryRow}>
@@ -140,7 +178,7 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
     <AdminModalShell
       compact={!isTablet}
       footer={
-        <ModalActions stacked>
+        <ModalActions stacked={!isTablet}>
           <AppButton
             label="New Sale"
             onPress={onNewSale}
@@ -154,11 +192,13 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
           />
         </ModalActions>
       }
-      height={Math.min(height * (isTablet ? 0.66 : 0.74), isTablet ? 680 : 620)}
-      maxHeight={isTablet ? '80%' : '74%'}
+      height={Math.min(height * (isTablet ? 0.82 : 0.84), isTablet ? 760 : 680)}
+      maxHeight={isTablet ? '88%' : '86%'}
+      maxWidth={isTablet ? 760 : 450}
       onClose={() => setShowSuccessModal(false)}
       title="Payment Success"
       visible={showSuccessModal}
+      widthRatio={isTablet ? 0.76 : 0.94}
     >
       <ScrollView
         contentContainerStyle={[styles.modalContent, styles.successModalScrollContent]}
@@ -167,14 +207,14 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
         scrollEventThrottle={16}
         showsVerticalScrollIndicator
         style={styles.successModalScroll}>
-        <View style={{ alignItems: 'center', marginBottom: 20 }}>
-          <CheckCircle2 color={colors.success} size={64} strokeWidth={2.2} />
-          <Text style={{ fontFamily: fonts.bold, fontSize: 24, marginTop: 10 }}>Payment Success</Text>
+        <View style={styles.successHeader}>
+          <CheckCircle2 color={colors.success} size={48} strokeWidth={2.2} />
+          <Text style={styles.successTitle}>Payment Success</Text>
         </View>
 
         {completedSale ? (
           <>
-            <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+            <SurfaceCard style={styles.successInfoCard}>
               <View style={styles.detailRow}>
                 <Text style={styles.summaryLabel}>Receipt No</Text>
                 <Text style={styles.detailValue}>#{completedSale.receiptNumber}</Text>
@@ -196,8 +236,14 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
                 <Text style={styles.detailValue}>{completedSale.cashierName}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.summaryLabel}>Customer</Text>
-                <Text style={styles.detailValue}>{completedSale.customerName || 'Walk-in'}</Text>
+                <Text style={styles.summaryLabel}>
+                  {completedSale.saleType === 'INTERNAL_CASHIER' ? 'Recipient Cashier' : 'Customer'}
+                </Text>
+                <Text style={styles.detailValue}>
+                  {completedSale.saleType === 'INTERNAL_CASHIER'
+                    ? completedSale.recipientCashierName || 'Cashier'
+                    : completedSale.customerName || 'Walk-in'}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.summaryLabel}>Payment Method</Text>
@@ -206,7 +252,7 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
             </SurfaceCard>
 
             {completedSale.items?.length ? (
-              <SurfaceCard style={{ padding: 16, marginBottom: 16 }}>
+              <SurfaceCard style={styles.successInfoCard}>
                 <Text style={styles.sectionTitle}>ITEMS SOLD</Text>
                 {completedSale.items.map((item, index) => (
                   <View
@@ -227,7 +273,7 @@ export function SuccessModal({ onNewSale, onViewReceipt }: { onNewSale: () => vo
               </SurfaceCard>
             ) : null}
 
-            <SurfaceCard style={{ padding: 16 }}>
+            <SurfaceCard style={styles.successInfoCard}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
                 <Text style={styles.summaryValue}>{formatPeso(completedSale.subtotal)}</Text>
@@ -268,6 +314,8 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
     paymentMethod,
     setPaymentMethod,
     amountReceivedInput,
+    buyerMode,
+    selectedRecipientCashierName,
     handleKeypadPress,
     handleKeypadBackspace,
     saleError,
@@ -283,7 +331,10 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
   const changeAmount = Math.max(amountReceived - cartSubtotal, 0);
   const remainingBalance = Math.max(cartSubtotal - amountReceived, 0);
   const hasEnoughPayment = cartSubtotal > 0 && amountReceived >= cartSubtotal;
-  const canCompleteSale = !isSubmittingSale && cart.length > 0 && (paymentMethod === 'Utang' ? true : hasEnoughPayment);
+  const canCompleteSale =
+    !isSubmittingSale &&
+    cart.length > 0 &&
+    (buyerMode === 'cashier' ? Boolean(selectedRecipientCashierName) && hasEnoughPayment : paymentMethod === 'Utang' ? true : hasEnoughPayment);
 
   return (
     <AdminModalShell
@@ -345,14 +396,21 @@ export function CheckoutModal({ onComplete }: { onComplete: () => void }) {
         </ScrollView>
 
         <Text style={styles.fieldLabel}>PAYMENT METHOD</Text>
-        <View style={{ marginBottom: 16 }}>
-          <AppSegmentedControl
-            onChange={setPaymentMethod}
-            options={cashierPaymentMethods.map((m) => ({ icon: m.icon, label: m.label, value: m.key }))}
-            selected={paymentMethod}
-            variant="tile"
-          />
-        </View>
+        {buyerMode === 'cashier' ? (
+          <SurfaceCard style={styles.internalPaymentCard}>
+            <Text style={styles.summaryLabel}>CASHIER INVENTORY SALE</Text>
+            <Text style={styles.summaryValue}>Cash payment from {selectedRecipientCashierName || 'selected cashier'}</Text>
+          </SurfaceCard>
+        ) : (
+          <View style={{ marginBottom: 16 }}>
+            <AppSegmentedControl
+              onChange={setPaymentMethod}
+              options={cashierPaymentMethods.map((m) => ({ icon: m.icon, label: m.label, value: m.key }))}
+              selected={paymentMethod}
+              variant="tile"
+            />
+          </View>
+        )}
 
         <Text style={styles.fieldLabel}>AMOUNT RECEIVED</Text>
         <Pressable
@@ -398,7 +456,22 @@ const styles = StyleSheet.create({
   },
   successModalScrollContent: {
     flexGrow: 1,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  successHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  successTitle: {
+    color: colors.textStrong,
+    fontFamily: fonts.bold,
+    fontSize: 20,
+    marginTop: spacing.sm,
+  },
+  successInfoCard: {
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   cartItemsBlock: {
     gap: spacing.sm,
@@ -416,6 +489,13 @@ const styles = StyleSheet.create({
   customerAttachText: {
     flex: 1,
     minWidth: 0,
+  },
+  buyerBlock: {
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
   },
   customerAttachLabel: {
     color: colors.textSecondary,
@@ -579,6 +659,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     fontSize: 13,
     marginTop: 2,
+  },
+  internalPaymentCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderPanel,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    padding: spacing.md,
   },
   sectionTitle: {
     color: colors.textSecondary,

@@ -10,7 +10,10 @@ import { Plus, Search, Users } from 'lucide-react-native';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TextInput as PaperTextInput } from 'react-native-paper';
 
-import { CashierCustomerListItem } from './cashier-customer-list-item';
+import {
+  CashierCustomerListItem,
+  cashierCustomerTableColumns,
+} from './cashier-customer-list-item';
 import { AdminModalShell } from '../ui/admin-modal-shell';
 import { AppButton } from '../ui/app-button';
 import { ModalActions } from '../ui/modal-actions';
@@ -33,6 +36,11 @@ type Customer = {
   notes?: string | null;
   createdAt?: string;
 };
+
+const customerTableWidth = Object.values(cashierCustomerTableColumns).reduce(
+  (sum, width) => sum + width,
+  0
+);
 
 type FormState = {
   name: string;
@@ -191,17 +199,6 @@ export function CashierCustomersSection() {
 
       {/* Table */}
       <SurfaceCard style={styles.tableCard}>
-        {/* Table header */}
-        <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
-          <View style={styles.headerDataArea}>
-            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 2.5 }]}>CUSTOMER</Text>
-            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>PHONE</Text>
-            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 1.5 }]}>ADDRESS</Text>
-            <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { flex: 2 }]}>NOTES</Text>
-          </View>
-          <View style={styles.headerCellActions} />
-        </View>
-
         {isLoading ? (
           <View style={styles.centeredState}>
             <ActivityIndicator color={colors.secondary} size="small" />
@@ -215,7 +212,18 @@ export function CashierCustomersSection() {
           </View>
         ) : (
           <View>
-            <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableScroller}>
+              <View style={[styles.tableContent, { minWidth: customerTableWidth }]}>
+                <View style={[styles.tableHeader, isTablet && styles.tableHeaderTablet]}>
+                  <View style={styles.headerDataArea}>
+                    <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { width: cashierCustomerTableColumns.customer }]}>CUSTOMER</Text>
+                    <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { width: cashierCustomerTableColumns.phone }]}>PHONE</Text>
+                    <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { width: cashierCustomerTableColumns.address }]}>ADDRESS</Text>
+                    <Text style={[styles.headerCell, isTablet && styles.headerCellTablet, { width: cashierCustomerTableColumns.notes }]}>NOTES</Text>
+                  </View>
+                  <View style={[styles.headerCellActions, { width: cashierCustomerTableColumns.actions }]} />
+                </View>
+
               {customers.map((c) => (
                 <CashierCustomerListItem
                   key={c.id}
@@ -228,7 +236,8 @@ export function CashierCustomersSection() {
                   onDelete={() => setDeletingCustomer(c)}
                 />
               ))}
-            </View>
+              </View>
+            </ScrollView>
             <View style={{ paddingVertical: 16, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: colors.borderPanel, backgroundColor: colors.surfaceSoft }}>
               <PaginationControls
                 borderless
@@ -256,8 +265,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={isTablet ? 560 : 520}
-        maxHeight={isTablet ? '78%' : '72%'}
+        height={isTablet ? 500 : 460}
+        maxHeight={isTablet ? '72%' : '70%'}
         onClose={() => setShowFormModal(false)}
         title={editingCustomer ? 'Edit Customer' : 'New Customer'}
         visible={showFormModal}
@@ -309,8 +318,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={isTablet ? 480 : 420}
-        maxHeight={isTablet ? '70%' : '62%'}
+        height={isTablet ? 420 : 380}
+        maxHeight={isTablet ? '66%' : '60%'}
         onClose={() => setViewingCustomer(null)}
         title="Customer Details"
         visible={viewingCustomer !== null}
@@ -385,8 +394,8 @@ export function CashierCustomersSection() {
             />
           </ModalActions>
         }
-        height={isTablet ? 260 : 220}
-        maxHeight={isTablet ? '44%' : '36%'}
+        height={isTablet ? 260 : 240}
+        maxHeight={isTablet ? '44%' : '64%'}
         onClose={() => setDeletingCustomer(null)}
         title="Delete Customer"
         visible={deletingCustomer !== null}
@@ -435,6 +444,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 0,
   },
+  tableScroller: {
+    flexGrow: 1,
+  },
+  tableContent: {
+    width: '100%',
+  },
   tableHeader: {
     backgroundColor: colors.surfaceNeutral,
     borderBottomColor: '#EAECF0',
@@ -449,24 +464,21 @@ const styles = StyleSheet.create({
   },
   headerDataArea: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
-    gap: 8,
     minWidth: 0,
   },
   headerCell: {
     color: colors.textSecondary,
-    flex: 1,
     fontFamily: fonts.semiBold,
     fontSize: 10,
     letterSpacing: 0.8,
+    paddingRight: 12,
   },
   headerCellTablet: {
     fontSize: textSizes.small,
   },
   headerCellActions: {
-    flex: 0,
-    width: 72,
+    flexShrink: 0,
   },
   centeredState: {
     alignItems: 'center',

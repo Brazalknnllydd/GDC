@@ -4,7 +4,6 @@ import type { Product, Category } from '../components/admin-products/products-sc
 import type { CashierDashboardResponse } from '../components/cashier/cashier-screen-data';
 import { apiClient } from '../lib/api';
 import { getApiErrorMessage } from '../lib/api-errors';
-import { normalizeNumber } from '../lib/product-utils';
 
 export type CartItem = {
   barcode: string | null;
@@ -28,11 +27,16 @@ export type CompletedSale = {
   customerName?: string | null;
   discountAmount: number;
   paymentMethod: string;
+  recipientCashierName?: string | null;
+  recipientUserId?: number | null;
   receiptNumber: string;
+  saleType?: string;
   subtotal: number;
   totalAmount: number;
   items?: { product?: { name: string }; price: number; quantity: number; subtotal: number }[];
 };
+
+export type BuyerMode = 'customer' | 'cashier';
 
 export type ActiveCheckoutInput =
   | { type: 'amount' }
@@ -48,8 +52,11 @@ const emptyDashboard: CashierDashboardResponse = {
     name: 'Cashier',
     role: 'Cashier',
     username: 'cashier',
+    canSupplyCashiers: false,
   },
   currentShift: null,
+  internalRecipientCashiers: [],
+  inventoryProducts: [],
   paymentBreakdown: [],
   performance: {
     itemsSold: 0,
@@ -57,12 +64,14 @@ const emptyDashboard: CashierDashboardResponse = {
     served: 0,
     transactions: 0,
   },
+  recentExpenses: [],
   recentSales: [],
   totals: {
     drawerVariance: 0,
     totalReportedSales: 0,
     cashReceived: 0,
     changeGiven: 0,
+    expenses: 0,
   },
 };
 
@@ -122,6 +131,7 @@ type CashierState = {
 
   // Checkout state
   cart: CartItem[];
+  buyerMode: BuyerMode;
   paymentMethod: 'Cash' | 'GCash' | 'Utang';
   amountReceivedInput: string;
   showCartModal: boolean;
@@ -133,12 +143,15 @@ type CashierState = {
   activeCheckoutInput: ActiveCheckoutInput;
   selectedCustomerId: number | null;
   selectedCustomerName: string | null;
+  selectedRecipientCashierId: number | null;
+  selectedRecipientCashierName: string | null;
   showCustomerModal: boolean;
   toast: { message: string; type: 'success' | 'error' } | null;
 };
 
 type CashierActions = {
   loadWorkspace: (options?: { force?: boolean }) => Promise<void>;
+  resetWorkspace: () => void;
   setScreenError: (error: string) => void;
 
   clearCart: () => void;
@@ -152,7 +165,9 @@ type CashierActions = {
   
   setPaymentMethod: (method: 'Cash' | 'GCash' | 'Utang') => void;
   setActiveCheckoutInput: (input: ActiveCheckoutInput) => void;
+  setBuyerMode: (mode: BuyerMode) => void;
   setCustomer: (id: number | null, name: string | null) => void;
+  setRecipientCashier: (id: number | null, name: string | null) => void;
   setAmountReceivedInput: (val: string) => void;
   setSaleError: (val: string) => void;
   
@@ -177,6 +192,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
   // Checkout state
   cart: [],
+  buyerMode: 'customer',
   paymentMethod: 'Cash',
   amountReceivedInput: '',
   showCartModal: false,
@@ -189,9 +205,37 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
   activeCheckoutInput: { type: 'amount' },
   selectedCustomerId: null,
   selectedCustomerName: null,
+  selectedRecipientCashierId: null,
+  selectedRecipientCashierName: null,
   toast: null,
 
   // Actions
+  resetWorkspace: () =>
+    set({
+      activeCheckoutInput: { type: 'amount' },
+      amountReceivedInput: '',
+      buyerMode: 'customer',
+      cart: [],
+      categories: [],
+      completedSale: null,
+      dashboard: emptyDashboard,
+      hasLoadedWorkspace: false,
+      isSubmittingSale: false,
+      isWorkspaceLoading: false,
+      paymentMethod: 'Cash',
+      products: [],
+      saleError: '',
+      screenError: '',
+      selectedCustomerId: null,
+      selectedCustomerName: null,
+      selectedRecipientCashierId: null,
+      selectedRecipientCashierName: null,
+      showCartModal: false,
+      showCheckoutModal: false,
+      showCustomerModal: false,
+      showSuccessModal: false,
+      toast: null,
+    }),
   setScreenError: (screenError) => set({ screenError }),
   loadWorkspace: async (options) => {
     if (get().isWorkspaceLoading) {
@@ -213,6 +257,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
       const dashboard = dashboardResponse.data;
       const hasRestrictedCategories = dashboard.cashier.allowedCategories.length > 0;
+      const isCashier = dashboard.cashier.role.toLowerCase() === 'cashier';
       const allowedIds = new Set(
         dashboard.cashier.allowedCategories.map((category) => category.id)
       );
@@ -221,9 +266,11 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
         ? categoriesResponse.data.filter((category) => allowedIds.has(category.id))
         : categoriesResponse.data;
         
+      const inventoryProducts = dashboard.inventoryProducts ?? [];
+      const visibleProductsSource = isCashier ? inventoryProducts : productsResponse.data;
       const visibleProducts = hasRestrictedCategories
-        ? productsResponse.data.filter((product) => allowedIds.has(product.categoryId))
-        : productsResponse.data;
+        ? visibleProductsSource.filter((product) => allowedIds.has(product.categoryId))
+        : visibleProductsSource;
 
       set({
         dashboard,
@@ -238,7 +285,15 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
     }
   },
 
-  clearCart: () => set({ cart: [], amountReceivedInput: '', selectedCustomerId: null, selectedCustomerName: null }),
+  clearCart: () => set({
+    amountReceivedInput: '',
+    buyerMode: 'customer',
+    cart: [],
+    selectedCustomerId: null,
+    selectedCustomerName: null,
+    selectedRecipientCashierId: null,
+    selectedRecipientCashierName: null,
+  }),
 
   addToCart: (product) => {
     set((state) => {
@@ -359,7 +414,16 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
 
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setActiveCheckoutInput: (activeCheckoutInput) => set({ activeCheckoutInput }),
+  setBuyerMode: (buyerMode) => set((state) => ({
+    buyerMode,
+    paymentMethod: buyerMode === 'cashier' ? 'Cash' : state.paymentMethod,
+    selectedCustomerId: buyerMode === 'cashier' ? null : state.selectedCustomerId,
+    selectedCustomerName: buyerMode === 'cashier' ? null : state.selectedCustomerName,
+    selectedRecipientCashierId: buyerMode === 'customer' ? null : state.selectedRecipientCashierId,
+    selectedRecipientCashierName: buyerMode === 'customer' ? null : state.selectedRecipientCashierName,
+  })),
   setCustomer: (id, name) => set({ selectedCustomerId: id, selectedCustomerName: name }),
+  setRecipientCashier: (id, name) => set({ selectedRecipientCashierId: id, selectedRecipientCashierName: name }),
   setAmountReceivedInput: (amountReceivedInput) => set({ amountReceivedInput }),
   setSaleError: (saleError) => set({ saleError }),
   setToast: (toast) => set({ toast }),
@@ -372,11 +436,14 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
   resetSaleFlow: () => {
     set({
       amountReceivedInput: '',
+      buyerMode: 'customer',
       paymentMethod: 'Cash',
       saleError: '',
       activeCheckoutInput: { type: 'amount' },
       selectedCustomerId: null,
       selectedCustomerName: null,
+      selectedRecipientCashierId: null,
+      selectedRecipientCashierName: null,
       showCartModal: false,
       showCheckoutModal: false,
       toast: null,
@@ -402,6 +469,20 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
       return false;
     }
 
+    if (state.buyerMode === 'cashier') {
+      if (!state.dashboard.cashier.canSupplyCashiers) {
+        set({ saleError: 'This cashier cannot sell to cashier inventory.' });
+        return false;
+      }
+
+      if (!state.selectedRecipientCashierId) {
+        set({ saleError: 'Choose Cashier C or Cashier D before completing this sale.' });
+        return false;
+      }
+
+      status = 'completed';
+    }
+
     if (state.paymentMethod !== 'Utang' && amountReceived < cartSubtotal) {
       set({ saleError: 'Amount received must cover the total payable.' });
       return false;
@@ -414,7 +495,7 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
       const response = await apiClient.post('/sales', {
         amountPaid: amountReceived,
         changeAmount,
-        customerId: state.selectedCustomerId,
+        customerId: state.buyerMode === 'customer' ? state.selectedCustomerId : null,
         discountAmount: cartDiscountTotal,
         items: state.cart.map((item) => ({
           price: item.price,
@@ -422,8 +503,10 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
           quantity: item.quantity,
           subtotal: getCartItemNetTotal(item),
         })),
-        paymentMethod: state.paymentMethod,
+        paymentMethod: state.buyerMode === 'cashier' ? 'Cash' : state.paymentMethod,
+        recipientUserId: state.buyerMode === 'cashier' ? state.selectedRecipientCashierId : null,
         receiptNumber,
+        saleType: state.buyerMode === 'cashier' ? 'INTERNAL_CASHIER' : 'CUSTOMER',
         shiftId,
         subtotal: cartGrossSubtotal,
         totalAmount: cartSubtotal,
@@ -438,11 +521,14 @@ export const useCashierStore = create<CashierState & CashierActions>((set, get) 
         cashierName: cashierDisplayName,
         changeAmount,
         createdAt: new Date().toISOString(),
-        customerId: state.selectedCustomerId,
-        customerName: state.selectedCustomerName,
+        customerId: state.buyerMode === 'customer' ? state.selectedCustomerId : null,
+        customerName: state.buyerMode === 'customer' ? state.selectedCustomerName : null,
         discountAmount: cartDiscountTotal,
-        paymentMethod: state.paymentMethod,
+        paymentMethod: state.buyerMode === 'cashier' ? 'Cash' : state.paymentMethod,
+        recipientCashierName: state.selectedRecipientCashierName,
+        recipientUserId: state.selectedRecipientCashierId,
         receiptNumber,
+        saleType: state.buyerMode === 'cashier' ? 'INTERNAL_CASHIER' : 'CUSTOMER',
         subtotal: cartGrossSubtotal,
         totalAmount: cartSubtotal,
         items: state.cart.map((item) => ({

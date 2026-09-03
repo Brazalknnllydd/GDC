@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react-native';
 
@@ -20,15 +20,23 @@ export function AppToast({
   type = 'success',
   visible,
 }: ToastProps) {
+  const onHideRef = useRef(onHide);
+
   useEffect(() => {
-    if (!visible || !onHide) {
+    onHideRef.current = onHide;
+  }, [onHide]);
+
+  useEffect(() => {
+    if (!visible) {
       return;
     }
 
-    const timer = setTimeout(onHide, durationMs);
+    const timer = setTimeout(() => {
+      onHideRef.current?.();
+    }, durationMs);
 
     return () => clearTimeout(timer);
-  }, [durationMs, onHide, visible]);
+  }, [durationMs, message, visible]);
 
   if (!visible) {
     return null;

@@ -2,6 +2,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Package,
+  Receipt,
   Printer,
   ReceiptText,
   ScanLine,
@@ -24,6 +25,7 @@ export type CashierDashboardResponse = {
     name: string;
     role: string;
     username: string;
+    canSupplyCashiers?: boolean;
   };
   currentShift: {
     id: number;
@@ -36,6 +38,41 @@ export type CashierDashboardResponse = {
   paymentBreakdown: {
     method: string;
     total: number;
+  }[];
+  internalRecipientCashiers?: {
+    id: number;
+    name: string;
+    username: string;
+  }[];
+  inventoryProducts?: {
+    id: number;
+    name: string;
+    description?: string | null;
+    imageUrl: string | null;
+    barcode: string | null;
+    price: number | string;
+    cashierPrice?: number | string | null;
+    costPrice: number | string;
+    defaultPrice?: number | string;
+    stock: number;
+    weight: number | null;
+    unit: string;
+    categoryId: number;
+    createdAt: string;
+    updatedAt: string;
+    category: {
+      id: number;
+      description: string | null;
+      name: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+    sourceCashiers?: {
+      id: number;
+      name: string;
+      quantity: number;
+      username: string;
+    }[];
   }[];
   performance: {
     itemsSold: number;
@@ -54,6 +91,9 @@ export type CashierDashboardResponse = {
     customerName: string | null;
     changeAmount: number;
     cashierName: string;
+    recipientCashierName?: string | null;
+    recipientUserId?: number | null;
+    saleType?: string;
     discountAmount?: number;
     subtotal: number;
     amountPaid: number;
@@ -66,11 +106,20 @@ export type CashierDashboardResponse = {
       subtotal: number | string;
     }[];
   }[];
+  recentExpenses?: {
+    amount: number;
+    createdAt: string;
+    description: string;
+    expenseDate: string;
+    id: number;
+    shiftId?: number | null;
+  }[];
   totals: {
     drawerVariance: number;
     totalReportedSales: number;
     cashReceived?: number;
     changeGiven?: number;
+    expenses?: number;
   };
 };
 
@@ -125,6 +174,7 @@ export const cashierSections = [
   { key: 'register' as CashierSection, label: 'Register', icon: LayoutDashboard },
   { key: 'history' as CashierSection, label: 'History', icon: ReceiptText },
   { key: 'inventory' as CashierSection, label: 'Inventory', icon: Package },
+  { key: 'expenses' as CashierSection, label: 'Expenses', icon: Receipt },
   { key: 'customers' as CashierSection, label: 'Customers', icon: Users },
   { key: 'settings' as CashierSection, label: 'Settings', icon: Settings },
 ] as const;

@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { HelperText, TextInput } from 'react-native-paper';
 
-import { controlHeights, radius, spacing } from '../../constants/design-system';
+import { radius, spacing } from '../../constants/design-system';
 import { colors, textRoles, textSizes } from '../../constants/theme';
 
 type ProductFormInputProps = {
@@ -90,7 +90,7 @@ export function ProductFormInput({
 
 const styles = StyleSheet.create({
   fieldGroup: {
-    marginBottom: spacing.section - 2,
+    marginBottom: spacing.lg,
   },
   fieldGroupDense: {
     marginBottom: spacing.md,
@@ -98,8 +98,8 @@ const styles = StyleSheet.create({
   label: {
     color: colors.textHeading,
     ...textRoles.label,
-    fontSize: textSizes.body,
-    letterSpacing: 2.2,
+    fontSize: textSizes.small,
+    letterSpacing: 1.8,
     marginBottom: spacing.sm,
   },
   labelDense: {
@@ -109,11 +109,11 @@ const styles = StyleSheet.create({
   },
   inputShell: {
     backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    minHeight: controlHeights.input,
+    borderRadius: radius.lg,
+    minHeight: 50,
   },
   inputShellCompact: {
-    minHeight: controlHeights.inputCompact,
+    minHeight: 46,
   },
   inputShellDense: {
     borderRadius: radius.lg,
@@ -123,10 +123,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   inputShellMultiline: {
-    minHeight: controlHeights.inputMultiline,
+    minHeight: 82,
   },
   inputShellMultilineCompact: {
-    minHeight: controlHeights.inputMultilineCompact,
+    minHeight: 78,
   },
   inputShellMultilineDense: {
     minHeight: 78,
@@ -134,19 +134,19 @@ const styles = StyleSheet.create({
   input: {
     color: colors.textStrong,
     ...textRoles.body,
-    fontSize: textSizes.medium,
+    fontSize: textSizes.body,
   },
   inputCompact: {
-    fontSize: textSizes.bodyLarge,
+    fontSize: textSizes.body,
   },
   inputDense: {
     fontSize: textSizes.body,
   },
   inputMultiline: {
-    minHeight: 96,
+    minHeight: 78,
   },
   inputMultilineCompact: {
-    minHeight: 84,
+    minHeight: 74,
   },
   inputMultilineDense: {
     minHeight: 62,

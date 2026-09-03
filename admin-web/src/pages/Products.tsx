@@ -187,10 +187,10 @@ export function Products() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Link to="/categories" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Tags size={18} /> Categories
+            <Tags size={14} /> Categories
           </Link>
           <button className="btn btn-primary" onClick={openCreate}>
-            <PackagePlus size={18} /> Add Product
+            <PackagePlus size={14} /> Add Product
           </button>
         </div>
       </div>

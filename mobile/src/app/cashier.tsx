@@ -29,6 +29,7 @@ import { CashierCustomersSection } from '../components/cashier/cashier-customers
 import { CashierDashboardHeader } from '../components/cashier/cashier-dashboard-header';
 import { CashierHistorySection } from '../components/cashier/cashier-history-section';
 import { CashierInventorySection } from '../components/cashier/cashier-inventory-section';
+import { CashierExpensesSection } from '../components/cashier/cashier-expenses-section';
 import { CashierProductCard } from '../components/cashier/cashier-product-card';
 import { CashierSettingsSection } from '../components/cashier/cashier-settings-section';
 import { ShiftCloseModal } from '../components/cashier/shift-close-modal';
@@ -51,6 +52,7 @@ import { useRefreshHandler } from '../hooks/use-refresh-handler';
 import { clearAuthSession } from '../lib/auth-session';
 import { formatPaymentMethod } from '../lib/cashier-formatters';
 import { formatPeso, normalizeNumber } from '../lib/product-utils';
+import { barcodeExactMatches, barcodeSearchMatches, normalizeBarcode } from '../lib/barcode-utils';
 import { triggerHaptic } from '../lib/haptics';
 import { apiClient } from '../lib/api';
 import { AppToast } from '../components/ui/app-toast';
@@ -76,29 +78,6 @@ function formatReceiptDateTime(value: string) {
   });
 }
 
-function normalizeBarcode(value: string) {
-  return value.trim().replace(/[\s-]/g, '').toUpperCase();
-}
-
-function barcodeMatches(productBarcode: string | null | undefined, scannedBarcode: string) {
-  const stored = normalizeBarcode(productBarcode || '');
-  const scanned = normalizeBarcode(scannedBarcode);
-
-  if (!stored || !scanned) {
-    return false;
-  }
-
-  if (stored === scanned) {
-    return true;
-  }
-
-  if (stored.length === 12 && scanned === `0${stored}`) {
-    return true;
-  }
-
-  return scanned.length === 12 && stored === `0${scanned}`;
-}
-
 function filterProducts(
   products: Product[],
   selectedCategory: string,
@@ -114,7 +93,7 @@ function filterProducts(
       !normalizedQuery ||
       product.name.toLowerCase().includes(normalizedQuery) ||
       product.category.name.toLowerCase().includes(normalizedQuery) ||
-      (product.barcode || '').toLowerCase().includes(normalizedQuery);
+      barcodeSearchMatches(product.barcode, searchQuery);
 
     return matchesCategory && matchesQuery;
   });
@@ -144,7 +123,7 @@ export default function CashierScreen() {
   const { isRefreshing, onRefresh } = useRefreshHandler(refreshCashierWorkspace);
 
   useEffect(() => {
-    reloadWorkspace();
+    reloadWorkspace({ force: true });
   }, [reloadWorkspace]);
 
   useEffect(() => {
@@ -156,10 +135,7 @@ export default function CashierScreen() {
   }, []);
 
   // Shift states
-  const [showOpeningCashModal, setShowOpeningCashModal] = useState(false);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
-  const [openingCashInput, setOpeningCashInput] = useState('');
-  const [isSavingOpeningCash, setIsSavingOpeningCash] = useState(false);
   const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
 
   const [showVoidModal, setShowVoidModal] = useState(false);
@@ -174,7 +150,7 @@ export default function CashierScreen() {
     setIsVoiding(true);
     try {
       await apiClient.put(`/sales/${selectedSaleDetails.id}/void`, { reason: voidReason });
-      await reloadWorkspace();
+      await reloadWorkspace({ force: true });
       setShowVoidModal(false);
       setSelectedSaleDetails(null);
       setVoidReason('');
@@ -184,31 +160,6 @@ export default function CashierScreen() {
       console.error(e);
     } finally {
       setIsVoiding(false);
-    }
-  };
-
-  const handleUpdateOpeningCash = async () => {
-    const cleanInput = openingCashInput.replace(/,/g, '');
-    const amount = Number(cleanInput);
-    if (isNaN(amount) || amount < 0) {
-      setToast({ message: 'Please enter a valid positive number', type: 'error' });
-      return;
-    }
-
-    setIsSavingOpeningCash(true);
-    try {
-      await apiClient.put('/cashier/shift/opening-cash', {
-        openingCash: amount,
-      });
-      await reloadWorkspace();
-      setShowOpeningCashModal(false);
-      setOpeningCashInput('');
-      setToast({ message: 'Opening cash updated successfully', type: 'success' });
-    } catch (err) {
-      console.error('Failed to update opening cash:', err);
-      setToast({ message: 'Failed to update opening cash. Please try again.', type: 'error' });
-    } finally {
-      setIsSavingOpeningCash(false);
     }
   };
 
@@ -235,7 +186,29 @@ export default function CashierScreen() {
     return 'Cashier';
   }, [dashboard.cashier.name, dashboard.cashier.username]);
 
-  const { cart, addToCart, setShowCartModal, setShowCheckoutModal, handleCompleteSale, completedSale, setShowSuccessModal, updateCartQuantity, removeFromCart, toast, setToast, showCustomerModal, setShowCustomerModal, selectedCustomerId, selectedCustomerName, setCustomer } = useCashierStore();
+  const {
+    buyerMode,
+    cart,
+    addToCart,
+    setShowCartModal,
+    setShowCheckoutModal,
+    handleCompleteSale,
+    completedSale,
+    setShowSuccessModal,
+    updateCartQuantity,
+    removeFromCart,
+    toast,
+    setToast,
+    showCustomerModal,
+    setShowCustomerModal,
+    selectedCustomerId,
+    selectedCustomerName,
+    selectedRecipientCashierId,
+    selectedRecipientCashierName,
+    setBuyerMode,
+    setCustomer,
+    setRecipientCashier,
+  } = useCashierStore();
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartGrossSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartDiscountTotal = cart.reduce((sum, item) => {
@@ -266,6 +239,16 @@ export default function CashierScreen() {
   );
   const showInlineCart = isWideTablet;
   const registerSummaryText = dashboard.currentShift ? 'Shift Active' : 'No active shift';
+  const recipientCashiers = dashboard.internalRecipientCashiers ?? [];
+  const recipientCashierOptions = recipientCashiers.map((cashier) => cashier.name);
+  const selectedRecipientCashier = recipientCashiers.find(
+    (cashier) => cashier.id === selectedRecipientCashierId
+  );
+
+  function handleRecipientCashierChange(name: string) {
+    const recipient = recipientCashiers.find((cashier) => cashier.name === name);
+    setRecipientCashier(recipient?.id ?? null, recipient?.name ?? null);
+  }
 
   async function openProductScanner() {
     triggerHaptic('medium');
@@ -299,7 +282,7 @@ export default function CashierScreen() {
 
     const scannedBarcode = normalizeBarcode(result.data);
     const matchedProduct = products.find(
-      (product) => barcodeMatches(product.barcode, scannedBarcode)
+      (product) => barcodeExactMatches(product.barcode, scannedBarcode)
     );
 
     setScannerEnabled(false);
@@ -468,7 +451,27 @@ export default function CashierScreen() {
               )}
             </ScrollView>
 
-            <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            {dashboard.cashier.canSupplyCashiers ? (
+              <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.sm }}>
+                <Text style={{ fontSize: textSizes.small, color: colors.textSecondary, fontFamily: fonts.medium }}>BUYER</Text>
+                <AppSelect
+                  onValueChange={(value) => setBuyerMode(value === 'Cashier' ? 'cashier' : 'customer')}
+                  options={['Customer', 'Cashier']}
+                  value={buyerMode === 'cashier' ? 'Cashier' : 'Customer'}
+                />
+                {buyerMode === 'cashier' ? (
+                  <AppSelect
+                    onValueChange={handleRecipientCashierChange}
+                    options={recipientCashierOptions}
+                    placeholder="Choose cashier"
+                    value={selectedRecipientCashier?.name ?? selectedRecipientCashierName ?? ''}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
+            {buyerMode === 'customer' ? (
+              <View style={{ paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
                 <Text style={{ fontSize: textSizes.small, color: colors.textSecondary, fontFamily: fonts.medium }}>CUSTOMER</Text>
                 <Text style={{ fontFamily: fonts.bold, fontSize: textSizes.body, color: colors.text }}>
@@ -486,6 +489,7 @@ export default function CashierScreen() {
                 fullWidth={false}
               />
             </View>
+            ) : null}
 
             <View style={styles.cartSummary}>
               <View style={styles.summaryRow}>
@@ -571,14 +575,6 @@ export default function CashierScreen() {
               <CashierHistorySection
                 dashboard={dashboard}
                 isExportingDailyReport={isExportingDailyReport}
-                onEditOpeningCash={() => {
-                  setOpeningCashInput(
-                    dashboard.currentShift?.openingCash !== undefined
-                      ? String(dashboard.currentShift.openingCash)
-                      : ''
-                  );
-                  setShowOpeningCashModal(true);
-                }}
                 onExportDailyReport={handleExportDailyReport}
                 onSelectSale={(sale) => setSelectedSaleDetails(sale)}
               />
@@ -586,12 +582,20 @@ export default function CashierScreen() {
             {activeSection === 'customers' ? (
               <CashierCustomersSection />
             ) : null}
+            {activeSection === 'expenses' ? (
+              <CashierExpensesSection
+                dashboard={dashboard}
+                onSaved={() => reloadWorkspace({ force: true })}
+                onToast={(message, type) => setToast({ message, type })}
+              />
+            ) : null}
             {activeSection === 'settings' ? (
               <CashierSettingsSection
                 cashierName={cashierName}
                 onCloseShift={() => setShowCloseShiftModal(true)}
                 onLogout={() => {
                   void clearAuthSession().finally(() => {
+                    useCashierStore.getState().resetWorkspace();
                     router.replace('/');
                   });
                 }}
@@ -645,50 +649,10 @@ export default function CashierScreen() {
         onClose={() => setShowCloseShiftModal(false)}
         onSuccess={async () => {
           setShowCloseShiftModal(false);
-          await reloadWorkspace();
+          await reloadWorkspace({ force: true });
           router.replace('/cashier-shift');
         }}
       />
-      {/* Opening Cash Input Modal */}
-      <AdminModalShell
-        footer={
-          <ModalActions stacked={compactPhone}>
-            <AppButton
-              label="Cancel"
-              onPress={() => setShowOpeningCashModal(false)}
-              variant="secondary"
-            />
-            <AppButton
-              disabled={isSavingOpeningCash}
-              label={isSavingOpeningCash ? 'Saving...' : 'Save'}
-              onPress={handleUpdateOpeningCash}
-              variant="primary"
-            />
-          </ModalActions>
-        }
-        height={260}
-        onClose={() => setShowOpeningCashModal(false)}
-        title="Set Opening Cash"
-        visible={showOpeningCashModal}>
-        <ScrollView
-          contentContainerStyle={styles.modalFormScrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          style={styles.modalFormScroll}
-        >
-        <View style={styles.modalInputWrap}>
-          <Text style={styles.modalInputLabel}>Opening Cash Amount (₱)</Text>
-          <TextInput
-            style={styles.modalTextInput}
-            keyboardType="numeric"
-            placeholder="0.00"
-            value={openingCashInput}
-            onChangeText={setOpeningCashInput}
-          />
-        </View>
-        </ScrollView>
-      </AdminModalShell>
-
       <AdminModalShell
         footer={
           <AppButton
@@ -754,7 +718,7 @@ export default function CashierScreen() {
       />
 
       <CartModal />
-      <CheckoutModal onComplete={() => handleCompleteSale(cashierDisplayName, dashboard.currentShift?.id ?? null, async () => { setActiveSection('history'); await reloadWorkspace(); })} />
+      <CheckoutModal onComplete={() => handleCompleteSale(cashierDisplayName, dashboard.currentShift?.id ?? null, async () => { setActiveSection('history'); await reloadWorkspace({ force: true }); })} />
       <SuccessModal onNewSale={() => { setShowSuccessModal(false); setActiveSection('register'); }} onViewReceipt={() => { setShowSuccessModal(false); setSelectedSaleDetails(completedSale); }} />
 
       <AdminModalShell
@@ -807,7 +771,7 @@ export default function CashierScreen() {
                   try {
                     await apiClient.patch(`/sales/${selectedSaleDetails.id}/pay`);
                     setSelectedSaleDetails(null);
-                    await reloadWorkspace();
+                    await reloadWorkspace({ force: true });
                     setToast({ message: 'Payment completed successfully', type: 'success' });
                   } catch {
                     setToast({ message: 'Failed to complete payment', type: 'error' });
@@ -871,9 +835,13 @@ export default function CashierScreen() {
                 <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>{selectedSaleDetails.cashierName}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>Customer</Text>
+                <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary }}>
+                  {selectedSaleDetails.saleType === 'INTERNAL_CASHIER' ? 'Recipient Cashier' : 'Customer'}
+                </Text>
                 <Text style={{ fontFamily: fonts.regular, fontSize: 13, color: colors.textStrong }}>
-                  {selectedSaleDetails.customerName ?? selectedSaleDetails.customer?.name ?? 'Walk-in'}
+                  {selectedSaleDetails.saleType === 'INTERNAL_CASHIER'
+                    ? selectedSaleDetails.recipientCashierName ?? selectedSaleDetails.recipientUser?.name ?? 'Cashier'
+                    : selectedSaleDetails.customerName ?? selectedSaleDetails.customer?.name ?? 'Walk-in'}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

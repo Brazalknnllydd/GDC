@@ -143,7 +143,13 @@ export function useReportsAnalytics({
   sales,
 }: UseReportsAnalyticsParams) {
   const filteredSales = useMemo(
-    () => sales.filter((sale) => isWithinMonthRange(sale.createdAt, reportMonthRange)),
+    () =>
+      sales.filter(
+        (sale) =>
+          sale.status !== 'voided' &&
+          (sale.saleType ?? 'CUSTOMER') === 'CUSTOMER' &&
+          isWithinMonthRange(sale.createdAt, reportMonthRange)
+      ),
     [reportMonthRange, sales]
   );
 
@@ -222,7 +228,7 @@ export function useReportsAnalytics({
   const categoryPerformance = useMemo(() => {
     // Build a map from productId → category name for quick lookup
     const idToCategory = new Map<number, string>(
-      (products as Array<{ id?: number; category: { name: string } }>)
+      (products as { id?: number; category: { name: string } }[])
         .filter((p) => p.id !== undefined)
         .map((p) => [p.id as number, p.category.name])
     );

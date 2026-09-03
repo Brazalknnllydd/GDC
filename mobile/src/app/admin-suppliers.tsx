@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Plus, PencilLine, Trash2, Truck } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -12,6 +12,7 @@ import { AppSelect } from '../components/ui/app-select';
 import { ModalActions } from '../components/ui/modal-actions';
 import { ProductFormInput } from '../components/ui/product-form-input';
 import { SurfaceCard } from '../components/ui/surface-card';
+import { ActionIconButton } from '../components/ui/action-icon-button';
 import { colors, fonts, textRoles, textSizes } from '../constants/theme';
 import { radius, spacing } from '../constants/design-system';
 import { useRefreshHandler } from '../hooks/use-refresh-handler';
@@ -618,13 +619,11 @@ export default function AdminSuppliersScreen() {
                 <AppDataTableCell flex={1} text={supplier.phone || '-'} />
                 <AppDataTableCell flex={2} text={supplier.notes || '-'} />
                 <AppDataTableCell flex={0.7} numeric>
-                  <Pressable
+                  <ActionIconButton
                     accessibilityLabel={`Edit supplier ${supplier.name}`}
+                    icon={PencilLine}
                     onPress={() => openSupplierModal(supplier)}
-                    style={styles.iconButton}
-                  >
-                    <PencilLine color={colors.secondary} size={15} strokeWidth={2.1} />
-                  </Pressable>
+                  />
                 </AppDataTableCell>
               </AppDataTableRow>
             ))
@@ -654,13 +653,11 @@ export default function AdminSuppliersScreen() {
                 <AppDataTableCell flex={2.2} text={getPurchaseItemSummary(purchase)} />
                 <AppDataTableCell flex={1} numeric text={formatPeso(normalizeNumber(purchase.totalAmount))} />
                 <AppDataTableCell flex={0.7} numeric>
-                  <Pressable
+                  <ActionIconButton
                     accessibilityLabel={`Edit supplier purchase ${purchase.id}`}
+                    icon={PencilLine}
                     onPress={() => openPurchaseModal(purchase)}
-                    style={styles.iconButton}
-                  >
-                    <PencilLine color={colors.secondary} size={15} strokeWidth={2.1} />
-                  </Pressable>
+                  />
                 </AppDataTableCell>
               </AppDataTableRow>
             ))
@@ -689,8 +686,8 @@ export default function AdminSuppliersScreen() {
             />
           </ModalActions>
         }
-        height={isTablet ? 520 : 500}
-        maxHeight={isTablet ? '76%' : '82%'}
+        height={isTablet ? 460 : 430}
+        maxHeight={isTablet ? '70%' : '76%'}
         onClose={closeSupplierModal}
         title={editingSupplier ? 'Edit Supplier' : 'Add Supplier'}
         visible={supplierModalVisible}
@@ -745,8 +742,8 @@ export default function AdminSuppliersScreen() {
             />
           </ModalActions>
         }
-        height="88%"
-        maxHeight="92%"
+        height="82%"
+        maxHeight="86%"
         onClose={closePurchaseModal}
         title={editingPurchase ? 'Edit Supplier Purchase' : 'Receive Supplier Purchase'}
         visible={purchaseModalVisible}
@@ -842,9 +839,11 @@ export default function AdminSuppliersScreen() {
                 <View style={styles.lineHeader}>
                   <Text style={styles.lineTitle}>Item {index + 1}</Text>
                   {purchaseForm.items.length > 1 ? (
-                    <Pressable onPress={() => removePurchaseLine(index)} style={styles.removeLineButton}>
-                      <Trash2 color={colors.dangerStrong} size={15} strokeWidth={2.1} />
-                    </Pressable>
+                    <ActionIconButton
+                      accessibilityLabel={`Remove purchase item ${index + 1}`}
+                      icon={Trash2}
+                      onPress={() => removePurchaseLine(index)}
+                    />
                   ) : null}
                 </View>
 
@@ -1009,16 +1008,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  iconButton: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceInfoMuted,
-    borderColor: colors.borderInfoStrong,
-    borderRadius: radius.round,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
   emptyText: {
     color: colors.textSecondary,
     fontFamily: fonts.regular,
@@ -1090,12 +1079,6 @@ const styles = StyleSheet.create({
     color: colors.textStrong,
     fontFamily: fonts.semiBold,
     fontSize: textSizes.bodyLarge,
-  },
-  removeLineButton: {
-    alignItems: 'center',
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
   },
   lineGrid: {
     flexDirection: 'row',

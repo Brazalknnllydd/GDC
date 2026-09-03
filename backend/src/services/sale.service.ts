@@ -1,4 +1,12 @@
 import { prisma } from "../lib/prisma.js";
+import {
+  decrementCashierInventory,
+  getCashierProductPrice,
+  getCashierProductQuantity,
+  incrementCashierInventory,
+  isRecipientCashier,
+  isSupplierCashier,
+} from "./cashier-inventory.service.js";
 
 const allowedPaymentMethods = new Set(["Cash", "GCash", "Utang"]);
 
@@ -24,10 +32,24 @@ export type CreateSaleInput = {
   notes?: string | null;
   isPrinted?: boolean;
   customerId?: number | null;
+  recipientUserId?: number | null;
+  saleType?: string;
   userId: number;
   shiftId?: number | null;
   items: SaleItemInput[];
 };
+
+type SaleItemRow = SaleItemInput & {
+  sourceCashierId?: number | null;
+};
+
+function splitSubtotal(subtotal: number, quantity: number, consumedQuantity: number, isLast: boolean, usedSubtotal: number) {
+  if (isLast) {
+    return subtotal - usedSubtotal;
+  }
+
+  return Number(((subtotal * consumedQuantity) / quantity).toFixed(2));
+}
 
 export function isValidSaleItem(item: unknown): item is SaleItemInput {
   if (!item || typeof item !== "object") {
@@ -59,6 +81,8 @@ export async function createSaleWithInventoryUpdate({
   notes,
   isPrinted = false,
   customerId,
+  recipientUserId,
+  saleType = "CUSTOMER",
   userId,
   shiftId,
   items,
@@ -70,6 +94,8 @@ export async function createSaleWithInventoryUpdate({
       throw new Error("Payment method must be Cash, GCash, or Utang");
     }
 
+    const normalizedSaleType = saleType === "INTERNAL_CASHIER" ? "INTERNAL_CASHIER" : "CUSTOMER";
+
     const user = await tx.user.findUnique({
       where: { id: userId },
       include: {
@@ -80,6 +106,41 @@ export async function createSaleWithInventoryUpdate({
 
     if (!user) {
       throw new Error("User not found");
+    }
+
+    const isCashierSale = user.role.name === "Cashier";
+
+    let recipientUser: { id: number; name: string; username: string } | null = null;
+
+    if (normalizedSaleType === "INTERNAL_CASHIER") {
+      if (!isCashierSale || !isSupplierCashier(user.username)) {
+        throw new Error("Only Cashier A and Cashier B can sell to cashier inventory");
+      }
+
+      if (normalizedPaymentMethod !== "Cash") {
+        throw new Error("Cashier inventory sales must use Cash payment");
+      }
+
+      if (typeof recipientUserId !== "number") {
+        throw new Error("Recipient cashier is required");
+      }
+
+      recipientUser = await tx.user.findUnique({
+        where: { id: recipientUserId },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+        },
+      });
+
+      if (!recipientUser || !isRecipientCashier(recipientUser.username)) {
+        throw new Error("Recipient must be Cashier C or Cashier D");
+      }
+
+      if (recipientUser.id === user.id) {
+        throw new Error("Recipient cashier must be different from seller");
+      }
     }
 
     const restrictedCategoryIds = new Set(
@@ -131,15 +192,29 @@ export async function createSaleWithInventoryUpdate({
       }
 
       if (
-        user.role.name === "Cashier" &&
+        isCashierSale &&
         restrictedCategoryIds.size > 0 &&
         !restrictedCategoryIds.has(product.categoryId)
       ) {
         throw new Error(`Cashier cannot sell ${product.name} from this category`);
       }
 
-      if (product.stock < item.quantity) {
+      const availableStock = isCashierSale
+        ? await getCashierProductQuantity(tx, user.id, item.productId)
+        : product.stock;
+
+      if (availableStock < item.quantity) {
         throw new Error(`Insufficient stock for ${product.name}`);
+      }
+
+      if (isCashierSale) {
+        const overridePrice = await getCashierProductPrice(tx, user.id, item.productId);
+        const expectedPrice = Number(overridePrice ?? product.price);
+        const receivedPrice = Number(item.price);
+
+        if (Math.round(receivedPrice * 100) !== Math.round(expectedPrice * 100)) {
+          throw new Error(`Price has changed for ${product.name}. Please refresh and try again.`);
+        }
       }
     }
 
@@ -154,28 +229,67 @@ export async function createSaleWithInventoryUpdate({
         changeAmount,
         paymentMethod: normalizedPaymentMethod,
         paymentReference: paymentReference ?? null,
+        saleType: normalizedSaleType,
+        recipientUserId: normalizedSaleType === "INTERNAL_CASHIER" ? recipientUser!.id : null,
         status,
         approvedByUserId: typeof approvedByUserId === "number" ? approvedByUserId : null,
         notes: notes ?? null,
         isPrinted,
-        customerId: typeof customerId === "number" ? customerId : null,
+        customerId: normalizedSaleType === "CUSTOMER" && typeof customerId === "number" ? customerId : null,
         userId,
         shiftId: typeof shiftId === "number" ? shiftId : null,
       },
     });
 
-    await tx.saleItem.createMany({
-      data: items.map((item) => ({
-        saleId: createdSale.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.subtotal,
-      })),
-    });
+    const saleItemRows: SaleItemRow[] = [];
 
     for (const item of items) {
       const product = products.find((entry) => entry.id === item.productId);
+
+      if (isCashierSale) {
+        const consumedRows = await decrementCashierInventory(
+          tx,
+          user.id,
+          item.productId,
+          item.quantity
+        );
+
+        if (normalizedSaleType === "INTERNAL_CASHIER") {
+          await incrementCashierInventory(
+            tx,
+            recipientUser!.id,
+            item.productId,
+            user.id,
+            item.quantity
+          );
+
+          saleItemRows.push({
+            ...item,
+            sourceCashierId: user.id,
+          });
+          continue;
+        }
+
+        let usedSubtotal = 0;
+        consumedRows.forEach((consumedRow, index) => {
+          const subtotalPart = splitSubtotal(
+            item.subtotal,
+            item.quantity,
+            consumedRow.quantity,
+            index === consumedRows.length - 1,
+            usedSubtotal
+          );
+          usedSubtotal += subtotalPart;
+          saleItemRows.push({
+            ...item,
+            quantity: consumedRow.quantity,
+            subtotal: subtotalPart,
+            sourceCashierId: consumedRow.sourceCashierId,
+          });
+        });
+      } else {
+        saleItemRows.push(item);
+      }
 
       await tx.product.update({
         where: { id: item.productId },
@@ -195,6 +309,17 @@ export async function createSaleWithInventoryUpdate({
         },
       });
     }
+
+    await tx.saleItem.createMany({
+      data: saleItemRows.map((item) => ({
+        saleId: createdSale.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+        sourceCashierId: item.sourceCashierId ?? null,
+        subtotal: item.subtotal,
+      })),
+    });
 
     return tx.sale.findUnique({
       where: { id: createdSale.id },
@@ -221,6 +346,13 @@ export async function createSaleWithInventoryUpdate({
           },
         },
         shift: true,
+        recipientUser: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -237,7 +369,16 @@ export async function voidSale(saleId: number, userId: number, reason: string) {
   return prisma.$transaction(async (tx) => {
     const sale = await tx.sale.findUnique({
       where: { id: saleId },
-      include: { items: true },
+      include: {
+        items: true,
+        user: {
+          select: {
+            id: true,
+            role: true,
+            username: true,
+          },
+        },
+      },
     });
 
     if (!sale) {
@@ -261,6 +402,40 @@ export async function voidSale(saleId: number, userId: number, reason: string) {
 
     for (const item of sale.items) {
       if (!item.productId) continue;
+
+      if (sale.saleType === "INTERNAL_CASHIER") {
+        if (!sale.recipientUserId) {
+          throw new Error("Internal sale recipient is missing");
+        }
+
+        await decrementCashierInventory(
+          tx,
+          sale.recipientUserId,
+          item.productId,
+          item.quantity,
+          sale.userId
+        );
+
+        await incrementCashierInventory(
+          tx,
+          sale.userId,
+          item.productId,
+          sale.userId,
+          item.quantity
+        );
+
+        continue;
+      }
+
+      if (sale.user.role.name === "Cashier") {
+        await incrementCashierInventory(
+          tx,
+          sale.userId,
+          item.productId,
+          item.sourceCashierId ?? sale.userId,
+          item.quantity
+        );
+      }
       
       await tx.product.update({
         where: { id: item.productId },
